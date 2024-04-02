@@ -1,5 +1,6 @@
 use crate::binary_format::sections;
 use crate::binary_format::sections::{TypeSection, FunctionSection, ExportSection, ImportSection, CodeSection};
+use crate::binary_format::instructions;
 use crate::base::{
     indices::{TypeIndex, LocalIndex, GlobalIndex, LabelIndex, FunctionIndex},
     types::{FunctionType, ValueType, BlockType, NumType},
@@ -55,14 +56,16 @@ struct TypedFunctionImport {
 
 
 enum Expression {
+    Seq(Vec<Expression>),
+
     Unreachable,
     Nop,
 
     // ===Control Instructions===
     Block { type_: BlockType, body: Box<Expression> },
     Loop { type_: BlockType, body: Box<Expression> },
-    IfThen { type_: BlockType, then_body: Box<Expression> },
-    IfThenElse { type_: BlockType, then_body: Box<Expression>, else_body: Box<Expression> },
+    IfThen { type_: BlockType, test: Box<Expression>, then_body: Box<Expression> },
+    IfThenElse { type_: BlockType, test: Box<Expression>, then_body: Box<Expression>, else_body: Box<Expression> },
     Br(LabelIndex),
     Call(FunctionIndex, Vec<Expression>),
     Return(Box<Expression>),
@@ -155,19 +158,19 @@ enum Signedness {
 }
 
 enum Rel1 {
-    Int(Size, IntRel1),
+    Int(Size, IntegerRel1),
 }
 
 enum Rel2 {
-    Int(Size, IntRel2),
+    Int(Size, IntegerRel2),
     Float(Size, FloatRel2),
 }
 
-enum IntRel1 {
+enum IntegerRel1 {
     Eqz,
 }
 
-enum IntRel2 {
+enum IntegerRel2 {
     Eq,
     Ne,
     Lt(Signedness),
@@ -276,61 +279,74 @@ impl Function {
 impl Expression {
     pub fn binary_format(self) -> sections::Expression {
 
-        fn binary_format_instructions(expr: Expression, instructions: &mut Vec<sections::Instruction>)  {
+        fn binary_format_instructions(expr: Expression, instructions: &mut Vec<instructions::Instruction>)  {
             match expr {
-                Expression::Unreachable => instructions.push(sections::Instruction::Unreachable),
-                Expression::Nop => instructions.push(sections::Instruction::Nop),
+                Expression::Seq(expressions) => {
+                    for expr in expressions {
+                        binary_format_instructions(expr, instructions);
+                    }
+                },
+
+                Expression::Unreachable => instructions.push(instructions::Instruction::Unreachable),
+                Expression::Nop => instructions.push(instructions::Instruction::Nop),
 
                 // ===Control Instructions===
                 Expression::Block { type_, body } => {
                     let mut body_instructions = vec![];
                     binary_format_instructions(*body, &mut body_instructions);
-                    instructions.push(sections::Instruction::Block(type_, body_instructions))
+                    instructions.push(instructions::Instruction::Block(type_, body_instructions))
                 },
                 Expression::Loop { type_, body } => {
                     let mut body_instructions = vec![];
                     binary_format_instructions(*body, &mut body_instructions);
-                    instructions.push(sections::Instruction::Loop(type_, body_instructions))
+                    instructions.push(instructions::Instruction::Loop(type_, body_instructions))
                 },
-                Expression::IfThen { type_, then_body } => {
+                Expression::IfThen { type_, test, then_body } => {
+                    binary_format_instructions(*test, instructions);
                     let mut then_body_instructions = vec![];
                     binary_format_instructions(*then_body, &mut then_body_instructions);
-                    instructions.push(sections::Instruction::IfThen(type_, then_body_instructions))
+
+                    instructions.push(instructions::Instruction::IfThen(type_, then_body_instructions))
                 },
-                Expression::IfThenElse { type_, then_body, else_body } => {
+                Expression::IfThenElse { type_, test, then_body, else_body } => {
+                    binary_format_instructions(*test, instructions);
+
                     let mut then_body_instructions = vec![];
                     binary_format_instructions(*then_body, &mut then_body_instructions);
 
                     let mut else_body_instructions = vec![];
                     binary_format_instructions(*else_body, &mut else_body_instructions);
 
-                    instructions.push(sections::Instruction::IfThenElse(type_, then_body_instructions, else_body_instructions))
+                    instructions.push(instructions::Instruction::IfThenElse(type_, then_body_instructions, else_body_instructions))
                 },
-                // Expression::Br(index) => instructions.push(sections::Instruction::Br(index)),
+                Expression::Br(index) => instructions.push(instructions::Instruction::Br(index)),
                 Expression::Call(index, args) => {
                     for arg in args {
                         binary_format_instructions(arg, instructions);
                     }
-                    instructions.push(sections::Instruction::Call(index))
+                    instructions.push(instructions::Instruction::Call(index))
                 },
-                Expression::Return(expr) => todo!(),
+                Expression::Return(expr) => {
+                    binary_format_instructions(*expr, instructions);
+                    instructions.push(instructions::Instruction::Return)
+                },
 
                 // ===Variable Instructions====
-                Expression::LocalGet(index) => instructions.push(sections::Instruction::LocalGet(index)),
-                Expression::LocalSet(index, arg) => {
-                    binary_format_instructions(*arg, instructions);
-                    instructions.push(sections::Instruction::LocalSet(index))
+                Expression::LocalGet(index) => instructions.push(instructions::Instruction::LocalGet(index)),
+                Expression::LocalSet(var, value) => {
+                    binary_format_instructions(*value, instructions);
+                    instructions.push(instructions::Instruction::LocalSet(var));
                 },
-                Expression::LocalTee(index) => instructions.push(sections::Instruction::LocalTee(index)),
-                Expression::GlobalGet(index) => instructions.push(sections::Instruction::GlobalGet(index)),
-                Expression::GlobalSet(index, arg) => {
-                    binary_format_instructions(*arg, instructions);
-                    instructions.push(sections::Instruction::GlobalSet(index))
+                Expression::LocalTee(index) => instructions.push(instructions::Instruction::LocalTee(index)),
+                Expression::GlobalGet(index) => instructions.push(instructions::Instruction::GlobalGet(index)),
+                Expression::GlobalSet(var, value) => {
+                    binary_format_instructions(*value, instructions);
+                    instructions.push(instructions::Instruction::GlobalSet(var));
                 },
 
                 // ===Numeric Instructions===
-                Expression::Op0(Op0::Const(NumberLiteral::I32(x))) => instructions.push(sections::Instruction::I32Const(x)),
-                Expression::Op0(Op0::Const(NumberLiteral::I64(x))) => instructions.push(sections::Instruction::I64Const(x)),
+                Expression::Op0(Op0::Const(NumberLiteral::I32(x))) => instructions.push(instructions::Instruction::I32Const(x)),
+                Expression::Op0(Op0::Const(NumberLiteral::I64(x))) => instructions.push(instructions::Instruction::I64Const(x)),
                 Expression::Op0(Op0::Const(_)) => todo!(),
 
                 Expression::Op1(op1, arg) => {
@@ -351,9 +367,22 @@ impl Expression {
                     
                     match op2 {
                         Op2::Int(Size::X32, int_op) => match int_op {
-                            IntegerOp2::Add => instructions.push(sections::Instruction::I32Add),
-                            IntegerOp2::Sub => instructions.push(sections::Instruction::I32Sub),
-                            IntegerOp2::Mul => instructions.push(sections::Instruction::I32Mul),
+                            IntegerOp2::Add => instructions.push(instructions::Instruction::I32Add),
+                            IntegerOp2::Sub => instructions.push(instructions::Instruction::I32Sub),
+                            IntegerOp2::Mul => instructions.push(instructions::Instruction::I32Mul),
+                            _ => todo!(),
+                        },
+                        _ => todo!(),
+                    }
+                },
+
+                Expression::Rel2(rel2, arg0, arg1) => {
+                    binary_format_instructions(*arg0, instructions);
+                    binary_format_instructions(*arg1, instructions);
+
+                    match rel2 {
+                        Rel2::Int(Size::X32, int_rel) => match int_rel {
+                            IntegerRel2::Eq => instructions.push(instructions::Instruction::I32Eq),
                             _ => todo!(),
                         },
                         _ => todo!(),
@@ -371,6 +400,18 @@ impl Expression {
 }
 
 // ===Helpers===
+fn seq(expressions: Vec<Expression>) -> Expression {
+    Expression::Seq(expressions)
+}
+
+fn typed_loop(type_: ValueType, body: Expression) -> Expression {
+    Expression::Loop { type_: BlockType::ValueType(type_), body: Box::new(body) }
+}
+
+fn typed_if_then_else(type_: ValueType, test: Expression, then_body: Expression, else_body: Expression) -> Expression {
+    Expression::IfThenElse { type_: BlockType::ValueType(type_), test: Box::new(test), then_body: Box::new(then_body), else_body: Box::new(else_body) }
+}
+
 fn i32_const(x: i32) -> Expression {
     Expression::Op0(Op0::Const(NumberLiteral::I32(x)))
 }
@@ -383,8 +424,24 @@ fn i32_mul(e0: Expression, e1: Expression) -> Expression {
     Expression::Op2(Op2::Int(Size::X32, IntegerOp2::Mul), Box::new(e0), Box::new(e1))
 }
 
+fn i32_sub(e0: Expression, e1: Expression) -> Expression {
+    Expression::Op2(Op2::Int(Size::X32, IntegerOp2::Sub), Box::new(e0), Box::new(e1))
+}
+
+fn i32_eq(e0: Expression, e1: Expression) -> Expression {
+    Expression::Rel2(Rel2::Int(Size::X32, IntegerRel2::Eq), Box::new(e0), Box::new(e1))
+}
+
 fn local_get(i: u32) -> Expression {
     Expression::LocalGet(LocalIndex(i))
+}
+
+fn local_set(i: u32, value: Expression) -> Expression {
+    Expression::LocalSet(LocalIndex(i), Box::new(value))
+}
+
+fn branch(i: u32) -> Expression {
+    Expression::Br(LabelIndex(i))
 }
 
 fn call(fn_index: FunctionIndex, args: Vec<Expression>) -> Expression {
@@ -475,6 +532,50 @@ pub fn example2() -> Module {
         body: call(log, vec![i32_const(512)]),
     });
     module.add_export(Export { name: "log_pyth".to_string(), export_description: ExportDescription::Function(log_pyth) });
+
+    module
+}
+
+pub fn example_factorial() -> Module {
+    let mut module = Module::empty();
+
+    // (func $fct (param $x i32) (result i32)
+    //   (local $state i32)
+    //
+    //   (local.set $state (i32.const 1))
+    //   (loop $loop (result i32)
+    //     (if (result i32)
+    //       (i32.eq (local.get $x) (i32.const 0))
+    //       (then
+    //         (local.get $state)
+    //       )
+    //       (else
+    //         (local.set $state (i32.mul (local.get $state) (local.get $x)))
+    //         (local.set $state (i32.sub (local.get $x) (i32.const 1)))
+    //         (br $loop)
+    //       )
+    //   )
+    // )
+    let fct = module.add_typed_function(TypedFunction {
+        type_: fn_type(vec![TYPE_I32], vec![TYPE_I32]),
+        locals: vec![TYPE_I32],
+        body: seq(vec![
+            local_set(1, i32_const(1)),
+            typed_loop(TYPE_I32,
+                typed_if_then_else(TYPE_I32,
+                    i32_eq(local_get(0), i32_const(0)),
+
+                    local_get(1),
+                    seq(vec![
+                        local_set(1, i32_mul(local_get(1), local_get(0))),
+                        local_set(0, i32_sub(local_get(0), i32_const(1))),
+                        branch(1),
+                    ]),
+                )
+            )
+        ]),
+    });
+    module.add_export(Export { name: "fct".to_string(), export_description: ExportDescription::Function(fct) });
 
     module
 }

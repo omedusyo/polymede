@@ -17,8 +17,9 @@ use crate::binary_format::sections::{
     CodeSection,
     DataSection, DataItem,
     DataCountSection,
-    Expression, Code, LocalDeclaration, Instruction
+    Expression, Code, LocalDeclaration
 };
+use crate::binary_format::instructions::Instruction;
 use crate::base::{
     memory::Limit,
     export::{Export, ExportDescription},
@@ -118,9 +119,15 @@ pub fn generate0() -> Vec<u8> {
 
 pub fn generate1() -> Vec<u8> {
     let module = syntax::example2();
-
     let mut bytes = module.binary_format().emit();
+    let bytes = bytes.to_vec();
 
+    bytes
+}
+
+pub fn generate_factorial() -> Vec<u8> {
+    let module = syntax::example_factorial();
+    let mut bytes = module.binary_format().emit();
     let bytes = bytes.to_vec();
 
     bytes

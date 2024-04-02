@@ -9,7 +9,8 @@ type Result<A> = std::result::Result<A, io::Error>;
 
 fn main() -> Result<()> {
     // let bytes = wasm::generate0();
-    let bytes = wasm::generate1();
+    // let bytes = wasm::generate1();
+    let bytes = wasm::generate_factorial();
 
     let mut file = fs::OpenOptions::new()
         .create(true) // To create a new file
