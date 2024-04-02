@@ -1,12 +1,8 @@
-use crate::encoder::Encoder;
-use crate::byte_stream::{string, UTF8, ByteStream, byte, Byte, Seq};
+use crate::binary_format::primitives::encoder::Encoder;
+use crate::binary_format::primitives::byte_stream::{string, UTF8, ByteStream, byte, Byte, Seq};
+use crate::binary_format::indices::IndexStream;
 
-use crate::indices::{GlobalIndex, FunctionIndex, MemoryIndex, IndexStream};
-
-pub struct Export {
-    pub name: String,
-    pub export_description: ExportDescription,
-}
+use crate::base::export::{Export, ExportDescription};
 
 impl Encoder for Export {
     type S = Seq<UTF8, <ExportDescription as Encoder>::S>;
@@ -14,12 +10,6 @@ impl Encoder for Export {
     fn emit(&self) -> Self::S {
         string(&self.name).seq(self.export_description.emit())
     }
-}
-
-pub enum ExportDescription {
-    Function(FunctionIndex),
-    Memory(MemoryIndex),
-    Global(GlobalIndex),
 }
 
 impl ExportDescription {

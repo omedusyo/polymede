@@ -1,12 +1,7 @@
-use crate::encoder::Encoder;
+use crate::binary_format::primitives::encoder::Encoder;
+use crate::binary_format::primitives::byte_stream::{ByteStream, byte, Byte, Seq, U32ToFixed40LEB128, Response};
 
-use crate::byte_stream::{ByteStream, byte, Byte, Seq, U32ToFixed40LEB128, Response};
-
-// ==Limits==
-pub enum Limit {
-    MinToInfinity { min: u32 },
-    MinMax { min: u32, max: u32 },
-}
+use crate::base::memory::Limit;
 
 pub enum LimitsStream {
     MinToInfinity(Seq<Byte, U32ToFixed40LEB128>),

@@ -1,11 +1,14 @@
-use crate::byte_stream::{ByteStream, Response, Enclose, EVec, evector, bytes4, byte, Byte, Bytes4, CVec, cvector, Seq, U32ToFixed40LEB128, I32ToSignedLEB128, I64ToSignedLEB128};
-use crate::encoder::Encoder;
+use crate::binary_format::primitives::byte_stream::{ByteStream, Response, Enclose, EVec, evector, bytes4, byte, Byte, Bytes4, CVec, cvector, Seq, U32ToFixed40LEB128, I32ToSignedLEB128, I64ToSignedLEB128};
+use crate::binary_format::primitives::encoder::Encoder;
+use crate::binary_format::indices::IndexStream;
 
-use crate::types::{FunctionType, BlockType, ValueType, GlobalType};
-use crate::indices::{TypeIndex, LocalIndex, GlobalIndex, FunctionIndex, LabelIndex, IndexStream, Index};
-use crate::memory::Limit;
-use crate::export::Export;
-use crate::import::Import;
+use crate::base::{
+    types::{FunctionType, BlockType, ValueType, GlobalType},
+    indices::{TypeIndex, LocalIndex, GlobalIndex, FunctionIndex, LabelIndex, Index},
+    memory::Limit,
+    export::Export,
+    import::Import,
+};
 
 // ===Instructions===
 
@@ -680,7 +683,7 @@ impl Encoder for Module {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{ValueType, NumType};
+    use crate::base::types::{ValueType, NumType};
 
     #[test]
     fn empty_module() {

@@ -1,19 +1,11 @@
-mod byte_stream;
-mod encoder;
-
-mod sections;
-mod export;
-mod import;
-mod indices;
-mod memory;
-mod types;
-
+mod base;
+mod binary_format;
 mod syntax;
 
-use crate::encoder::Encoder;
-use crate::byte_stream::ByteStream;
+use crate::binary_format::primitives::encoder::Encoder;
+use crate::binary_format::primitives::byte_stream::ByteStream;
 
-use crate::sections::{
+use crate::binary_format::sections::{
     Module,
     TypeSection,
     ImportSection,
@@ -27,11 +19,13 @@ use crate::sections::{
     DataCountSection,
     Expression, Code, LocalDeclaration, Instruction
 };
-use crate::memory::Limit;
-use crate::export::{Export, ExportDescription};
-use crate::import::{Import, ImportDescription};
-use crate::indices::{TypeIndex, LocalIndex, GlobalIndex, FunctionIndex};
-use crate::types::{NumType, ValueType, FunctionType, BlockType, GlobalType, Mutability};
+use crate::base::{
+    memory::Limit,
+    export::{Export, ExportDescription},
+    import::{Import, ImportDescription},
+    indices::{TypeIndex, LocalIndex, GlobalIndex, FunctionIndex},
+    types::{NumType, ValueType, FunctionType, BlockType, GlobalType, Mutability},
+};
 use NumType::*;
 
 

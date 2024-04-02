@@ -1,6 +1,3 @@
-use crate::byte_stream::U32ToFixed40LEB128;
-use crate::encoder::Encoder;
-
 #[derive(Debug, Copy, Clone)]
 pub struct LocalIndex(pub u32);
 #[derive(Debug, Copy, Clone)]
@@ -19,13 +16,6 @@ pub struct DataIndex(pub u32);
 
 pub trait Index {
     fn get(&self) -> u32;
-}
-
-pub type IndexStream = U32ToFixed40LEB128;
-
-impl <I: Index> Encoder for I {
-    type S = IndexStream;
-    fn emit(&self) -> Self::S { U32ToFixed40LEB128::new(self.get()) }
 }
 
 impl Index for LocalIndex {

@@ -1,9 +1,11 @@
-use crate::sections;
-use crate::sections::{TypeSection, FunctionSection, ExportSection, ImportSection, CodeSection};
-use crate::indices::{TypeIndex, LocalIndex, GlobalIndex, LabelIndex, FunctionIndex};
-use crate::types::{FunctionType, ValueType, BlockType, NumType};
-use crate::export::{Export, ExportDescription};
-use crate::import::{Import, ImportDescription};
+use crate::binary_format::sections;
+use crate::binary_format::sections::{TypeSection, FunctionSection, ExportSection, ImportSection, CodeSection};
+use crate::base::{
+    indices::{TypeIndex, LocalIndex, GlobalIndex, LabelIndex, FunctionIndex},
+    types::{FunctionType, ValueType, BlockType, NumType},
+    export::{Export, ExportDescription},
+    import::{Import, ImportDescription},
+};
 
 pub struct Module {
     function_types: Vec<FunctionType>,

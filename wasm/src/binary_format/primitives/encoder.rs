@@ -1,4 +1,4 @@
-use crate::byte_stream::ByteStream;
+use crate::binary_format::primitives::byte_stream::ByteStream;
 
 pub trait Encoder {
     type S: ByteStream;

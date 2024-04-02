@@ -1,13 +1,10 @@
-use crate::byte_stream::{ByteStream, byte, Byte, CVec, cvector, Either, Seq};
-use crate::encoder::Encoder;
+use crate::binary_format::primitives::encoder::Encoder;
+use crate::binary_format::primitives::byte_stream::{ByteStream, byte, Byte, CVec, cvector, Either, Seq};
 
-use crate::indices::TypeIndex;
-
-// ===Types===
-pub struct FunctionType {
-    pub domain: Vec<ValueType>,
-    pub codomain: Vec<ValueType>,
-}
+use crate::base::{
+    indices::TypeIndex,
+    types::{FunctionType, BlockType, ValueType, NumType, VecType, RefType, Mutability, GlobalType},
+};
 
 impl Encoder for FunctionType {
     type S = Seq<Byte, Seq<CVec<Byte>, CVec<Byte>>>;
@@ -19,12 +16,6 @@ impl Encoder for FunctionType {
         let codomain_types: CVec<Byte> = cvector(self.codomain.iter().map(|t| t.emit()).collect());
         result_bytes.seq(domain_types.seq(codomain_types))
     }
-}
-
-pub enum BlockType {
-    EmptyType,
-    ValueType(ValueType),
-    TypeIndex(TypeIndex),
 }
 
 impl BlockType {
@@ -44,13 +35,6 @@ impl Encoder for BlockType {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum ValueType {
-    NumType(NumType),
-    VecType(VecType),
-    RefType(RefType),
-}
-
 impl Encoder for ValueType {
     type S = Byte;
 
@@ -62,14 +46,6 @@ impl Encoder for ValueType {
             RefType(t) => t.emit(),
         }
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum NumType {
-    I32,
-    I64,
-    F32,
-    F64,
 }
 
 impl Encoder for NumType {
@@ -86,11 +62,6 @@ impl Encoder for NumType {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum VecType {
-    V128,
-}
-
 impl Encoder for VecType {
     type S = Byte;
 
@@ -100,12 +71,6 @@ impl Encoder for VecType {
             V128 => 0x7b,
         })
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum RefType {
-    FuncRef,
-    ExternRef,
 }
 
 impl Encoder for RefType {
@@ -121,11 +86,6 @@ impl Encoder for RefType {
 }
 
 // ==Global Type==
-pub struct GlobalType {
-    pub type_: ValueType,
-    pub mutability: Mutability,
-}
-
 impl Encoder for GlobalType {
     type S = Seq<<ValueType as Encoder>::S, <Mutability as Encoder>::S>;
     fn emit(&self) -> Self::S {
@@ -134,11 +94,6 @@ impl Encoder for GlobalType {
 }
 
 // ==Mutability==
-pub enum Mutability {
-    Const,
-    Var
-}
-
 impl Encoder for Mutability {
     type S = Byte;
     fn emit(&self) -> Self::S {

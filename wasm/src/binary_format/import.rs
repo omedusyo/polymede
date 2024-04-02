@@ -1,15 +1,15 @@
-use crate::encoder::Encoder;
-use crate::byte_stream::{string, UTF8, ByteStream, byte, Byte, Seq, Response};
+use crate::binary_format::primitives::encoder::Encoder;
+use crate::binary_format::primitives::byte_stream::{string, UTF8, ByteStream, byte, Byte, Seq, Response};
+use crate::binary_format::{
+    indices::IndexStream,
+    memory::LimitsStream
+};
 
-use crate::indices::{TypeIndex, IndexStream};
-use crate::types::GlobalType;
-use crate::memory::{Limit, LimitsStream};
+use crate::base::{
+    import::{Import, ImportDescription},
+    types::GlobalType,
+};
 
-pub struct Import {
-    pub module_name: String,
-    pub name: String,
-    pub import_description: ImportDescription,
-}
 
 impl Encoder for Import {
     type S = Seq<UTF8, Seq<UTF8, <ImportDescription as Encoder>::S>>;
@@ -17,12 +17,6 @@ impl Encoder for Import {
     fn emit(&self) -> Self::S {
         string(&self.module_name).seq(string(&self.name).seq(self.import_description.emit()))
     }
-}
-
-pub enum ImportDescription {
-    FunctionTypeIndex(TypeIndex),
-    MemoryType(Limit),
-    GlobalType(GlobalType),
 }
 
 pub enum ImportDescriptionStream {
