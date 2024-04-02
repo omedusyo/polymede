@@ -1,0 +1,21 @@
+
+type Msg = ind {
+| Inc
+| Dec
+| Reset
+}
+
+let initialState =
+  # Int
+  0
+
+let update =
+  # Msg -> Int -> Int
+  { msg state .
+    match msg {
+    | Inc . state + 1
+    | Dec . state - 1
+    | Reset . 0
+    }
+  }
+

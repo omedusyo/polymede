@@ -1,0 +1,30 @@
+
+// let List[A] =
+// | Nil
+// | Cons(A, List[A])
+
+type List = # forall A
+  ind { List .
+  | Nil
+  | Cons(A, List)
+  }
+
+let exampleList0 =
+  # List[Int]
+  Cons(0, Cons(1, Cons(2, Cons(3, Cons(4, Cons(5, Nil))))))
+
+let id = forall { A .
+  # A -> A
+  { x . x }
+}
+
+let concat = forall { A .
+  # List[A], List[A] -> List[A] : fn { xs, ys .
+    fold xs {
+    | Nil . ys
+    | Cons(x, result) .
+      Cons(x, result)
+    }
+  }
+}
+

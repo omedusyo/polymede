@@ -1,0 +1,35 @@
+
+// Introduces new type Bool
+// and two new 0-ary constructors
+// T : Bool
+// F : Bool
+type Bool = enum {
+| T
+| F
+}
+
+// Top-level binding.
+
+let not = # Bool -> Bool : fn { x .
+  match x {
+  | T . F
+  | F . T
+  }
+}
+
+// shorter version
+let not = # Bool -> Bool : fn {
+| T . F
+| F . T
+}
+
+let and = # Bool, Bool -> Bool : fn {
+| T, T . T
+| F, _ . F
+}
+
+let or = # Bool, Bool -> Bool : fn {
+| F, F . F
+| _, _ . T
+}
+

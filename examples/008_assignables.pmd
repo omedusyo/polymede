@@ -1,0 +1,17 @@
+
+
+let sum =
+  # Int -> Cmd[Int] : fn { x . do {
+    new result <- # Int : 0;
+    new counter <- # Int : 0;
+    # Cmd[Int] : loop { done .
+      let c <- @counter;
+      match c < x {
+      | T . 
+        set result <- @result + c;
+        set counter <- c + 1;
+      | F . done(@result)
+      }
+    }
+  }}
+

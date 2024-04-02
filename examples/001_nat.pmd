@@ -1,0 +1,37 @@
+
+type Nat = ind { Nat .
+| Zero
+| Succ(Nat)
+}
+
+let zero =
+  # Nat
+  Zero
+
+let one =
+  # Nat
+  Succ(zero)
+
+let two =
+  # Nat
+  Succ(two)
+
+let three =
+  # Nat
+  Succ(Succ(Succ(Zero)))
+  
+
+let plus = # Nat, Nat -> Nat : fn { x, y .
+  fold x {
+  | Zero . y
+  | Succ(result) . Succ(result)
+  }
+}
+
+let mul = # Nat, Nat -> Nat : fn { x, y .
+  fold x {
+  | Zero . Zero
+  | Succ(result) . plus(x, y)
+  }
+}
+

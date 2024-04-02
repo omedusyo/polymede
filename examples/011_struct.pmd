@@ -1,0 +1,40 @@
+
+type Complex = struct {
+, re: Real
+, im: Real
+}
+
+
+type Rational = struct {
+, numerator: Int
+, denominator: Int
+}
+
+
+type Color = struct {
+, r: u256
+, g: u256
+, b: u256
+, alpha: u256
+}
+
+
+type OperationName = enum { OperationName(String) }
+
+type Register = enum { Register(String) }
+
+type Constant = enum {
+| Number(i32)
+| Nil
+}
+
+type OperationArgument = enum {
+| Register(Register)
+| Constant(Constant)
+}
+
+type OperationApplication = struct {
+, name: OperationName
+, arguments: List[OperationArgument]
+}
+

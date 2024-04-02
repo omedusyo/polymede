@@ -1,0 +1,42 @@
+
+let sum =
+  # Int -> Int
+  fn-rec { sum, n .
+    match n {
+    | 0 . 0
+    | _ .
+      n + sum(n - 1)
+    }
+  }
+
+let fib =
+  # Int -> Int
+  fn-rec { fib n .
+    match n {
+    | 0 . 0
+    | 1 . 1
+      // Note that this need not be a tail-call
+      fib(n - 1) + fib(n - 2)
+    }
+  }
+
+
+
+sum(5)
+(fn-rec { ... })(5)
+(fn-rec { ... })(4)    5 + _ :: []
+(fn-rec { ... })(3)    4 + _ :: 5 + _ :: []
+(fn-rec { ... })(2)    3 + _ :: 4 + _ :: 5 + _ :: []
+(fn-rec { ... })(1)    2 + _ :: 3 + _ :: 4 + _ :: 5 + _ :: []
+(fn-rec { ... })(0)    1 + _ :: 2 + _ :: 3 + _ :: 4 + _ :: 5 + _ :: []
+
+
+
+let iterateUntil = # forall A .
+  # Fn[A, Bool], A, Fn[A, A] -> A
+  fn-rec { iterateUntil test a f .
+    match apply(test,a) {
+    | T . a
+    | F . iterateUntil(test, apply(f, a), f)
+    }
+  }

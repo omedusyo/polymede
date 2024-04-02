@@ -1,0 +1,19 @@
+
+type Unit = enum {
+| Unit
+}
+
+let hello =
+  # Cmd[Unit]
+  do {
+    print("hello, world");
+    // < means return as the final value of the expression
+    < Unit
+  }
+
+let getUserInput =
+  # Cmd[Unit]
+  do {
+    let x <- get;
+  }
+
