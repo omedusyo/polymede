@@ -1,0 +1,43 @@
+
+# ===Basics===
+
+cargo run
+
+cargo build
+
+cargo test
+
+
+
+# ===WASM===
+
+cargo test -p wasm
+
+TMP_WASM=tmp_wasm
+TMP_WAT=tmp_wat
+FILE=test
+
+rm $TMP_WASM/$FILE.wasm
+cargo run --bin compiler
+
+
+wasm2wat $TMP_WASM/$FILE.wasm -o $TMP_WAT/$FILE.wat
+
+wasm-objdump $TMP_WASM/$FILE.wasm -x
+
+wasm-objdump $TMP_WASM/$FILE.wasm -s
+
+
+
+# ===WAT tests===
+
+TMP_WASM=tmp_wasm
+TMP_WAT=tmp_wat
+FILE=another_test
+
+wat2wasm $TMP_WAT/$FILE.wat -o $TMP_WASM/$FILE.wasm
+
+wasm-objdump $TMP_WASM/$FILE.wasm -x
+
+cat $TMP_WASM/$FILE.wasm
+
