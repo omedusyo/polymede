@@ -282,8 +282,12 @@ impl Expression {
         fn binary_format_instructions(expr: Expression, instructions: &mut Vec<instructions::Instruction>)  {
             match expr {
                 Expression::Seq(expressions) => {
-                    for expr in expressions {
-                        binary_format_instructions(expr, instructions);
+                    if expressions.is_empty() {
+                        instructions.push(instructions::Instruction::Nop);
+                    } else {
+                        for expr in expressions {
+                            binary_format_instructions(expr, instructions);
+                        }
                     }
                 },
 

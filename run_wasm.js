@@ -12,5 +12,5 @@ WebAssembly.instantiate(bytes).then(({ instance }) => {
   const fct = instance.exports.fct;
 
   console.log(fct(6));
-})
+});
 
