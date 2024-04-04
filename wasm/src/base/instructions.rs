@@ -1,6 +1,7 @@
 use crate::base::{
-    indices::{LocalIndex, GlobalIndex, LabelIndex, FunctionIndex},
+    indices::{LocalIndex, GlobalIndex, DataIndex, LabelIndex, FunctionIndex},
     types::BlockType,
+    memory::MemoryArgument,
 };
 
 pub enum Instruction {
@@ -19,12 +20,31 @@ pub enum Instruction {
 
     Return,
 
-    // ===Variable Instructions====
+    // ===Variable Instructions===
     LocalGet(LocalIndex),
     LocalSet(LocalIndex),
     LocalTee(LocalIndex),
     GlobalGet(GlobalIndex),
     GlobalSet(GlobalIndex),
+
+    // ===Memory Instructions===
+    MemorySize,
+    MemoryGrow,
+    MemoryInit(DataIndex),
+    DataDrop(DataIndex),
+    MemoryCopy,
+    MemoryFill,
+
+    // i32
+    I32Load(MemoryArgument),
+    I32Load_8_s(MemoryArgument),
+    I32Load_8_u(MemoryArgument),
+    I32Load_16_s(MemoryArgument),
+    I32Load_16_u(MemoryArgument),
+
+    I32Store(MemoryArgument),
+    I32Store8(MemoryArgument),
+    I32Store16(MemoryArgument),
 
     // ===Numeric Instructions===
     // i32

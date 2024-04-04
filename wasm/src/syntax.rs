@@ -1,11 +1,12 @@
 use crate::binary_format::sections;
-use crate::binary_format::sections::{TypeSection, FunctionSection, ExportSection, ImportSection, CodeSection};
+use crate::binary_format::sections::{TypeSection, FunctionSection, ExportSection, ImportSection, CodeSection, MemorySection};
 use crate::base::{
-    indices::{TypeIndex, LocalIndex, GlobalIndex, LabelIndex, FunctionIndex},
+    indices::{TypeIndex, LocalIndex, GlobalIndex, LabelIndex, FunctionIndex, MemoryIndex},
     types::{FunctionType, ValueType, BlockType, NumType},
     export::{Export, ExportDescription},
     import::{Import, ImportDescription},
     instructions,
+    memory::{MemoryArgument, Limit},
 };
 
 pub struct Module {
@@ -13,7 +14,8 @@ pub struct Module {
     // TODO: Bundling Function Imports and Functions into one place is convinient, but not exactly
     // performance friendly.
     functions: Vec<FunctionOrImport>,
-    exports: Vec<Export>
+    exports: Vec<Export>,
+    memory_types: Vec<Limit>,
 }
 
 enum FunctionOrImport {
@@ -70,12 +72,16 @@ enum Expression {
     Call(FunctionIndex, Vec<Expression>),
     Return(Box<Expression>),
 
-    // ===Variable Instructions====
+    // ===Variable Instructions===
     LocalGet(LocalIndex),
     LocalSet(LocalIndex, Box<Expression>),
     LocalTee(LocalIndex),
     GlobalGet(GlobalIndex),
     GlobalSet(GlobalIndex, Box<Expression>),
+
+    // ===Memory Instructions===
+    LoadInteger { size: Size, arg: MemoryArgument, address: Box<Expression> },
+    StoreInteger { size: Size, arg: MemoryArgument, address: Box<Expression>, value: Box<Expression> },
 
     // ===Numeric Instructions===
     Op0(Op0),
@@ -191,7 +197,7 @@ enum FloatRel2 {
 
 impl Module {
     fn empty() -> Self {
-        Self { function_types: vec![], functions: vec![], exports: vec![], }
+        Self { function_types: vec![], functions: vec![], exports: vec![], memory_types: vec![] }
     }
 
     fn add_function_type(&mut self, fn_type: FunctionType) -> TypeIndex {
@@ -211,6 +217,12 @@ impl Module {
         let type_index = self.add_function_type(type_);
         let fn_index = self.add_function(Function { type_index, locals: typed_function.locals, body: typed_function.body });
         fn_index
+    }
+
+    fn add_memory(&mut self, limit: Limit) -> MemoryIndex {
+        let memory_index = MemoryIndex(self.memory_types.len() as u32);
+        self.memory_types.push(limit);
+        memory_index
     }
 
     fn add_export(&mut self, export: Export) {
@@ -257,6 +269,10 @@ impl Module {
                 FunctionOrImport::Import(_) => None,
             }).collect();
             Some(CodeSection { codes })
+        };
+
+        bin_module.memory_section = {
+            Some(MemorySection { memory_types: self.memory_types })
         };
 
         bin_module.export_section = Some(ExportSection { exports: self.exports });
@@ -346,6 +362,30 @@ impl Expression {
                 Expression::GlobalSet(var, value) => {
                     binary_format_instructions(*value, instructions);
                     instructions.push(instructions::Instruction::GlobalSet(var));
+                },
+
+                // ===Memory Instructions===
+                Expression::LoadInteger { size, arg, address } => {
+                    binary_format_instructions(*address, instructions);
+                    instructions.push(match size {
+                        Size::X32 => instructions::Instruction::I32Load(arg),
+                        Size::X64 =>  {
+                            todo!()
+                            // instructions::Instruction::I64Load(arg)
+                        },
+                    })
+                },
+
+                Expression::StoreInteger { size, arg, address, value } => {
+                    binary_format_instructions(*address, instructions);
+                    binary_format_instructions(*value, instructions);
+                    instructions.push(match size {
+                        Size::X32 => instructions::Instruction::I32Store(arg),
+                        Size::X64 =>  {
+                            todo!()
+                            // instructions::Instruction::I64Load(arg)
+                        },
+                    })
                 },
 
                 // ===Numeric Instructions===
@@ -450,6 +490,22 @@ fn branch(i: u32) -> Expression {
 
 fn call(fn_index: FunctionIndex, args: Vec<Expression>) -> Expression {
     Expression::Call(fn_index, args)
+}
+
+fn i32_memory_get(address: Expression) -> Expression {
+    Expression::LoadInteger { size: Size::X32, arg: MemoryArgument { align: 2, offset: 0 }, address: Box::new(address) }
+}
+
+fn i64_memory_get(address: Expression) -> Expression {
+    Expression::LoadInteger { size: Size::X64, arg: MemoryArgument { align: 3, offset: 0 }, address: Box::new(address) }
+}
+
+fn i32_memory_set(address: Expression, value: Expression) -> Expression {
+    Expression::StoreInteger { size: Size::X32, arg: MemoryArgument { align: 2, offset: 0 }, address: Box::new(address), value: Box::new(value) }
+}
+
+fn i64_memory_set(address: Expression, value: Expression) -> Expression {
+    Expression::StoreInteger { size: Size::X64, arg: MemoryArgument { align: 3, offset: 0 }, address: Box::new(address), value: Box::new(value) }
 }
 
 const TYPE_I32: ValueType = ValueType::NumType(NumType::I32);
@@ -581,5 +637,74 @@ pub fn example_factorial() -> Module {
     });
     module.add_export(Export { name: "fct".to_string(), export_description: ExportDescription::Function(fct) });
 
+    module
+}
+
+pub fn example_memory0() -> Module {
+    let mut module = Module::empty();
+
+    let memory = module.add_memory(Limit::MinMax { min: 1, max: 1 });
+    module.add_export(Export { name: "main_memory".to_string(), export_description: ExportDescription::Memory(memory) });
+
+    let some_fn = module.add_typed_function(TypedFunction {
+        type_: fn_type(vec![], vec![TYPE_I32]),
+        locals: vec![],
+        body: seq(vec![
+            i32_memory_set(i32_const(0), i32_const(123)),
+            i32_memory_get(i32_const(0)),
+        ])
+    });
+
+    module.add_export(Export { name: "some_fn".to_string(), export_description: ExportDescription::Function(some_fn) });
+    
+    module
+}
+
+pub fn example_memory1() -> Module {
+    let mut module = Module::empty();
+
+    let log = module.add_typed_function_import(TypedFunctionImport { module_name: "console".to_string(), name: "log".to_string(), type_: fn_type(vec![TYPE_I32], vec![]) });
+
+    let memory = module.add_memory(Limit::MinMax { min: 1, max: 1 });
+    module.add_export(Export { name: "main_memory".to_string(), export_description: ExportDescription::Memory(memory) });
+
+    // pointer <- 0
+    // offset <- 1
+    //
+    // memory[pointer] <- 6
+    //
+    // pointer += offset
+    // memory[pointer] <- 7
+    //
+    // pointer += offset
+    // memory[pointer] <- memory[0] + memory[4]
+    //
+    // memory[pointer]
+    let some_fn = module.add_typed_function(TypedFunction {
+        type_: fn_type(vec![], vec![TYPE_I32]),
+        locals: vec![TYPE_I32, TYPE_I32],
+        body: {
+            let pointer = 0;
+            let offset = 1;
+            seq(vec![
+                local_set(offset, i32_const(4)),
+                local_set(pointer, i32_const(0)),
+
+
+                i32_memory_set(local_get(pointer), i32_const(6)),
+
+                local_set(pointer, i32_add(local_get(pointer), local_get(offset))),
+                i32_memory_set(local_get(pointer), i32_const(7)),
+
+                local_set(pointer, i32_add(local_get(pointer), local_get(offset))),
+                i32_memory_set(local_get(pointer), i32_add(i32_memory_get(i32_const(0)), i32_memory_get(i32_const(4)))),
+
+                i32_memory_get(local_get(pointer)),
+            ])
+        }
+    });
+
+    module.add_export(Export { name: "some_fn".to_string(), export_description: ExportDescription::Function(some_fn) });
+    
     module
 }

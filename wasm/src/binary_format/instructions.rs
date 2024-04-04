@@ -1,4 +1,4 @@
-use crate::binary_format::primitives::byte_stream::{ByteStream, Response, EVec, evector, byte, Byte, Seq, I64ToSignedLEB128, I32ToSignedLEB128};
+use crate::binary_format::primitives::byte_stream::{ByteStream, Response, EVec, evector, byte, Byte, Seq, I64ToSignedLEB128, I32ToSignedLEB128, U32ToVariableLEB128};
 use crate::binary_format::primitives::encoder::Encoder;
 use crate::binary_format::indices::IndexStream;
 
@@ -6,10 +6,11 @@ use crate::base::{
     indices::Index,
     types::BlockType,
     instructions::Instruction,
+    memory::MemoryArgument,
 };
 
 impl Instruction {
-    // control
+    // ===control===
     pub const UNREACHABLE: u8 = 0x00;
     pub const NOP: u8 = 0x01;
     pub const BLOCK: u8 = 0x02;
@@ -25,13 +26,30 @@ impl Instruction {
 
     pub const END: u8 = 0x0B;
 
-    // var
+    // ===var===
     pub const LOCAL_GET: u8 = 0x20;
     pub const LOCAL_SET: u8 = 0x21;
     pub const LOCAL_TEE: u8 = 0x22;
     pub const GLOBAL_GET: u8 = 0x23;
     pub const GLOBAL_SET: u8 = 0x24;
 
+    // ===memory===
+    pub const MEMORY_SIZE: u8 = 0x3f;
+    pub const MEMORY_GROW: u8 = 0x40;
+    pub const MEMORY_VARIOUS_PREFIX: u8 = 0xfc;
+
+    // i32
+    pub const I32_LOAD: u8 = 0x28;
+    pub const I32_LOAD_8_S: u8 = 0x2c;
+    pub const I32_LOAD_8_U: u8 = 0x2d;
+    pub const I32_LOAD_16_S: u8 = 0x2e;
+    pub const I32_LOAD_16_U: u8 = 0x2f;
+
+    pub const I32_STORE: u8 = 0x36;
+    pub const I32_STORE_8: u8 = 0x3a;
+    pub const I32_STORE_16: u8 = 0x3b;
+
+    // ===numeric===
     // i32
     pub const I32_CONST: u8 = 0x41;
 
@@ -75,6 +93,7 @@ impl Instruction {
 
 pub enum InstructionStream {
     Simple(Byte),
+    Simple2(Seq<Byte, Byte>),
     ConstI32(Seq<Byte, I32ToSignedLEB128>),
     ConstI64(Seq<Byte, I64ToSignedLEB128>),
     SimpleWithIndex(Seq<Byte, IndexStream>),
@@ -87,11 +106,20 @@ pub enum InstructionStream {
         Seq<Byte, <BlockType as Encoder>::S>,
         Seq<EVec<InstructionStream, Byte>, EVec<InstructionStream, Byte>>
     >),
+    InstructionWithMemoryArgument(Seq<Byte, <MemoryArgument as Encoder>::S>),
+    MemoryInit(Seq<Seq<Seq<Byte, U32ToVariableLEB128>, IndexStream>, Byte>),
+    DataDrop(Seq<Seq<Byte, U32ToVariableLEB128>, IndexStream>),
+    MemoryCopy(Seq<Seq<Seq<Byte, U32ToVariableLEB128>, Byte>, Byte>),
+    MemoryFill(Seq<Seq<Byte, U32ToVariableLEB128>, Byte>),
 }
 
 impl InstructionStream {
     fn simple(opcode: u8) -> Self {
         Self::Simple(byte(opcode))
+    }
+
+    fn simple2(opcode: u8, b: u8) -> Self {
+        Self::Simple2(byte(opcode).seq(byte(b)))
     }
 
     fn i32_const(x: i32) -> Self {
@@ -126,17 +154,27 @@ impl InstructionStream {
         let s = header.seq(instructions);
         Self::IfThenElseExpr(s)
     }
+
+    fn instruction_with_memory_argument(opcode: u8, memory_argument: MemoryArgument) -> Self {
+        Self::InstructionWithMemoryArgument(byte(opcode).seq(memory_argument.emit()))
+    }
 }
 
 impl ByteStream for InstructionStream {
     fn next(&mut self) -> Response {
         match self {
             Self::Simple(s) => s.next(),
+            Self::Simple2(s) => s.next(),
             Self::ConstI32(s) => s.next(),
             Self::ConstI64(s) => s.next(),
             Self::SimpleWithIndex(s) => s.next(),
             Self::BlockExpr(s) => s.next(),
             Self::IfThenElseExpr(s) => s.next(),
+            Self::InstructionWithMemoryArgument(s) => s.next(),
+            Self::MemoryInit(s) => s.next(),
+            Self::DataDrop(s) => s.next(),
+            Self::MemoryCopy(s) => s.next(),
+            Self::MemoryFill(s) => s.next(),
         }
     }
 }
@@ -168,6 +206,25 @@ impl Encoder for Instruction {
             LocalTee(i) => InstructionStream::simple_with_index(Self::LOCAL_TEE, *i),
             GlobalGet(i) => InstructionStream::simple_with_index(Self::GLOBAL_GET, *i),
             GlobalSet(i) => InstructionStream::simple_with_index(Self::GLOBAL_SET, *i),
+
+            // ===Memory Instructions===
+            MemorySize => InstructionStream::simple2(Self::MEMORY_SIZE, 0x00),
+            MemoryGrow => InstructionStream::simple2(Self::MEMORY_GROW, 0x00),
+            MemoryInit(index) => InstructionStream::MemoryInit(byte(Self::MEMORY_VARIOUS_PREFIX).seq(U32ToVariableLEB128::new(8)).seq(index.emit()).seq(byte(0x00))),
+            DataDrop(index) => InstructionStream::DataDrop(byte(Self::MEMORY_VARIOUS_PREFIX).seq(U32ToVariableLEB128::new(9)).seq(index.emit())),
+            MemoryCopy => InstructionStream::MemoryCopy(byte(Self::MEMORY_VARIOUS_PREFIX).seq(U32ToVariableLEB128::new(10)).seq(byte(0x00)).seq(byte(0x00))),
+            MemoryFill => InstructionStream::MemoryFill(byte(Self::MEMORY_VARIOUS_PREFIX).seq(U32ToVariableLEB128::new(11)).seq(byte(0x00))),
+
+            // i32
+            I32Load(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_LOAD, *memory_argument),
+            I32Load_8_s(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_LOAD_8_S, *memory_argument),
+            I32Load_8_u(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_LOAD_8_U, *memory_argument),
+            I32Load_16_s(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_LOAD_16_S, *memory_argument),
+            I32Load_16_u(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_LOAD_16_U, *memory_argument),
+
+            I32Store(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_STORE, *memory_argument),
+            I32Store8(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_STORE_8, *memory_argument),
+            I32Store16(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_STORE_16, *memory_argument),
 
             // ===Numeric Instructions===
             // i32

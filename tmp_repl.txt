@@ -22,8 +22,7 @@ wasm2wat $TMP_WASM/$FILE.wasm -o $TMP_WAT/$FILE.wat
 
 cat $TMP_WAT/$FILE.wat
 
-
-node run_wasm.js $TMP_WASM/$FILE.wasm "fct"
+node run_wasm.js $TMP_WASM/$FILE.wasm "some_fn"
 
 wat2wasm $TMP_WAT/another_test2.wat -o $TMP_WASM/another_test2.wasm
 
@@ -47,4 +46,8 @@ wat2wasm $TMP_WAT/$FILE.wat -o $TMP_WASM/$FILE.wasm
 wasm-objdump $TMP_WASM/$FILE.wasm -x
 
 cat $TMP_WASM/$FILE.wasm
+
+wasm2wat $TMP_WASM/$FILE.wasm -o $TMP_WAT/another_test_decompile.wat
+
+cat $TMP_WAT/another_test_decompile.wat
 

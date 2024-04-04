@@ -132,3 +132,19 @@ pub fn generate_factorial() -> Vec<u8> {
 
     bytes
 }
+
+pub fn generate_memory0() -> Vec<u8> {
+    let module = syntax::example_memory0();
+    let mut bytes = module.binary_format().emit();
+    let bytes = bytes.to_vec();
+
+    bytes
+}
+
+pub fn generate_memory1() -> Vec<u8> {
+    let module = syntax::example_memory1();
+    let mut bytes = module.binary_format().emit();
+    let bytes = bytes.to_vec();
+
+    bytes
+}
