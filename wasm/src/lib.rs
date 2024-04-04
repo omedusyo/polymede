@@ -1,6 +1,6 @@
-mod base;
+pub mod base;
 mod binary_format;
-mod syntax;
+pub mod syntax;
 
 use crate::binary_format::primitives::encoder::Encoder;
 use crate::binary_format::primitives::byte_stream::ByteStream;

@@ -6,6 +6,16 @@ cargo build
 cargo test
 
 
+# ===Expressions===
+
+rm $TMP_WASM/$FILE.wasm
+cargo run --bin expressions
+
+wasm2wat $TMP_WASM/$FILE.wasm -o $TMP_WAT/$FILE.wat
+
+cat $TMP_WAT/$FILE.wat
+
+node run_wasm.js $TMP_WASM/$FILE.wasm "value"
 
 # ===WASM===
 

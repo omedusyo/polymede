@@ -1,11 +1,13 @@
 use crate::base::indices::TypeIndex;
 
 // ===Types===
+#[derive(Debug)]
 pub struct FunctionType {
     pub domain: Vec<ValueType>,
     pub codomain: Vec<ValueType>,
 }
 
+#[derive(Debug)]
 pub enum BlockType {
     EmptyType,
     ValueType(ValueType),
@@ -39,12 +41,14 @@ pub enum RefType {
 }
 
 // ==Global Type==
+#[derive(Debug)]
 pub struct GlobalType {
     pub type_: ValueType,
     pub mutability: Mutability,
 }
 
 // ==Mutability==
+#[derive(Debug, Clone, Copy)]
 pub enum Mutability {
     Const,
     Var

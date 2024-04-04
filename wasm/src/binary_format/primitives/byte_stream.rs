@@ -567,10 +567,6 @@ impl ByteStream for I64ToSignedLEB128 {
 pub struct UTF8(CVec<Byte>);
 
 pub fn string(s: &str) -> UTF8 {
-    {
-        let bs = s.bytes();
-        println!("The bs: {bs:?}");
-    }
     let bs: Vec<Byte> = s.bytes().map(byte).collect();
     UTF8(cvector(bs))
 }
@@ -669,9 +665,7 @@ mod tests {
         let mut s = I32ToSignedLEB128::new(x);
         let v = s.to_vec();
 
-        println!("{v:?}");
         let v0 = vec![0xc0, 0xbb, 0x78];
-        println!("{v0:?}");
         assert!([0xc0, 0xbb, 0x78].to_vec() == v);
     }
 
@@ -726,7 +720,6 @@ mod tests {
         let mut s = byte(9).enclose().enclose();
         let bytes = s.to_vec();
 
-        println!("{bytes:?}");
         assert!(bytes == vec![128 + 6, 128 + 0, 128 + 0, 128 + 0, 0,     128 + 1, 128, 128, 128, 0,      9]);
 
     }

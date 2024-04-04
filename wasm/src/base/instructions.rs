@@ -4,6 +4,7 @@ use crate::base::{
     memory::MemoryArgument,
 };
 
+#[derive(Debug)]
 pub enum Instruction {
     Unreachable,
     Nop,
@@ -37,10 +38,10 @@ pub enum Instruction {
 
     // i32
     I32Load(MemoryArgument),
-    I32Load_8_s(MemoryArgument),
-    I32Load_8_u(MemoryArgument),
-    I32Load_16_s(MemoryArgument),
-    I32Load_16_u(MemoryArgument),
+    I32Load8S(MemoryArgument),
+    I32Load8U(MemoryArgument),
+    I32Load16S(MemoryArgument),
+    I32Load16U(MemoryArgument),
 
     I32Store(MemoryArgument),
     I32Store8(MemoryArgument),

@@ -3,6 +3,12 @@ use crate::lexer::{LocatedToken};
 use crate::token::{Token, OperatorSymbol};
 use crate::expr::{Expr};
 
+pub fn parse(str: &str) -> Result<Expr, Error> {
+    let mut state = State::new(str);
+    let result = start(&mut state);
+    result
+}
+
 // Note that this is not a closure type. It's simply a function pointer.
 type Parser<A> = fn(&mut State) -> Result<A, Error>;
 
@@ -128,7 +134,6 @@ fn nat32_literal(state: &mut State) -> Result<Expr, Error> {
     let LocatedToken { token: Token::Nat32(x), position } = state.request_token(lexer::Request::Nat32)? else { unreachable!() };
     Ok(Expr::Nat32(position, x))
 }
-
 
 pub fn example0() {
     let s = "3*2 + 8 + 1 * 2  * 5  ";

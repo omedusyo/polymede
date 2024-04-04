@@ -1,5 +1,6 @@
 use crate::binary_format::sections;
 use crate::binary_format::sections::{TypeSection, FunctionSection, ExportSection, ImportSection, CodeSection, MemorySection};
+use crate::{Encoder, ByteStream};
 use crate::base::{
     indices::{TypeIndex, LocalIndex, GlobalIndex, LabelIndex, FunctionIndex, MemoryIndex},
     types::{FunctionType, ValueType, BlockType, NumType},
@@ -38,10 +39,10 @@ struct Function {
     body: Expression,
 }
 
-struct TypedFunction {
-    type_: FunctionType,
-    locals: Vec<ValueType>,
-    body: Expression,
+pub struct TypedFunction {
+    pub type_: FunctionType,
+    pub locals: Vec<ValueType>,
+    pub body: Expression,
 }
 
 struct FunctionImport {
@@ -50,14 +51,15 @@ struct FunctionImport {
     type_index: TypeIndex,
 }
 
-struct TypedFunctionImport {
+pub struct TypedFunctionImport {
     module_name: String,
     name: String,
     type_: FunctionType,
 }
 
 
-enum Expression {
+#[derive(Debug)]
+pub enum Expression {
     Seq(Vec<Expression>),
 
     Unreachable,
@@ -91,10 +93,12 @@ enum Expression {
     Rel2(Rel2, Box<Expression>, Box<Expression>),
 }
 
+#[derive(Debug)]
 enum Op0 {
     Const(NumberLiteral),
 }
 
+#[derive(Debug)]
 enum NumberLiteral {
     I32(i32),
     I64(i64),
@@ -102,27 +106,32 @@ enum NumberLiteral {
     F64(f64),
 }
 
+#[derive(Debug)]
 enum Op1 {
     Int(Size, IntegerOp1),
     Float(Size, FloatOp1)
 }
 
+#[derive(Debug)]
 enum Op2 {
     Int(Size, IntegerOp2),
     Float(Size, FloatOp2),
 }
 
+#[derive(Debug)]
 enum IntegerOp1 {
     Clz,
     Ctz,
     Popcnt,
 }
 
+#[derive(Debug)]
 enum Size {
     X32,
     X64,
 }
 
+#[derive(Debug)]
 enum IntegerOp2 {
     Add,
     Sub,
@@ -138,6 +147,7 @@ enum IntegerOp2 {
     Rotr
 }
 
+#[derive(Debug)]
 enum FloatOp1 {
     Abs,
     Neg,
@@ -148,6 +158,7 @@ enum FloatOp1 {
     Nearest,
 }
 
+#[derive(Debug)]
 enum FloatOp2 {
     Add,
     Sub,
@@ -158,24 +169,29 @@ enum FloatOp2 {
     Copysign,
 }
 
+#[derive(Debug)]
 enum Signedness {
     Signed,
     Unsigned,
 }
 
+#[derive(Debug)]
 enum Rel1 {
     Int(Size, IntegerRel1),
 }
 
+#[derive(Debug)]
 enum Rel2 {
     Int(Size, IntegerRel2),
     Float(Size, FloatRel2),
 }
 
+#[derive(Debug)]
 enum IntegerRel1 {
     Eqz,
 }
 
+#[derive(Debug)]
 enum IntegerRel2 {
     Eq,
     Ne,
@@ -185,6 +201,7 @@ enum IntegerRel2 {
     Ge(Signedness),
 }
 
+#[derive(Debug)]
 enum FloatRel2 {
     Eq,
     Ne,
@@ -196,11 +213,11 @@ enum FloatRel2 {
 
 
 impl Module {
-    fn empty() -> Self {
+    pub fn empty() -> Self {
         Self { function_types: vec![], functions: vec![], exports: vec![], memory_types: vec![] }
     }
 
-    fn add_function_type(&mut self, fn_type: FunctionType) -> TypeIndex {
+    pub fn add_function_type(&mut self, fn_type: FunctionType) -> TypeIndex {
         let type_index = TypeIndex(self.function_types.len() as u32);
         self.function_types.push(fn_type);
         type_index
@@ -212,20 +229,20 @@ impl Module {
         fn_index
     }
 
-    fn add_typed_function(&mut self, typed_function: TypedFunction) -> FunctionIndex {
+    pub fn add_typed_function(&mut self, typed_function: TypedFunction) -> FunctionIndex {
         let type_ = typed_function.type_;
         let type_index = self.add_function_type(type_);
         let fn_index = self.add_function(Function { type_index, locals: typed_function.locals, body: typed_function.body });
         fn_index
     }
 
-    fn add_memory(&mut self, limit: Limit) -> MemoryIndex {
+    pub fn add_memory(&mut self, limit: Limit) -> MemoryIndex {
         let memory_index = MemoryIndex(self.memory_types.len() as u32);
         self.memory_types.push(limit);
         memory_index
     }
 
-    fn add_export(&mut self, export: Export) {
+    pub fn add_export(&mut self, export: Export) {
         self.exports.push(export);
     }
 
@@ -235,7 +252,7 @@ impl Module {
         fn_index
     }
 
-    fn add_typed_function_import(&mut self, fn_import: TypedFunctionImport) -> FunctionIndex {
+    pub fn add_typed_function_import(&mut self, fn_import: TypedFunctionImport) -> FunctionIndex {
         let type_ = fn_import.type_;
         let type_index = self.add_function_type(type_);
         self.add_function_import(FunctionImport { module_name: fn_import.module_name, name: fn_import.name, type_index })
@@ -278,6 +295,14 @@ impl Module {
         bin_module.export_section = Some(ExportSection { exports: self.exports });
 
         bin_module
+    }
+
+    pub fn emit(self) -> <sections::Module as Encoder>::S {
+        self.binary_format().emit()
+    }
+
+    pub fn bytes(self) -> Vec<u8> {
+        self.emit().to_vec()
     }
 }
 
@@ -444,74 +469,74 @@ impl Expression {
 }
 
 // ===Helpers===
-fn seq(expressions: Vec<Expression>) -> Expression {
+pub fn seq(expressions: Vec<Expression>) -> Expression {
     Expression::Seq(expressions)
 }
 
-fn typed_loop(type_: ValueType, body: Expression) -> Expression {
+pub fn typed_loop(type_: ValueType, body: Expression) -> Expression {
     Expression::Loop { type_: BlockType::ValueType(type_), body: Box::new(body) }
 }
 
-fn typed_if_then_else(type_: ValueType, test: Expression, then_body: Expression, else_body: Expression) -> Expression {
+pub fn typed_if_then_else(type_: ValueType, test: Expression, then_body: Expression, else_body: Expression) -> Expression {
     Expression::IfThenElse { type_: BlockType::ValueType(type_), test: Box::new(test), then_body: Box::new(then_body), else_body: Box::new(else_body) }
 }
 
-fn i32_const(x: i32) -> Expression {
+pub fn i32_const(x: i32) -> Expression {
     Expression::Op0(Op0::Const(NumberLiteral::I32(x)))
 }
 
-fn i32_add(e0: Expression, e1: Expression) -> Expression {
+pub fn i32_add(e0: Expression, e1: Expression) -> Expression {
     Expression::Op2(Op2::Int(Size::X32, IntegerOp2::Add), Box::new(e0), Box::new(e1))
 }
 
-fn i32_mul(e0: Expression, e1: Expression) -> Expression {
+pub fn i32_mul(e0: Expression, e1: Expression) -> Expression {
     Expression::Op2(Op2::Int(Size::X32, IntegerOp2::Mul), Box::new(e0), Box::new(e1))
 }
 
-fn i32_sub(e0: Expression, e1: Expression) -> Expression {
+pub fn i32_sub(e0: Expression, e1: Expression) -> Expression {
     Expression::Op2(Op2::Int(Size::X32, IntegerOp2::Sub), Box::new(e0), Box::new(e1))
 }
 
-fn i32_eq(e0: Expression, e1: Expression) -> Expression {
+pub fn i32_eq(e0: Expression, e1: Expression) -> Expression {
     Expression::Rel2(Rel2::Int(Size::X32, IntegerRel2::Eq), Box::new(e0), Box::new(e1))
 }
 
-fn local_get(i: u32) -> Expression {
+pub fn local_get(i: u32) -> Expression {
     Expression::LocalGet(LocalIndex(i))
 }
 
-fn local_set(i: u32, value: Expression) -> Expression {
+pub fn local_set(i: u32, value: Expression) -> Expression {
     Expression::LocalSet(LocalIndex(i), Box::new(value))
 }
 
-fn branch(i: u32) -> Expression {
+pub fn branch(i: u32) -> Expression {
     Expression::Br(LabelIndex(i))
 }
 
-fn call(fn_index: FunctionIndex, args: Vec<Expression>) -> Expression {
+pub fn call(fn_index: FunctionIndex, args: Vec<Expression>) -> Expression {
     Expression::Call(fn_index, args)
 }
 
-fn i32_memory_get(address: Expression) -> Expression {
+pub fn i32_memory_get(address: Expression) -> Expression {
     Expression::LoadInteger { size: Size::X32, arg: MemoryArgument { align: 2, offset: 0 }, address: Box::new(address) }
 }
 
-fn i64_memory_get(address: Expression) -> Expression {
+pub fn i64_memory_get(address: Expression) -> Expression {
     Expression::LoadInteger { size: Size::X64, arg: MemoryArgument { align: 3, offset: 0 }, address: Box::new(address) }
 }
 
-fn i32_memory_set(address: Expression, value: Expression) -> Expression {
+pub fn i32_memory_set(address: Expression, value: Expression) -> Expression {
     Expression::StoreInteger { size: Size::X32, arg: MemoryArgument { align: 2, offset: 0 }, address: Box::new(address), value: Box::new(value) }
 }
 
-fn i64_memory_set(address: Expression, value: Expression) -> Expression {
+pub fn i64_memory_set(address: Expression, value: Expression) -> Expression {
     Expression::StoreInteger { size: Size::X64, arg: MemoryArgument { align: 3, offset: 0 }, address: Box::new(address), value: Box::new(value) }
 }
 
-const TYPE_I32: ValueType = ValueType::NumType(NumType::I32);
-const TYPE_I64: ValueType = ValueType::NumType(NumType::I64);
+pub const TYPE_I32: ValueType = ValueType::NumType(NumType::I32);
+pub const TYPE_I64: ValueType = ValueType::NumType(NumType::I64);
 
-fn fn_type(domain: Vec<ValueType>, codomain: Vec<ValueType>) -> FunctionType {
+pub fn fn_type(domain: Vec<ValueType>, codomain: Vec<ValueType>) -> FunctionType {
     FunctionType { domain, codomain }
 }
 

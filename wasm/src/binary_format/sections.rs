@@ -14,6 +14,7 @@ use crate::base::{
 type SectionId = u8;
 
 // === 1 Type Section ===
+#[derive(Debug)]
 pub struct TypeSection {
     pub function_types: Vec<FunctionType>
 }
@@ -32,6 +33,7 @@ impl Encoder for TypeSection {
 }
 
 // === 2 Import Section ===
+#[derive(Debug)]
 pub struct ImportSection {
     pub imports: Vec<Import>
 }
@@ -50,6 +52,7 @@ impl Encoder for ImportSection {
 }
 
 // === 3 Function Section ===
+#[derive(Debug)]
 pub struct FunctionSection {
     pub type_indices: Vec<TypeIndex>
 }
@@ -69,6 +72,7 @@ impl Encoder for FunctionSection {
 }
 
 // === 5 Memory Section ===
+#[derive(Debug)]
 pub struct MemorySection {
     pub memory_types: Vec<Limit>
 }
@@ -88,6 +92,7 @@ impl Encoder for MemorySection {
 }
 
 // === 6 Globals Section ===
+#[derive(Debug)]
 pub struct GlobalsSection {
     pub globals: Vec<Global>,
 }
@@ -106,6 +111,7 @@ impl Encoder for GlobalsSection {
     }
 }
 
+#[derive(Debug)]
 pub struct Global {
     pub global_type: GlobalType,
     pub expression: Expression,
@@ -119,6 +125,7 @@ impl Encoder for Global {
 }
 
 // === 7 Export Section ===
+#[derive(Debug)]
 pub struct ExportSection {
     pub exports: Vec<Export>
 }
@@ -138,6 +145,7 @@ impl Encoder for ExportSection {
 }
 
 // === 8 Start Section ===
+#[derive(Debug)]
 pub struct StartSection {
     pub start: FunctionIndex,
 }
@@ -156,6 +164,7 @@ impl Encoder for StartSection {
 }
 
 // === 10 Code Section ===
+#[derive(Debug)]
 pub struct CodeSection {
     pub codes: Vec<Code>,
 }
@@ -175,6 +184,7 @@ impl Encoder for CodeSection {
 }
 
 
+#[derive(Debug)]
 pub struct Code {
     pub locals: Vec<LocalDeclaration>,
     pub expression: Expression,
@@ -190,6 +200,7 @@ impl Encoder for Code {
     }
 }
 
+#[derive(Debug)]
 pub struct LocalDeclaration {
     pub count: u32,
     pub type_: ValueType,
@@ -205,6 +216,7 @@ impl Encoder for LocalDeclaration {
     }
 }
 
+#[derive(Debug)]
 pub struct Expression {
     pub instructions: Vec<Instruction>
 }
@@ -219,6 +231,7 @@ impl Encoder for Expression {
 }
 
 // === 11 Data Section ===
+#[derive(Debug)]
 pub struct DataSection {
     pub data_items: Vec<DataItem>
 }
@@ -237,6 +250,7 @@ impl Encoder for DataSection {
     }
 }
 
+#[derive(Debug)]
 pub enum DataItem {
     Active { initialize: Vec<u8>, offset_expression: Expression },
     Passive { initialize: Vec<u8> }
@@ -274,6 +288,7 @@ impl Encoder for DataItem {
 }
 
 // === 12 Data Count Section ===
+#[derive(Debug)]
 pub struct DataCountSection {
     pub count: u32,
 }
@@ -292,6 +307,7 @@ impl Encoder for DataCountSection {
 }
 
 // ====== Module =======
+#[derive(Debug)]
 pub struct Module {
     pub type_section: Option<TypeSection>,
     pub import_section: Option<ImportSection>,

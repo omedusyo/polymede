@@ -217,10 +217,10 @@ impl Encoder for Instruction {
 
             // i32
             I32Load(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_LOAD, *memory_argument),
-            I32Load_8_s(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_LOAD_8_S, *memory_argument),
-            I32Load_8_u(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_LOAD_8_U, *memory_argument),
-            I32Load_16_s(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_LOAD_16_S, *memory_argument),
-            I32Load_16_u(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_LOAD_16_U, *memory_argument),
+            I32Load8S(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_LOAD_8_S, *memory_argument),
+            I32Load8U(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_LOAD_8_U, *memory_argument),
+            I32Load16S(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_LOAD_16_S, *memory_argument),
+            I32Load16U(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_LOAD_16_U, *memory_argument),
 
             I32Store(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_STORE, *memory_argument),
             I32Store8(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_STORE_8, *memory_argument),

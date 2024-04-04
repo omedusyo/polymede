@@ -12,6 +12,9 @@ dependencies = [
 [[package]]
 name = "expressions"
 version = "0.1.0"
+dependencies = [
+ "wasm",
+]
 
 [[package]]
 name = "wasm"
