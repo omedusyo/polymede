@@ -1,8 +1,6 @@
 
 # ===Basics===
 
-cargo run
-
 cargo build
 
 cargo test
@@ -25,7 +23,11 @@ wasm2wat $TMP_WASM/$FILE.wasm -o $TMP_WAT/$FILE.wat
 cat $TMP_WAT/$FILE.wat
 
 
-node run_wasm.js $TMP_WASM/$FILE.wasm
+node run_wasm.js $TMP_WASM/$FILE.wasm "fct"
+
+wat2wasm $TMP_WAT/another_test2.wat -o $TMP_WASM/another_test2.wasm
+
+node run_wasm.js $TMP_WASM/another_test2.wasm "wat"
 
 wasm-objdump $TMP_WASM/$FILE.wasm -d
 

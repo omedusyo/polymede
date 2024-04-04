@@ -19,13 +19,13 @@ use crate::binary_format::sections::{
     DataCountSection,
     Expression, Code, LocalDeclaration
 };
-use crate::binary_format::instructions::Instruction;
 use crate::base::{
     memory::Limit,
     export::{Export, ExportDescription},
     import::{Import, ImportDescription},
     indices::{TypeIndex, LocalIndex, GlobalIndex, FunctionIndex},
     types::{NumType, ValueType, FunctionType, BlockType, GlobalType, Mutability},
+    instructions::Instruction,
 };
 use NumType::*;
 

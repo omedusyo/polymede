@@ -1,11 +1,11 @@
 use crate::binary_format::sections;
 use crate::binary_format::sections::{TypeSection, FunctionSection, ExportSection, ImportSection, CodeSection};
-use crate::binary_format::instructions;
 use crate::base::{
     indices::{TypeIndex, LocalIndex, GlobalIndex, LabelIndex, FunctionIndex},
     types::{FunctionType, ValueType, BlockType, NumType},
     export::{Export, ExportDescription},
     import::{Import, ImportDescription},
+    instructions,
 };
 
 pub struct Module {

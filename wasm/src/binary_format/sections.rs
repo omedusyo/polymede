@@ -1,7 +1,6 @@
 use crate::binary_format::primitives::byte_stream::{ByteStream, Response, Enclose, EVec, evector, bytes4, byte, Byte, Bytes4, CVec, cvector, Seq, U32ToFixed40LEB128};
 use crate::binary_format::primitives::encoder::Encoder;
 use crate::binary_format::indices::IndexStream;
-use crate::binary_format::instructions::Instruction;
 
 use crate::base::{
     types::{FunctionType, ValueType, GlobalType},
@@ -9,6 +8,7 @@ use crate::base::{
     memory::Limit,
     export::Export,
     import::Import,
+    instructions::Instruction,
 };
 
 type SectionId = u8;
