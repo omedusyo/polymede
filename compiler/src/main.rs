@@ -3,6 +3,7 @@ use std::io::Write;
 use std::fs;
 
 mod graph_memory_machine;
+mod interpreter;
 
 use wasm;
 
