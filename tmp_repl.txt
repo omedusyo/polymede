@@ -61,3 +61,9 @@ wasm2wat $TMP_WASM/$FILE.wasm -o $TMP_WAT/another_test_decompile.wat
 
 cat $TMP_WAT/another_test_decompile.wat
 
+
+
+# ===Graph Memory Machine===
+
+cargo test -p compiler
+
