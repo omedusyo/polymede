@@ -67,3 +67,20 @@ cat $TMP_WAT/another_test_decompile.wat
 
 cargo test -p compiler
 
+
+# ===WASM Runtime Support===
+
+cargo build
+
+cargo run --bin runtime
+
+
+FILE=test
+
+wat2wasm runtime/src/wasm/$FILE.wat -o tmp_wasm/runtime/$FILE.wasm
+
+wat2wasm runtime/src/$FILE.wat -o tmp_wasm/runtime/$FILE.wasm --debug-names
+
+node runtime/src/run.js tmp_wasm/runtime/$FILE.wasm
+
+
