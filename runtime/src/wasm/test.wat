@@ -115,27 +115,31 @@
     (local $destination i32)
 
     (local.set $byte_size (i32.mul (global.get $TAGGED_POINTER_BYTE_SIZE) (local.get $count)))
-    (local.set $source (i32.sub (global.get $STACK) (local.get $byte_size)))
-    (local.set $destination (i32.add (local.get $source) (global.get $ENV_HEADER_BYTE_SIZE)))
+    (call $dec_stack (local.get $byte_size))
+    (local.set $destination (i32.add (global.get $STACK) (global.get $SCOPE_EXTENSION_HEADER_SIZE)))
 
-    (; ==Copy the tagged pointers== ;)
-    (memory.copy (local.get $destination) (local.get $source) (local.get $byte_size))
+    (; ==Copy the arguments== ;)
+    (memory.copy (local.get $destination) (global.get $STACK) (local.get $byte_size))
 
-    (; ==Set the header== ;)
-    (i32.store (local.get $source) (local.get $count))
+    (; ==Saving old ENV register== ;)
+    (i32.store (global.get $STACK) (global.get $ENV))
+    (call $inc_stack (global.get $ENV_POINTER_BYTE_SIZE))
+
+    (; ==Set the size== ;)
+    (i32.store (global.get $STACK) (local.get $count))
+    (call $inc_stack (global.get $ENV_HEADER_BYTE_SIZE))
 
     (; ==Set the environment on the Linear Stack as the current environment== ;)
-    (global.set $ENV (local.get $destination))
-    
-    (call $inc_stack (global.get $ENV_HEADER_BYTE_SIZE))
+    (global.set $ENV (global.get $STACK))
+    (call $inc_stack (local.get $byte_size))
   )
 
   (; Assume N arguments on the stack (here N == $arg_count) ;)
   (; The N arguments are consumed, and in their place we have ;)
-  (; * Saved current env register ;)
+  (; * Environment header (saved current ENV register followed by the count of variables) ;)
   (; * Followed by the new extended environment with the consumed arguments ;)
   (; The env register is updated to point to this new environment. ;)
-  (func $open_new_scope (param $arg_count i32)
+  (func $extend_env (param $arg_count i32)
     (local $old_env_count i32)
     (local $old_env_byte_size i32)
 
@@ -171,10 +175,28 @@
   )
 
 
-  (; TODO: I need to have n-th variable in the current environment ;)
-  (; copies the n-th var to the top of the current stack ;)
-  (; Suddenly I need call-frames ;)
-  (func $var (param i32)
+  (; copies the n-th var in the current env to the top of the current stack ;)
+  (func $var (param $index i32)
+    (memory.copy
+      (global.get $STACK)
+      (i32.add (global.get $ENV) (i32.mul (global.get $TAGGED_POINTER_BYTE_SIZE) (local.get $index)))
+      (global.get $TAGGED_POINTER_BYTE_SIZE))
+    (call $inc_stack (global.get $TAGGED_POINTER_BYTE_SIZE))
+  )
+
+  (func $drop_env
+    (local $header_start i32)
+    (local.set $header_start (i32.sub (global.get $ENV) (global.get $SCOPE_EXTENSION_HEADER_SIZE)))
+
+    (; ==Reset env== ;)
+    (global.set $ENV (i32.load (local.get $header_start)))
+
+    (memory.copy
+      (local.get $header_start)
+      (i32.sub (global.get $STACK) (global.get $TAGGED_POINTER_BYTE_SIZE))
+      (global.get $TAGGED_POINTER_BYTE_SIZE))
+
+    (global.set $STACK (i32.add (local.get $header_start) (global.get $TAGGED_POINTER_BYTE_SIZE)))
   )
 
   (; ===Primitive Operations=== ;)
@@ -235,6 +257,7 @@
     )
   )
 
+
   (; fn sum(n) { ;)
   (;   match n { ;)
   (;   | 0 -> 0 ;)
@@ -242,12 +265,25 @@
   (;   } ;)
   (; } ;)
   (func $sum
+    (call $var (i32.const 0)) ;; n
+    (call $get_const)
+    (call $log)
+
+    (call $var (i32.const 0)) ;; n
     (call $get_const)
     (if (i32.eqz)
       (then
         (call $const (i32.const 0))
       )
       (else
+        (call $var (i32.const 0)) ;; n
+        (call $dec)
+        (call $make_env (i32.const 1)) ;; n - 1
+        (call $sum)
+        (call $drop_env) ;; sum(n - 1)
+
+        (call $var (i32.const 0)) ;; n
+        (call $add) ;; sum(n - 1) + n
       )
     )
   )
@@ -330,13 +366,46 @@
     (call $const (i32.const 62))
     (call $log_stack)
 
-    (call $open_new_scope (i32.const 3))
+    (call $extend_env (i32.const 3))
+    (call $log_stack)
+  )
+
+  (func $env_test_2
+    (call $const (i32.const 25))
+    (call $const (i32.const 26))
+    (call $const (i32.const 27))
+    (call $make_env (i32.const 3))
+    (call $log_stack)
+
+    (call $var (i32.const 2))
+    (call $log_stack)
+  )
+
+  (func $env_test_3
+    (call $const (i32.const 25))
+    (call $const (i32.const 27))
+    (call $log_stack)
+    (call $make_env (i32.const 2))
+
+    (call $log_stack)
+
+    (call $var (i32.const 0))
+    (call $log_stack)
+    (call $var (i32.const 1))
+    (call $log_stack)
+    (call $add)
+    (call $log_stack)
+
+    (call $drop_env)
     (call $log_stack)
   )
 
   (func $sum_test_0
-    (call $const (i32.const 5))
+    (call $const (i32.const 8))
+    (call $make_env (i32.const 1))
     (call $sum)
+    (call $drop_env)
+
     (call $log_stack)
   )
 
@@ -352,9 +421,11 @@
     (; (call $is_zero_test_1) ;)
 
     (; (call $env_test_0) ;)
-    (call $env_test_1)
+    (; (call $env_test_1) ;)
+    (; (call $env_test_2) ;)
+    (; (call $env_test_3) ;)
 
-    (; (call $sum_test_0) ;)
+    (call $sum_test_0)
   )
   (export "init" (func $init))
 )
