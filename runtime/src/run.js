@@ -7,21 +7,25 @@ const file = fs.readFileSync(`./${file_name}`);
 const bytes = new Uint8Array(file);
 // console.log(bytes);
 
-function printRawStack(buffer, stack_start, stack) {
+function printRawStack(buffer) {
   const array = new Uint8Array(buffer);
-  const start = stack_start.valueOf();
-  const end = stack.valueOf();
+  const start = GLOBAL.STACK_START.valueOf();
+  const end = GLOBAL.STACK.valueOf();
   console.log(`STACK[${start} to ${end}]`, array.slice(start, end));
 }
 
-function printStack(buffer, stack_start, stack) {
+function showGlobals() {
+  console.log(`STACK=${GLOBAL.STACK.valueOf()}, ENV=${GLOBAL.ENV.valueOf()}, FREE=${GLOBAL.FREE.valueOf()}`);
+}
+
+function printStack(buffer) {
   // TODO
 }
 
-function printRawHeap(buffer, heap, free) {
+function printRawHeap(buffer) {
   const array = new Uint8Array(buffer);
-  const start = heap.valueOf();
-  const end = free.valueOf();
+  const start = GLOBAL.HEAP.valueOf();
+  const end = GLOBAL.FREE.valueOf();
   console.log(`HEAP[${start} to ${end}]`, array.slice(start, end));
 }
 
@@ -29,34 +33,36 @@ function printHeap(buffer, heap, free) {
   // TODO: This probably doesn't even make sense
 }
 
+const GLOBAL = {};
+let buffer;
 
-let GLOBAL_BUFFER;
-let GLOBAL_STACK_START;
-let GLOBAL_STACK;
 const config = {
   console: {
     log(x) {
       console.log(x);
     },
     logStack() {
-      printRawStack(GLOBAL_BUFFER, GLOBAL_STACK_START, GLOBAL_STACK);
+      showGlobals();
+      printRawStack(buffer);
     },
     logHeap() {
-      printRawHeap(GLOBAL_BUFFER, GLOBAL_HEAP, GLOBAL_FREE);
+      printRawHeap(buffer);
     },
   },
 };
 
 WebAssembly.instantiate(bytes, config).then(({ instance }) => {
-  const { memory, init, stack_start, stack, heap, free} = instance.exports;
+  const { memory, init, stack_start, stack, env, heap, free, frame } = instance.exports;
+  buffer = memory.buffer;
 
-  GLOBAL_BUFFER = memory.buffer;
-  GLOBAL_STACK_START = stack_start;
-  GLOBAL_STACK = stack;
-  GLOBAL_HEAP = heap;
-  GLOBAL_FREE = free;
+  GLOBAL.BUFFER = memory.buffer;
+  GLOBAL.STACK_START = stack_start;
+  GLOBAL.STACK = stack;
+  GLOBAL.ENV = env;
+  GLOBAL.HEAP = heap;
+  GLOBAL.FREE = free;
+  GLOBAL.FRAME = frame;
 
-  const buffer = memory.buffer;
   const array = new Uint8Array(buffer);
 
   init()
