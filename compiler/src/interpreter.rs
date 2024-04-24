@@ -104,9 +104,11 @@ impl FunctionEnvironment {
                 self.apply(*fn_name, args)
             },
             VarUse(var) => var_env.lookup(*var),
-            Let(term, body_term) => {
-                let val = self.interpret(term, var_env)?;
-                var_env.push_binding(val);
+            Let(terms, body_term) => {
+                for term in terms {
+                    let val = self.interpret(term, var_env)?;
+                    var_env.push_binding(val);
+                }
                 let body_val = self.interpret(body_term, var_env)?;
                 var_env.pop_binding()?;
                 Ok(body_val)

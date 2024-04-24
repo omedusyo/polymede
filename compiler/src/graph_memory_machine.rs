@@ -14,7 +14,7 @@ pub enum Term {
     ProjectComponent(Box<Term>, ComponentIndex),
     Call(FunctionName, Vec<Term>),
     VarUse(VarName),
-    Let(Box<Term>, Box<Term>), // let x = e0 in e1
+    Let(Vec<Term>, Box<Term>), // let x0 = e0, x1 = e1, ... in body
     Match(Box<Term>, Vec<(Pattern, Term)>),
     Seq(Vec<Term>),
 }
@@ -70,8 +70,8 @@ pub fn var(var_name: VarName) -> Term {
     Term::VarUse(var_name)
 }
 
-pub fn let_bind(e0: Term, e1: Term) -> Term {
-    Term::Let(Box::new(e0), Box::new(e1))
+pub fn let_bind(args: Vec<Term>, e1: Term) -> Term {
+    Term::Let(args, Box::new(e1))
 }
 
 pub fn pattern_match(arg: Term, branches: Vec<(Pattern, Term)>) -> Term {
