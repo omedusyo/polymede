@@ -34,6 +34,11 @@
   (global $ARRAY_TAG i32 (i32.const 2))
   (global $TUPLE_TAG i32 (i32.const 3))
 
+  (global $TUPLE_HEADER_OFFSET i32 (i32.const 6)) ;; 6 bytes, 1 byte for GC bit, 4 bytes for variant, 1 byte for count
+  (global $TUPLE_VARIANT_OFFSET i32 (i32.const 1))
+  (global $TUPLE_COUNT_OFFSET i32 (i32.const 5))
+
+
   (global $GC_TAG_LIVE i32 (i32.const 0))
   (global $GC_TAG_MOVED i32 (i32.const 1))
 
@@ -101,6 +106,35 @@
 
     (i32.store (global.get $STACK) (local.get $tuple_pointer))
     (call $inc_stack (i32.const 4))
+  )
+
+  (; Assumes that a pointer to a tuple is on the top of the Linear Stack. ;)
+  (; Moves its to WASM stack ;)
+  (func $get_tuple_pointer (result i32)
+    (call $dec_stack (i32.const 4))
+    (i32.load (global.get $STACK))
+    (call $dec_stack (i32.const 1))
+  )
+
+  (func $get_tuple_variant (result i32)
+    (i32.load (i32.add (call $get_tuple_pointer) (global.get $TUPLE_VARIANT_OFFSET)))
+  )
+
+  (; On top of the stack there is a tagged pointer to a tuple on the heap. ;)
+  (; Moves its $index-th component onto the Linear Stack ;)
+  (func $tuple_project (param $index i32)
+    (local $offset i32)
+    (local $source i32)
+
+    (local.set $offset (i32.add (global.get $TUPLE_HEADER_OFFSET) (i32.mul (global.get $TAGGED_POINTER_BYTE_SIZE) (local.get $index))))
+    ;; WARNING: $get_tuple_pointer decrements the $STACK register!
+    (local.set $source (i32.add (call $get_tuple_pointer) (local.get $offset)))
+
+    (memory.copy
+      (global.get $STACK) ;; Note that the tagged pointer to the tuple was already consumed
+      (local.get $source)
+      (global.get $TAGGED_POINTER_BYTE_SIZE))
+    (call $inc_stack (global.get $TAGGED_POINTER_BYTE_SIZE))
   )
 
   (; ===Environment=== ;)
@@ -309,6 +343,22 @@
     (call $log_heap)
   )
 
+  (func $tuple_test_0
+    (call $const (i32.const 15))
+    (call $const (i32.const 16))
+    (call $log_stack)
+
+    (call $tuple (i32.const 25) (i32.const 2))
+    (call $log_stack)
+    (call $log_heap)
+
+    (; (call $get_tuple_pointer) ;)
+    (; (call $get_tuple_variant) ;)
+    (; (call $log) ;)
+    (call $tuple_project (i32.const 1))
+    (call $log_stack)
+  )
+
   (; cons(125, nil) ;)
   (func $example_list_0
     (call $const (i32.const 125))
@@ -413,6 +463,7 @@
   (func $init
     (; (call $example_stack0) ;)
     (; (call $example_heap0) ;)
+    (call $tuple_test_0)
     (; (call $example_list_0) ;)
     (; (call $example_list_1) ;)
     (; (call $singleton_plus_one_test_0) ;)
@@ -425,7 +476,7 @@
     (; (call $env_test_2) ;)
     (; (call $env_test_3) ;)
 
-    (call $sum_test_0)
+    (; (call $sum_test_0) ;)
   )
   (export "init" (func $init))
 )
