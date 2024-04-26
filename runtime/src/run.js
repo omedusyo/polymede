@@ -1,5 +1,9 @@
 const fs = require("fs");
 
+// TODO: Create a function that takes in a .wat,
+// compiles it to .wasm
+// afterwards executes it.
+
 // file is an array of bytes.
 const file_name = process.argv[2];
 console.log(`file: ${file_name}`);

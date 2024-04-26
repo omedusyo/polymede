@@ -1,11 +1,14 @@
 (; memory.copy $destination $source $size ;)
 
+;; TODO: Change `get` to `take` - this will indicate that the operation actually consumes the value on the Linear Stack
+;;       Also introduce `read` functions that will just copy stuff from the linear stack to WASM stack without consumption.
+
 (module
   (import "console" "log" (func $log (param i32)))
   (import "console" "logStack" (func $log_stack))
   (import "console" "logHeap" (func $log_heap))
 
-  (memory 1 10)
+  (memory 2 10)
   (export "memory" (memory 0))
 
 
@@ -19,9 +22,9 @@
   (global $ENV (mut i32) (i32.const 0))
   (export "env" (global $ENV))
 
-  (global $heap (mut i32) (i32.const 1024)) ;; start of the heap
+  (global $heap (mut i32) (i32.const 2048)) ;; start of the heap
   (export "heap" (global $heap))
-  (global $FREE (mut i32) (i32.const 1024)) ;; pointer to the next free cell on the heap
+  (global $FREE (mut i32) (i32.const 2048)) ;; pointer to the next free cell on the heap
   (export "free" (global $FREE))
 
   (; ===Global Constants=== ;)
@@ -67,6 +70,9 @@
 
   (; Assumes that a constant is on the top of the Linear Stack. ;)
   (; Moves it to WASM stack ;)
+  ;; TODO: Maybe I should have another function with a check
+  ;;       that the tagged pointer is really a constant
+  ;;       that would trigger a trap otherwise?
   (func $get_const (result i32)
     (call $dec_stack (i32.const 4))
     (i32.load (global.get $STACK))
@@ -135,6 +141,37 @@
       (local.get $source)
       (global.get $TAGGED_POINTER_BYTE_SIZE))
     (call $inc_stack (global.get $TAGGED_POINTER_BYTE_SIZE))
+  )
+
+  (; ==Tagged Pointers== ;)
+  (; Given a tagged pointer, returns the tag on WASM stack ;)
+  (func $read_tag (result i32)
+    (call $dec_stack (global.get $TAGGED_POINTER_BYTE_SIZE))
+    (i32.load8_u (global.get $STACK))
+    (call $inc_stack (global.get $TAGGED_POINTER_BYTE_SIZE))
+  )
+
+  (; Given a tagged pointer, ;)
+  (; case it is const, moves the variant on WASM stack. ;)
+  (; case it is tagged pointer, dereferences the pointer and copies the variant on WASM stack ;)
+  (func $get_variant (result i32)
+    (i32.eq (call $read_tag) (global.get $CONST_TAG))
+    (if (result i32)
+      (then
+        (call $get_const)
+      )
+      (else
+        (i32.eq (call $read_tag) (global.get $TUPLE_TAG))
+        (if (result i32)
+          (then
+            (call $get_tuple_variant)
+          )
+          (else
+            unreachable
+          )
+        )
+      )
+    )
   )
 
   (; ===Environment=== ;)
@@ -207,7 +244,6 @@
     (; ==Moving the stack== ;)
     (call $inc_stack (i32.add (global.get $ENV_HEADER_BYTE_SIZE) (i32.add (local.get $old_env_byte_size) (local.get $arg_byte_size))))
   )
-
 
   (; copies the n-th var in the current env to the top of the current stack ;)
   (func $var (param $index i32)
@@ -301,10 +337,6 @@
   (func $sum
     (call $var (i32.const 0)) ;; n
     (call $get_const)
-    (call $log)
-
-    (call $var (i32.const 0)) ;; n
-    (call $get_const)
     (if (i32.eqz)
       (then
         (call $const (i32.const 0))
@@ -318,6 +350,92 @@
 
         (call $var (i32.const 0)) ;; n
         (call $add) ;; sum(n - 1) + n
+      )
+    )
+  )
+
+  (; fn rangeLoop(n, xs) { ;)
+  (;  match n { ;)
+  (;  | Const(0) -> xs ;)
+  (;  | _ -> ;)
+  (;      let m = call dec(n) ;)
+  (;      call rangeLoop(m, cons(m, xs))) ;)
+  (;  } ;)
+  (; } ;)
+  (func $range_loop
+    (call $var (i32.const 0)) ;; n
+    (call $get_const)
+    (if (i32.eqz)
+      (then
+        (call $var (i32.const 1)) ;; xs
+      )
+      (else
+        (call $var (i32.const 0)) ;; n
+        (call $dec) ;; n - 1
+        ;; Start Let
+        (call $extend_env (i32.const 1)) ;; let m := n - 1
+        ;; now our environment is n, xs, m
+
+        (call $var (i32.const 2)) ;; m
+
+        (call $var (i32.const 2)) ;; m
+        (call $var (i32.const 1)) ;; xs
+        (call $cons)
+
+        (call $make_env (i32.const 2)) ;; range_loop(m, cons(m, xs))
+        (call $range_loop)
+        (call $drop_env)
+
+        ;; End Let
+        (call $drop_env)
+      )
+    )
+  )
+
+  (func $head_unsafe
+    (call $tuple_project (i32.const 0))
+  )
+
+  (func $tail_unsafe
+    (call $tuple_project (i32.const 1))
+  )
+
+  (; fn range(n) { ;)
+  (;   call rangeLoop(n, Const(Nil)) ;)
+  (; } ;)
+  (func $range
+    (call $var (i32.const 0)) ;; n
+    (call $const (i32.const 0)) ;; xs := nil
+    (call $make_env (i32.const 2))
+    (call $range_loop)
+    (call $drop_env)
+  )
+
+  (; fn log_list(xs) { ;)
+  (;  match xs { ;)
+  (;  | Const(nil) -> log(5555555) ;)
+  (;  | _ -> ;)
+  (;    call log(call head(xs)) ;)
+  (;    call log_list(call tail(xs)) ;)
+  (;  } ;)
+  (; } ;)
+  (func $log_list ;; list of integers
+    (call $var (i32.const 0)) ;; xs
+    (call $get_variant)
+    (if (i32.eqz)
+      (then ;; nil branch
+        (call $log (i32.const 5555555)) ;; right now this is how we print empty list
+      )
+      (else ;; cons branch
+        (call $var (i32.const 0)) ;; xs
+        (call $tuple_project (i32.const 0)) ;; head(xs)
+        (call $log (call $get_const))
+
+        (call $var (i32.const 0)) ;; xs
+        (call $tuple_project (i32.const 1)) ;; head(xs)
+        (call $make_env (i32.const 1))
+        (call $log_list) ;; log_list(tail(xs))
+        (call $drop_env)
       )
     )
   )
@@ -459,11 +577,22 @@
     (call $log_stack)
   )
 
+  (func $range_test_0
+    (call $const (i32.const 25)) ;; n  := 25
+    (call $make_env (i32.const 1))
+    (call $range)
+    (call $drop_env)
+
+    (call $make_env (i32.const 1))
+    (call $log_list)
+    (call $drop_env)
+  )
+
 
   (func $init
     (; (call $example_stack0) ;)
     (; (call $example_heap0) ;)
-    (call $tuple_test_0)
+    (; (call $tuple_test_0) ;)
     (; (call $example_list_0) ;)
     (; (call $example_list_1) ;)
     (; (call $singleton_plus_one_test_0) ;)
@@ -477,6 +606,7 @@
     (; (call $env_test_3) ;)
 
     (; (call $sum_test_0) ;)
+    (call $range_test_0)
   )
   (export "init" (func $init))
 )

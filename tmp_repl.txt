@@ -87,4 +87,3 @@ node runtime/src/run.js tmp_wasm/runtime/$FILE.wasm
 wat2wasm runtime/src/wasm/$FILE.wat -o tmp_wasm/runtime/$FILE.wasm
 node runtime/src/run.js tmp_wasm/runtime/$FILE.wasm
 
-
