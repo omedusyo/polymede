@@ -10,9 +10,10 @@ pub enum Term {
     Const(Variant),
     ByteArray(Vec<u8>),
     Tuple(Variant, Vec<Term>),
-    // TODO: Consider having the projections as primitive functions.
     ProjectComponent(Box<Term>, ComponentIndex),
     Call(FunctionName, Vec<Term>),
+    PartialApply(FunctionName, Vec<Term>),
+    CallClosure(Box<Term>, Vec<Term>),
     VarUse(VarName),
     Let(Vec<Term>, Box<Term>), // let x0 = e0, x1 = e1, ... in body
     Match(Box<Term>, Vec<(Pattern, Term)>),
@@ -64,6 +65,14 @@ pub fn second(tuple: Term) -> Term {
 
 pub fn call(fn_name: FunctionName, args: Vec<Term>) -> Term {
     Term::Call(fn_name, args)
+}
+
+pub fn call_closure(closure_term: Term, args: Vec<Term>) -> Term {
+    Term::CallClosure(Box::new(closure_term), args)
+}
+
+pub fn partial_apply(fn_name: FunctionName, args: Vec<Term>) -> Term {
+    Term::PartialApply(fn_name, args)
 }
 
 pub fn var(var_name: VarName) -> Term {

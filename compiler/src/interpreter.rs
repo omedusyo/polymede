@@ -1,11 +1,47 @@
 use crate::graph_memory_machine::{Term, Pattern, Variant, Program, Function, FunctionName, VarName};
 
+type Result<A> = std::result::Result<A, RuntimeError>;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug)]
+enum RuntimeError {
+    UndefinedVariable(VarName),
+    UndefinedFunction(FunctionName),
+    WrongNumberOfArguments { expected: usize, received: usize },
+    ExpectedConstant,
+    ExpectedByteArray,
+    ExpectedTuple,
+    ExpectedClosure,
+    TupleIndexOutOfBounds,
+    AttemptToPopEmptyVarEnv,
+    EmptySequenceOfTerms,
+    AttemptToPatternMatchOnByteArray,
+    AttemptToPatternMatchOnClosure,
+    NoMatchesFound,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 enum Value {
     Const(Variant),
     ByteArray(Vec<u8>),
     Tuple(Variant, Vec<Value>),
+    Closure(Closure),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct Closure {
+    fn_name: FunctionName,
+    partial_arguments: Vec<Value>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct VarEnvironment(Vec<Value>);
+
+type PrimitiveFunction = fn (Vec<Value>) -> Result<Value>;
+
+#[derive(Debug)]
+struct FunctionEnvironment {
+    primitive_functions: Vec<PrimitiveFunction>,
+    functions: Vec<Function>,
 }
 
 impl Value {
@@ -14,15 +50,13 @@ impl Value {
         use Value::*;
         match (self, pattern) {
             (ByteArray(_), _) => Err(RuntimeError::AttemptToPatternMatchOnByteArray),
+            (Closure(_), _) => Err(RuntimeError::AttemptToPatternMatchOnClosure),
             (Const(variant0), Variant(variant1)) => Ok(variant0 == variant1),
             (Tuple(variant0, _), Variant(variant1)) => Ok(variant0 == variant1),
             (_, Always) => Ok(true),
         }
     }
 }
-
-#[derive(Debug)]
-struct VarEnvironment(Vec<Value>);
 
 impl VarEnvironment {
     fn new() -> Self {
@@ -46,14 +80,6 @@ impl VarEnvironment {
             None => Err(RuntimeError::AttemptToPopEmptyVarEnv),
         }
     }
-}
-
-type PrimitiveFunction = fn (Vec<Value>) -> Result<Value>;
-
-#[derive(Debug)]
-struct FunctionEnvironment {
-    primitive_functions: Vec<PrimitiveFunction>,
-    functions: Vec<Function>,
 }
 
 impl FunctionEnvironment {
@@ -103,6 +129,25 @@ impl FunctionEnvironment {
                 let args = self.interpret_terms(terms, var_env)?;
                 self.apply(*fn_name, args)
             },
+            PartialApply(fn_name, terms) => {
+                let partial_arguments = self.interpret_terms(terms, var_env)?;
+                Ok(Value::Closure(Closure { fn_name: *fn_name, partial_arguments }))
+            },
+            CallClosure(closure_term, arg_terms) => {
+                match self.interpret(closure_term, var_env)? {
+                    Value::Closure(closure) => {
+                        let mut args = vec![Value::Closure(closure.clone())]; // For recursion
+                        for captured_val in closure.partial_arguments {
+                            args.push(captured_val)
+                        }
+                        for arg_val in self.interpret_terms(arg_terms, var_env)? {
+                            args.push(arg_val)
+                        }
+                        self.apply(closure.fn_name, args)
+                    },
+                    _ => Err(RuntimeError::ExpectedClosure),
+                }
+            },
             VarUse(var) => var_env.lookup(*var),
             Let(terms, body_term) => {
                 for term in terms {
@@ -136,24 +181,6 @@ impl FunctionEnvironment {
         }
     }
 }
-
-#[derive(Debug)]
-enum RuntimeError {
-    UndefinedVariable(VarName),
-    UndefinedFunction(FunctionName),
-    WrongNumberOfArguments { expected: usize, received: usize },
-    ExpectedConstant,
-    ExpectedByteArray,
-    ExpectedTuple,
-    TupleIndexOutOfBounds,
-    AttemptToPopEmptyVarEnv,
-    EmptySequenceOfTerms,
-    AttemptToPatternMatchOnByteArray,
-    NoMatchesFound,
-}
-
-type Result<A> = std::result::Result<A, RuntimeError>;
-
 
 fn run(program: Program, primitive_functions: Vec<PrimitiveFunction>) -> Result<Value> {
     let fn_env = FunctionEnvironment {
@@ -204,7 +231,7 @@ fn addition(args: Vec<Value>) -> Result<Value> {
 
 mod tests {
     use super::*;
-    use crate::graph_memory_machine::{constant, tuple, project, var, call, pattern_match};
+    use crate::graph_memory_machine::{constant, tuple, project, var, call, call_closure, partial_apply, pattern_match};
 
     #[test]
     fn test_constant() -> Result<()> {
@@ -212,7 +239,7 @@ mod tests {
         let inc = 0;
         let program = Program {
             // Assume the first primitive function is `inc`.
-            number_of_primitive_functions: 2,
+            number_of_primitive_functions: 1,
             functions: vec![],
             // main: call(inc, vec![constant(666)]),
             main: call(inc, vec![call(inc, vec![constant(666)])]),
@@ -453,6 +480,40 @@ mod tests {
         // println!("VALUE: {:?}", val);
         // assert!(val == Tuple(cons, vec![Const(0), Tuple(cons, vec![Const(1), Const(nil)])]));
         assert!(val == construct(Const(0), construct(Const(1), construct(Const(2), Const(nil)))));
+        Ok(())
+    }
+
+    #[test]
+    fn test_closure() -> Result<()> {
+        // functions
+        let add = 0;
+        let another_add = 1;
+
+        let program = Program {
+            // Assume the first primitive function is `inc`.
+            number_of_primitive_functions: 1,
+            functions: vec![
+                // fn another_add(self, x, y) {
+                //     x + y
+                // }
+                Function {
+                    number_of_parameters: 3,
+                    body: {
+                        // let self_var = 0;
+                        let x = 1;
+                        let y = 2;
+                        call(add, vec![var(x), var(y)])
+                    }
+                }
+            ],
+            main: call_closure(partial_apply(another_add, vec![constant(5)]), vec![constant(6)]),
+        };
+
+        let primitive_functions: Vec<PrimitiveFunction> = vec![ addition ];
+
+        let val = run(program, primitive_functions)?;
+
+        assert!(val == Value::Const(11));
         Ok(())
     }
 }
