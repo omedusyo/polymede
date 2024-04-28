@@ -77,13 +77,8 @@ cargo run --bin runtime
 
 FILE=test
 
-wat2wasm runtime/src/wasm/$FILE.wat -o tmp_wasm/runtime/$FILE.wasm
+# wat2wasm runtime/src/wasm/$FILE.wat -o tmp_wasm/runtime/$FILE.wasm
+# wat2wasm runtime/src/wasm/$FILE.wat -o tmp_wasm/runtime/$FILE.wasm --debug-names
+# wat2wasm runtime/src/wasm/$FILE.wat -o tmp_wasm/runtime/$FILE.wasm -v
 
-wat2wasm runtime/src/wasm/$FILE.wat -o tmp_wasm/runtime/$FILE.wasm --debug-names
-
-node runtime/src/run.js tmp_wasm/runtime/$FILE.wasm
-
-
-wat2wasm runtime/src/wasm/$FILE.wat -o tmp_wasm/runtime/$FILE.wasm
-node runtime/src/run.js tmp_wasm/runtime/$FILE.wasm
-
+node runtime/src/run.js $FILE

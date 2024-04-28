@@ -11,6 +11,8 @@
   (memory 2 10)
   (export "memory" (memory 0))
 
+  (table 50 funcref)
+
 
   (; Linear Stack := Linear Memory Stack ;)
   (global $stack_start (mut i32) (i32.const 0))
@@ -441,7 +443,7 @@
   )
 
   (; ==tests== ;)
-  (func $example_stack0
+  (func $example_stack_0
     (call $const (i32.const 5))
     (call $const (i32.const 7))
     (call $log_stack)
@@ -451,7 +453,7 @@
     (; (call $log (call $get_const)) ;)
   )
 
-  (func $example_heap0
+  (func $example_heap_0
     (call $const (i32.const 15))
     (call $const (i32.const 16))
     (call $log_stack)
@@ -578,7 +580,7 @@
   )
 
   (func $range_test_0
-    (call $const (i32.const 25)) ;; n  := 25
+    (call $const (i32.const 5)) ;; n  := 5
     (call $make_env (i32.const 1))
     (call $range)
     (call $drop_env)
@@ -589,24 +591,30 @@
   )
 
 
-  (func $init
-    (; (call $example_stack0) ;)
-    (; (call $example_heap0) ;)
-    (; (call $tuple_test_0) ;)
-    (; (call $example_list_0) ;)
-    (; (call $example_list_1) ;)
-    (; (call $singleton_plus_one_test_0) ;)
-
-    (; (call $is_zero_test_0) ;)
-    (; (call $is_zero_test_1) ;)
-
-    (; (call $env_test_0) ;)
-    (; (call $env_test_1) ;)
-    (; (call $env_test_2) ;)
-    (; (call $env_test_3) ;)
-
-    (; (call $sum_test_0) ;)
-    (call $range_test_0)
+  (func $tables_test_0
+    (call_indirect (i32.const 2))
   )
-  (export "init" (func $init))
+
+  (; (elem (i32.const 0) $add $inc $range_test_0) ;)
+  (elem (i32.const 0) $add)
+  (elem (i32.const 1) $inc)
+  (elem (i32.const 2) $range_test_0)
+
+  (export "example_stack_0" (func $example_stack_0))
+  (export "example_heap_0" (func $example_heap_0))
+  (export "tuple_test_0" (func $tuple_test_0))
+  (export "example_list_0" (func $example_list_0))
+  (export "example_list_1" (func $example_list_1))
+  (export "singleton_plus_one_test_0" (func $singleton_plus_one_test_0))
+
+  (export "is_zero_test_0" (func $is_zero_test_0))
+  (export "is_zero_test_1" (func $is_zero_test_1))
+
+  (export "env_test_0" (func $env_test_0))
+  (export "env_test_1" (func $env_test_1))
+  (export "env_test_2" (func $env_test_2))
+  (export "env_test_3" (func $env_test_3))
+
+  (export "sum_test_0" (func $sum_test_0))
+  (export "range_test_0" (func $range_test_0))
 )
