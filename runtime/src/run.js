@@ -17,11 +17,13 @@ TESTS.push(({ exports }, { LOG }) => {
   );
 });
 
-// TESTS.push(({ exports }, { LOG }) => {
-//   console.log("RANGE TEST 0-");
-//   exports.range_test_0();
-//   console.log("LOG IS ", LOG);
-// });
+TESTS.push(({ exports }, { LOG }) => {
+  console.log("RANGE TEST 0");
+  exports.range_test_0();
+  assert.deepEqual(LOG,
+    [0, 1, 2, 3, 4, 5555555]
+  );
+});
 
 
 // ===Setup===
