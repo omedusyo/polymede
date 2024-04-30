@@ -2,7 +2,8 @@
 resolver = "2"
 members = [ "compiler",
     "expressions",
-    "wasm"
+    "wasm",
+    "runtime"
 ]
 
 [workspace.dependencies]
