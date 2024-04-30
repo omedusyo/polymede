@@ -1,6 +1,21 @@
+// Requires: `wasm-merge` and `wat2wasm`
+
 const fs = require("fs");
-const exec = require("child_process").exec;
+// const exec = require("child_process").exec;
+const child_process = require("child_process");
 const assert = require('assert');
+
+function exec(cmd) {
+  return new Promise((resolve, reject) => {
+    child_process.exec(cmd, (err, stdout, stderr) => {
+      if (err) {
+        reject(stderr);
+      } else {
+        resolve(stdout);
+      }
+    });
+  });
+}
 
 const TESTS = [];
 
@@ -19,7 +34,7 @@ TESTS.push(({ exports }, { LOG }) => {
 
 TESTS.push(({ exports }, { LOG }) => {
   console.log("RANGE TEST 0");
-  exports.range_test_0();
+  exports.range_test_0(5);
   assert.deepEqual(LOG,
     [0, 1, 2, 3, 4, 5555555]
   );
@@ -31,26 +46,54 @@ function main() {
   const module_name = process.argv[2];
   console.log(`module_name: ${module_name}`);
 
-  wat2wasm(module_name, (bytes) => {
+  compile(module_name).then(bytes => {
     // run tests
     TESTS.forEach(test => {
       run(bytes, test);
     });
+  }).catch(err => {
+    console.log(err);
   });
 }
 
-function wat2wasm(module_name, on_success) {
-  const wasm_out = `tmp_wasm/runtime/${module_name}.wasm`;
-  const cmd = `wat2wasm runtime/src/wasm/${module_name}.wat -o ${wasm_out}`;
-  exec(cmd, (err, stdout, stderr) => {
-    if (err) {
-      console.log("ERROR", stderr);
-    } else {
-      const file = fs.readFileSync(wasm_out);
-      const bytes = new Uint8Array(file);
-      on_success(bytes);
-    }
+function compile(in_module) {
+  // Compiles runtime + module and links them into one `output.wasm` module
+
+  const runtime_module = "runtime";
+  const output_module = "output";
+
+  const wat_path = "runtime/src/wasm";
+  const wasm_path = "tmp_wasm/runtime";
+
+  // ===.wat compilation===
+  return wat2wasm(wat_path, wasm_path, in_module)
+    .then(_ => wat2wasm(wat_path, wasm_path, runtime_module))
+  // ===static merging===
+    .then(_ => wasm_merge(wasm_path, [in_module, runtime_module], output_module))
+  // ===bytes===
+    .then(_ => {
+      return wasm2bytes(wasm_path, output_module);
+    });
+}
+
+function wat2wasm(wat_path, wasm_path, module_name) {
+  const cmd = `wat2wasm ${wat_path}/${module_name}.wat -o ${wasm_path}/${module_name}.wasm`;
+  return exec(cmd);
+}
+
+function wasm_merge(wasm_path, modules, out_module) {
+  const merge_args = [];
+  modules.forEach(module => {
+    merge_args.push(`${wasm_path}/${module}.wasm ${module}`);
   });
+  const cmd = `wasm-merge --enable-bulk-memory ${merge_args.join(" ")} -o ${wasm_path}/${out_module}.wasm`;
+  return exec(cmd);
+}
+
+function wasm2bytes(wasm_path, module) {
+  const file = fs.readFileSync(`${wasm_path}/${module}.wasm`);
+  const bytes = new Uint8Array(file);
+  return bytes;
 }
 
 function run(bytes, on_instance) {

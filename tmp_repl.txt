@@ -74,11 +74,17 @@ cargo build
 
 cargo run --bin runtime
 
-
-FILE=test
-
+# FILE=test
 # wat2wasm runtime/src/wasm/$FILE.wat -o tmp_wasm/runtime/$FILE.wasm
 # wat2wasm runtime/src/wasm/$FILE.wat -o tmp_wasm/runtime/$FILE.wasm --debug-names
 # wat2wasm runtime/src/wasm/$FILE.wat -o tmp_wasm/runtime/$FILE.wasm -v
 
+FILE=test
 node runtime/src/run.js $FILE
+
+# wasm-merge --enable-bulk-memory tmp_wasm/runtime/test.wasm test tmp_wasm/runtime/runtime.wasm runtime -o tmp_wasm/runtime/output.wasm
+# wasm2wat tmp_wasm/runtime/output.wasm 
+
+======Binaryen Installation========
+for `wasm-merge`
+https://github.com/WebAssembly/binaryen/releases
