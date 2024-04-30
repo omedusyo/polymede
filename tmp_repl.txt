@@ -68,6 +68,15 @@ cat $TMP_WAT/another_test_decompile.wat
 cargo test -p compiler
 
 
+TMP_WASM=tmp_wasm
+MODULE=out00
+rm $TMP_WASM/$MODULE.wasm
+
+cargo run --bin compiler
+
+
+node runtime/src/run_gmm.js $MODULE
+
 # ===WASM Runtime Support===
 
 cargo build
@@ -79,8 +88,11 @@ cargo run --bin runtime
 # wat2wasm runtime/src/wasm/$FILE.wat -o tmp_wasm/runtime/$FILE.wasm --debug-names
 # wat2wasm runtime/src/wasm/$FILE.wat -o tmp_wasm/runtime/$FILE.wasm -v
 
-FILE=test
-node runtime/src/run.js $FILE
+node runtime/src/test.js
+
+MODULE=test
+node runtime/src/compile_wasm.js $MODULE
+
 
 # wasm-merge --enable-bulk-memory tmp_wasm/runtime/test.wasm test tmp_wasm/runtime/runtime.wasm runtime -o tmp_wasm/runtime/output.wasm
 # wasm2wat tmp_wasm/runtime/output.wasm 
