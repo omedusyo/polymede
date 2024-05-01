@@ -52,9 +52,9 @@ struct FunctionImport {
 }
 
 pub struct TypedFunctionImport {
-    module_name: String,
-    name: String,
-    type_: FunctionType,
+    pub module_name: String,
+    pub name: String,
+    pub type_: FunctionType,
 }
 
 
