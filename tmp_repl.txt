@@ -71,11 +71,15 @@ cargo test -p compiler
 TMP_WASM=tmp_wasm
 MODULE=out00
 rm $TMP_WASM/$MODULE.wasm
-
 cargo run --bin compiler
 
+wasm2wat $TMP_WASM/$MODULE.wasm 
+
+wasm2wat $TMP_WASM/$MODULE.wasm  -v
 
 node runtime/src/run_gmm.js $MODULE
+
+wasm2wat $TMP_WASM/output.wasm 
 
 # ===WASM Runtime Support===
 

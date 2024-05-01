@@ -1,4 +1,4 @@
-const { wat2wasm, wasm_merge } = require("./wasm_helpers.js");
+const { wat2wasm, wasm_merge, wasm2bytes, run } = require("./wasm_helpers.js");
 
 function main() {
   const module_name = process.argv[2];
@@ -6,6 +6,14 @@ function main() {
 
   compile(module_name).then(bytes => {
     console.log("Compiled.")
+
+    run(bytes, ({ exports }, { LOG, config }) => {
+      console.log("Running module...")
+      exports.main();
+      config.console.logStack();
+    });
+
+
   }).catch(err => {
     console.log(err);
   });
@@ -22,7 +30,10 @@ function compile(in_module) {
   return wat2wasm(wat_path, wasm_path, runtime_module)
     // Note that we've skipped wat2wasm compilation of the in_module
     // ===static merging===
-    .then(_ => wasm_merge(wasm_path, [in_module, runtime_module], output_module));
+    .then(_ => wasm_merge(wasm_path, [in_module, runtime_module], output_module))
+    .then(_ => {
+      return wasm2bytes(wasm_path, output_module);
+    });
 }
 
 main();

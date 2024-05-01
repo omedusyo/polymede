@@ -14,25 +14,16 @@
   (import "runtime" "var" (func $var (param $index i32)))
   (import "runtime" "drop_env" (func $drop_env))
 
+  (import "runtime" "add" (func $add))
+  (import "runtime" "inc" (func $inc))
+  (import "runtime" "dec" (func $dec))
+
   (import "console" "log" (func $log (param i32)))
   (import "console" "logStack" (func $log_stack))
   (import "console" "logHeap" (func $log_heap))
 
   (table 50 funcref)
 
-
-  (; ===Primitive Operations=== ;)
-  (func $add
-    (call $const (i32.add (call $get_const) (call $get_const)))
-  )
-
-  (func $inc
-    (call $const (i32.add (call $get_const) (i32.const 1)))
-  )
-
-  (func $dec
-    (call $const (i32.sub (call $get_const) (i32.const 1)))
-  )
 
   (; ===Examples=== ;)
   (; ==functions== ;)

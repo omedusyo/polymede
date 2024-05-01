@@ -103,9 +103,7 @@ function run(bytes, on_instance) {
     GLOBAL.FREE = free;
     GLOBAL.FRAME = frame;
 
-    const array = new Uint8Array(buffer);
-
-    on_instance(instance, { GLOBAL, LOG, buffer });
+    on_instance(instance, { GLOBAL, LOG, buffer, config });
   });
 }
 module.exports.run = run;
