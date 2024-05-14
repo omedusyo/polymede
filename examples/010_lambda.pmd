@@ -14,12 +14,24 @@ let closure = # forall A B .
     ...
   }
 
+// Partial application.
+
+let add1 =
+  # Fn[Nat -> Nat]
+  fn { x . add(1, x) }
+
+let addClosure =
+  # Fn[Nat, Nat -> Nat]
+  fn { x, y . add(x, y) }
+
 
 // So basically `fn` is an operator, that takes in a judgment 
 //     # Int -> Int { x . x * x }
 // and turns it into an actual value?
-let square = # Fn[Int, Int]
-  closure(# Int -> Int : fn { x . x * x })
+let square = # -> Fn[Int -> Int]
+  fn { .
+    # Int -> Int : fn { x . x * x }
+  }
 
 // hmmm, what's the point of the above?
 // I can do...
@@ -28,7 +40,7 @@ let square = # Int -> Int : fn {
 }
 
 // Is this ok? This is kinda pointless because it doesn't capture any variables.
-let squareLambda = # Fn[Int, Int]
+let squareLambda = # Fn[Int -> Int]
   fn square
 // or maybe? Somehow creation of coinductive things should be distinguished maybe?
   fn<square>
@@ -39,25 +51,26 @@ let squareLambda = # Fn[Int, Int]
 // They don't really have normal types. They are not first class.
 // They are more values on meta-level. And they have meta-types (judgments?)
 
-let adder = # Int -> Fn[Int, Int] : fn { x .
-  let addN = # Int -> Int { y
+let adder = # Int -> Fn[Int -> Int] : fn { x .
+  let incBy = # Fn[Int -> Int] : fn { y .
     x + y
   };
-  closure(addN) // Now this actually captures x.
+  incBy // Now this actually captures x.
 }
 
 // How to apply squareLambda to an argument?
-squareLambda.apply
+apply squareLambda(5)
 
 
 // Pair[A, B]
-let mapFirst = forall { A B .
-  # Fn[A, A'], Pair[A, B] -> Pair[A', B]
-  { f, Pair(x, y) . Pair(f(x), y) }
+let mapFirst =
+  # forall A B .
+  # Fn[A -> A'], Pair[A, B] -> Pair[A', B]
+  fn { f, Pair(x, y) . Pair(f(x), y) }
 }
 
 let map = # forall A B .
-  # Fn[A, B], List[A] -> List[B]
+  # Fn[A -> B], List[A] -> List[B]
   fn { f, xs .
     fold xs {
     | Nil . Nil
@@ -73,7 +86,7 @@ fn map[A, B](f: A -> B, xs: List[A]): List[B] = fold xs {
 
 let exampleList1 =
   # List[Int]
-  map(# Fn[Int, Int] : closure(fn { x . x * x }), exampleList0)
+  map(# Fn[Int -> Int] : fn { x . x * x }), exampleList0)
 
 let filter = # forall A .
   # Fn[A, Bool], List[A] -> List[A]
@@ -86,5 +99,17 @@ let filter = # forall A .
       | False . result
       }
     }
+  }
+
+let foldl = # forall A X
+  # List[A], X, Fn[A, X -> X] -> 
+  fn { as, initialState, update .
+    apply
+      (fold as {
+      | Nil .
+        fn { state . state }
+      | Cons(a, result) .
+        fn { state . apply update(state, a) }
+      })(initialState)
   }
 

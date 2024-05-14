@@ -10,6 +10,13 @@ type Bool = enum {
 
 // Top-level binding.
 
+# Bool -> Bool
+fn not(x) {
+  match x {
+  | T . F
+  | F . T
+  }
+}
 let not = # Bool -> Bool : fn { x .
   match x {
   | T . F
