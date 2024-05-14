@@ -6,6 +6,13 @@ cargo build
 cargo test
 
 
+# ===AST===
+
+cargo run --bin ast
+
+cargo test
+
+
 # ===Expressions===
 
 rm $TMP_WASM/$FILE.wasm
