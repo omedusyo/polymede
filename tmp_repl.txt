@@ -10,7 +10,7 @@ cargo test
 
 cargo run --bin ast
 
-cargo test
+cargo test -p ast
 
 
 # ===Expressions===

@@ -1,6 +1,6 @@
 
 let map = forall { A B .
-  # (A -> B) -> List[A] -> List[B] : fn { f xs .
+  # (A -> B) -> List(A) -> List(B) : fn { f xs .
     fold xs {
     | Nil . Nil
     | Cons(x, result) . Cons(f(x), result)

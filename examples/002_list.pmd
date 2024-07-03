@@ -1,7 +1,7 @@
 
-// let List[A] =
+// let List(a) =
 // | Nil
-// | Cons(A, List[A])
+// | Cons(a, List(a))
 
 type List = # forall A
   ind { List .

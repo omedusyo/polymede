@@ -1,3 +1,4 @@
+use crate::token;
 use crate::token::{Token, SeparatorSymbol};
 
 #[derive(Debug, Clone, Copy)]
@@ -19,11 +20,15 @@ impl LocatedToken {
 pub enum Request {
     OpenParen,
     CloseParen,
+    OpenCurly,
+    CloseCurly,
+    Keyword(token::Keyword),
+    TypeDeclarationKeyword,
     Identifier,
-    Nat32,
-    Arrow,
     Separator(SeparatorSymbol),
-    End
+    BindingSeparator,
+    Nat32,
+    End,
 }
 
 
@@ -31,7 +36,8 @@ pub enum Request {
 // TODO: Introduce Committed vs Recoverable Error
 pub enum Error {
     UnexpectedEnd,
-    Expected { requested: Request, found: char },
+    Expected { requested: Request, found: String },
+    ExpectedTypeDeclarationKeyword,
     Nat32LiteralTooBig,
 }
 
@@ -51,8 +57,8 @@ impl <'state> State<'state> {
     }
 
     #[inline]
-    pub fn position(&self) -> &Position {
-        &self.position
+    pub fn position(&self) -> Position {
+        self.position
     }
 
     #[inline]
@@ -94,6 +100,7 @@ impl <'state> State<'state> {
         }
     }
 
+    // Note that this returns the position BEFORE the advancement.
     pub fn advance(&mut self) -> Position {
         let previous_position = self.position;
         self.move_column_by(1);
@@ -108,25 +115,50 @@ impl <'state> State<'state> {
         }
     }
 
+    pub fn match_string(&mut self, str: &str, request: Request, result_token: Token) -> Result<LocatedToken, Error> {
+        let mut chars_for_error: Vec<char> = vec![];
+        let start_position = self.position();
+        for c0 in str.chars() {
+            let c = self.read_char_or_fail_when_end()?;
+            chars_for_error.push(c);
+            if c != c0 {
+                return Err(Error::Expected { requested: request, found: chars_for_error.into_iter().collect() })
+            }
+            self.advance();
+        }
+        Ok(LocatedToken::new(result_token, start_position))
+    }
+
+    fn match_keyword(&mut self, request: Request, keyword: token::Keyword) -> Result<LocatedToken, Error> {
+        self.match_string(keyword.string(), request, Token::Keyword(keyword))
+    }
+
     pub fn request(&mut self, request: Request) -> Result<LocatedToken, Error> {
         self.consume_whitespace();
         match request {
             Request::OpenParen => {
-                let c = self.read_char_or_fail_when_end()?;
-                if c == '(' {
-                    let token_position = self.advance();
-                    Ok(LocatedToken::new(Token::OpenParen, token_position))
-                } else {
-                    Err(Error::Expected { requested: request, found: c })
-                }
+                self.match_string("(", request, Token::OpenParen)
             },
             Request::CloseParen => {
+                self.match_string(")", request, Token::CloseParen)
+            },
+            Request::OpenCurly => {
+                self.match_string("{", request, Token::OpenCurly)
+            },
+            Request::CloseCurly => {
+                self.match_string("}", request, Token::CloseCurly)
+            },
+            Request::Keyword(keyword) => {
+                self.match_keyword(request, keyword)
+            },
+            Request::TypeDeclarationKeyword => {
                 let c = self.read_char_or_fail_when_end()?;
-                if c == ')' {
-                    let token_position = self.advance();
-                    Ok(LocatedToken::new(Token::CloseParen, token_position))
+                if c == 'e' {
+                    self.match_keyword(request, token::Keyword::Enum)
+                } else if c == 'i' {
+                    self.match_keyword(request, token::Keyword::Ind)
                 } else {
-                    Err(Error::Expected { requested: request, found: c })
+                    Err(Error::ExpectedTypeDeclarationKeyword)
                 }
             },
             Request::Identifier => {
@@ -137,7 +169,7 @@ impl <'state> State<'state> {
                         chars.push(c);
                         self.advance()
                     } else {
-                        return Err(Error::Expected { requested: request, found: c })
+                        return Err(Error::Expected { requested: request, found: c.to_string() })
                     }
                 };
 
@@ -156,31 +188,22 @@ impl <'state> State<'state> {
             Request::Nat32 => {
                 self.nat32(request)
             },
-            Request::Arrow => {
-                let c0 = self.read_char_or_fail_when_end()?;
-                if c0 != '-' {
-                    return Err(Error::Expected { requested: request, found: c0 })
-                }
-                let start_position = self.advance();
-
-                let c1 = self.read_char_or_fail_when_end()?;
-                if c1 != '>' {
-                    return Err(Error::Expected { requested: request, found: c1 })
-                }
-                self.advance();
-                return Ok(LocatedToken::new(Token::Arrow, start_position));
-            },
             Request::Separator(separator_symbol) => {
                 let c = self.read_char_or_fail_when_end()?;
                 let c0 = match separator_symbol {
-                    SeparatorSymbol::Comma => ','
+                    SeparatorSymbol::Comma => SeparatorSymbol::COMMA,
+                    SeparatorSymbol::Or => SeparatorSymbol::OR,
+                    SeparatorSymbol::And => SeparatorSymbol::AND,
                 };
                 if c == c0 {
                     let token_position = self.advance();
                     Ok(LocatedToken::new(Token::Separator(separator_symbol), token_position))
                 } else {
-                    Err(Error::Expected { requested: request, found: c })
+                    Err(Error::Expected { requested: request, found: c.to_string() })
                 }
+            },
+            Request::BindingSeparator => {
+                self.match_string(token::BINDING_SEPARATOR, request, Token::BindingSeparator)
             },
             Request::End => {
                 if self.tokens.is_empty() {
@@ -190,6 +213,16 @@ impl <'state> State<'state> {
                 }
             },
         }
+
+    }
+
+    pub fn consume_optional_or(&mut self) -> Result<(), Error> {
+        self.consume_whitespace();
+        let c = self.read_char_or_fail_when_end()?;
+        if c == SeparatorSymbol::OR {
+            self.advance();
+        }
+        Ok(())
     }
 
     fn nat32(&mut self, request: Request) -> Result<LocatedToken, Error> {
@@ -220,7 +253,7 @@ impl <'state> State<'state> {
                 sum = d;
             },
             None => {
-                return Err(Error::Expected { requested: request, found: c })
+                return Err(Error::Expected { requested: request, found: c.to_string() })
             }
         }
 

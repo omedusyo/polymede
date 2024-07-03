@@ -1,5 +1,5 @@
 
-ind Pair[A, B] :=
+enum Pair[A, B] :=
 | Pair(A, B)
 
 type Pair = # forall A B .
