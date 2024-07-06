@@ -15,6 +15,7 @@ pub enum Token {
 #[derive(Debug, Copy, Clone)]
 pub enum Keyword {
     Let,
+    LocalLet,
     Fn,
     Eq,
     Arrow,
@@ -27,6 +28,8 @@ pub enum Keyword {
     TypeAnnotationStart,
     TypeAnnotationSeparator,
     Function,
+    Apply,
+    To,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -46,6 +49,7 @@ pub const BINDING_SEPARATOR: &'static str = ".";
 
 impl Keyword {
     pub const LET: &'static str = "let";
+    pub const LOCAL_LET: &'static str = "let";
     pub const FN: &'static str = "fn";
     pub const EQ: &'static str = "=";
     pub const ARROW: &'static str = "->";
@@ -58,11 +62,14 @@ impl Keyword {
     pub const VALUE_AFTER_TYPE: &'static str = ":";
     pub const FORALL: &'static str = "forall";
     pub const FUNCTION: &'static str = "fn";
+    pub const APPLY: &'static str = "apply";
+    pub const TO: &'static str = "to";
 
     pub fn string(&self) -> &str {
         use Keyword::*;
         match self {
             Let => Self::LET,
+            LocalLet => Self::LOCAL_LET,
             Fn => Self::FN,
             Eq => Self::EQ,
             Arrow => Self::ARROW,
@@ -75,6 +82,8 @@ impl Keyword {
             TypeAnnotationStart => Self::TYPE_OF_VALUE,
             TypeAnnotationSeparator => Self::VALUE_AFTER_TYPE,
             Function => Self::FUNCTION,
+            Apply => Self::APPLY,
+            To => Self::TO,
         }
     }
 }

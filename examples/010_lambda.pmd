@@ -28,16 +28,12 @@ let addClosure =
 // So basically `fn` is an operator, that takes in a judgment 
 //     # Int -> Int { x . x * x }
 // and turns it into an actual value?
-let square = # -> Fn[Int -> Int]
-  fn { .
-    # Int -> Int : fn { x . x * x }
-  }
+let square = # Fn[Int -> Int] :
+  fn # Int -> Int : { x . x * x }
 
 // hmmm, what's the point of the above?
 // I can do...
-let square = # Int -> Int : fn {
-| x . x * x
-}
+let square = # Int -> Int : { x . x * x }
 
 // Is this ok? This is kinda pointless because it doesn't capture any variables.
 let squareLambda = # Fn[Int -> Int]
@@ -51,8 +47,8 @@ let squareLambda = # Fn[Int -> Int]
 // They don't really have normal types. They are not first class.
 // They are more values on meta-level. And they have meta-types (judgments?)
 
-let adder = # Int -> Fn[Int -> Int] : fn { x .
-  let incBy = # Fn[Int -> Int] : fn { y .
+fn adder = # Int -> Fn(Int -> Int) : { x .
+  let incBy = fn # Fn[Int -> Int] : { y .
     x + y
   };
   incBy // Now this actually captures x.

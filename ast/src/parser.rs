@@ -45,7 +45,6 @@ struct IndDeclaration {
 enum TypeDeclaration {
     Enum(EnumDeclaration),
     Ind(IndDeclaration),
-    // TODO: structs
 }
 
 #[derive(Debug)]
@@ -80,6 +79,15 @@ enum Term {
     ConstructorUse(ConstructorName, Vec<Term>),
     Match(Box<Term>, Vec<PatternBranch>),
     Fold(Box<Term>, Vec<PatternBranch>),
+    Lambda(Box<Function>),
+    LambdaApplication(Box<Term>, Vec<Term>),
+    Let(Vec<(Variable, Term)>, Box<Term>),
+}
+
+#[derive(Debug)]
+struct LocalLetBinding {
+    bindings: Vec<(Variable, Term)>,
+    body: Term,
 }
 
 #[derive(Debug)]
@@ -132,6 +140,10 @@ impl <'state> State<'state> {
 
     pub fn consume_optional_or(&mut self) -> Result<()> {
         self.lexer_state.consume_optional_or().map_err(Error::LexError)
+    }
+
+    pub fn consume_optional_comma(&mut self) -> Result<()> {
+        self.lexer_state.consume_optional_comma().map_err(Error::LexError)
     }
 
     pub fn is_next_token_open_paren(&mut self) -> Result<bool> {
@@ -192,9 +204,7 @@ fn delimited_possibly_empty_sequence<S, A, D>(
  -> Result<S>
 {
     let a = { 
-        // TODO
         let saved_state = state.clone();
-        // TODO
         match p(state) {
             Ok(a) => a,
             Err(_err) => {
@@ -325,6 +335,9 @@ enum StartTerm {
     ConstructorApplication(ConstructorName),
     Match,
     Fold,
+    Let,
+    Apply,
+    Lambda,
 }
 
 fn start_term(state: &mut State) -> Result<StartTerm> {
@@ -343,6 +356,9 @@ fn start_term(state: &mut State) -> Result<StartTerm> {
         match id.str() {
             "fold" => Ok(StartTerm::Fold),
             "match" => Ok(StartTerm::Match),
+            "let" => Ok(StartTerm::Let),
+            "apply" => Ok(StartTerm::Apply),
+            "fn" => Ok(StartTerm::Lambda),
             _ => {
                 if state.is_next_token_open_paren()? {
                     Ok(StartTerm::FunctionApplication(id))
@@ -639,7 +655,34 @@ fn term(state: &mut State) -> Result<Term> {
             let branches = pattern_branches(state)?;
             Ok(Term::Match(Box::new(arg), branches))
         },
+        StartTerm::Let => {
+            state.request_token(Request::OpenCurly)?;
+            let bindings = nonempty_var_binding_sequence(state)?;
+            state.request_token(Request::BindingSeparator)?;
+            let body = term(state)?;
+            state.request_token(Request::CloseCurly)?;
+            Ok(Term::Let(bindings, Box::new(body)))
+        },
+        StartTerm::Lambda => {
+            todo!()
+        },
+        StartTerm::Apply => {
+            todo!()
+        },
     }
+}
+
+// Parses    x = expr
+fn var_binding(state: &mut State) -> Result<(Variable, Term)> {
+    let var = variable(state)?;
+    state.request_keyword(Keyword::Eq)?;
+    let term = term(state)?;
+    Ok((var, term))
+}
+
+fn nonempty_var_binding_sequence(state: &mut State) -> Result<Vec<(Variable, Term)>> {
+    state.consume_optional_comma()?;
+    delimited_nonempty_sequence_to_vector(state, var_binding, comma)
 }
 
 fn term_possibly_empty_sequence(state: &mut State) -> Result<Vec<Term>> {
@@ -677,7 +720,7 @@ impl Pattern {
 }
 
 // Parses
-//     { pattern_branch0 | pattern_branch1 | ... }
+//     {   pattern_branch0 | pattern_branch1 | ... }
 // or  { | pattern_branch0 | pattern_branch1 | ... }
 fn pattern_branches(state: &mut State) -> Result<Vec<PatternBranch>> {
     state.request_token(Request::OpenCurly)?;
@@ -976,6 +1019,17 @@ mod tests {
 
         assert_eq!(name.str(), "nil");
         assert_eq!(type_parameters.len(), 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_local_let_0() -> Result<()> {
+        let s = "fn f = # Nat -> Nat : { x . let {, y = add(x, One), z = add(x, Two) . mul(y, z) } }";
+        let mut state = State::new(s);
+
+        let result = function_declaration(&mut state);
+        assert!(matches!(result, Ok(_)));
 
         Ok(())
     }

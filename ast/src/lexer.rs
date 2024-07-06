@@ -236,6 +236,15 @@ impl <'state> State<'state> {
         Ok(())
     }
 
+    pub fn consume_optional_comma(&mut self) -> Result<(), Error> {
+        self.consume_whitespace();
+        let c = self.read_char_or_fail_when_end()?;
+        if c == SeparatorSymbol::COMMA {
+            self.advance();
+        }
+        Ok(())
+    }
+
     pub fn is_next_token_open_paren(&mut self) -> Result<bool, Error> {
         self.consume_whitespace();
         let c = self.read_char_or_fail_when_end()?;

@@ -1,3 +1,4 @@
+// No structs in the first version.
 
 type Complex = struct {
 , re: Real
@@ -12,10 +13,10 @@ type Rational = struct {
 
 
 type Color = struct {
-, r: u256
-, g: u256
+, r: U256
+, g: U256
 , b: u256
-, alpha: u256
+, alpha: U256
 }
 
 
@@ -35,6 +36,12 @@ type OperationArgument = enum {
 
 type OperationApplication = struct {
 , name: OperationName
-, arguments: List[OperationArgument]
+, arguments: List(OperationArgument)
 }
 
+
+let cnum = # Complex :
+  Complex { re: 123, im: 32 }
+
+
+// TODO: How to do field access?
