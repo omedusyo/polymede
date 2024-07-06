@@ -1,7 +1,6 @@
 
 
-let sum =
-  # Int -> Cmd[Int] : fn { x . do {
+fn sum = # Int -> Cmd[Int] : { x . do {
     new result <- # Int : 0;
     new counter <- # Int : 0;
     # Cmd[Int] : loop { done .
@@ -13,5 +12,5 @@ let sum =
       | F . done(@result)
       }
     }
-  }}
+}}
 

@@ -9,15 +9,7 @@ type Bool = enum {
 }
 
 // Top-level binding.
-
-# Bool -> Bool
-fn not(x) {
-  match x {
-  | T . F
-  | F . T
-  }
-}
-let not = # Bool -> Bool : fn { x .
+fn not = # Bool -> Bool : { x .
   match x {
   | T . F
   | F . T
@@ -25,18 +17,17 @@ let not = # Bool -> Bool : fn { x .
 }
 
 // shorter version
-let not = # Bool -> Bool : fn {
+fn not = # Bool -> Bool : {
 | T . F
 | F . T
 }
 
-let and = # Bool, Bool -> Bool : fn {
+fn and = # Bool, Bool -> Bool : {
 | T, T . T
 | F, _ . F
 }
 
-let or = # Bool, Bool -> Bool : fn {
+fn or = # Bool, Bool -> Bool : {
 | F, F . F
 | _, _ . T
 }
-

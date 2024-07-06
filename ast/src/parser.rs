@@ -62,6 +62,17 @@ struct Function {
     body: Term,
 }
 
+struct LetDeclaration {
+    name: Variable,
+    type_parameters: Vec<Variable>,
+    body: TypedTerm,
+}
+
+struct TypedTerm {
+    type_: Type,
+    term: Term
+}
+
 #[derive(Debug)]
 enum Term {
     VariableUse(Variable),
@@ -118,6 +129,7 @@ impl <'state> State<'state> {
     pub fn request_keyword(&mut self, keyword: Keyword) -> Result<LocatedToken> {
         self.request_token(Request::Keyword(keyword))
     }
+
     pub fn consume_optional_or(&mut self) -> Result<()> {
         self.lexer_state.consume_optional_or().map_err(Error::LexError)
     }
@@ -501,11 +513,18 @@ fn type_declaration(state: &mut State) -> Result<TypeDeclaration> {
     Ok(declaration)
 }
 
-// ===Functions===
+// ===Function/Let Declarations===
 fn function_declaration(state: &mut State) -> Result<FunctionDeclaration> {
-    state.request_keyword(Keyword::Let)?;
+    state.request_keyword(Keyword::Fn)?;
     let function_name = function_name(state)?;
     state.request_keyword(Keyword::Eq)?;
+
+
+    fn inner_function_declaration(state: &mut State, function_name: FunctionName, type_parameters: Vec<Variable>) -> Result<FunctionDeclaration> {
+        let type_ = function_type_annotation(state)?;
+        let function = function(state, type_)?;
+        Ok(FunctionDeclaration { name: function_name, type_parameters, function })
+    }
 
     if state.commit_if_next_token_forall()? {
         // forall encountered
@@ -523,14 +542,7 @@ fn function_declaration(state: &mut State) -> Result<FunctionDeclaration> {
     }
 }
 
- fn inner_function_declaration(state: &mut State, function_name: FunctionName, type_parameters: Vec<Variable>) -> Result<FunctionDeclaration> {
-    let type_ = type_annotation(state, function_type)?;
-    let function = function(state, type_)?;
-    Ok(FunctionDeclaration { name: function_name, type_parameters, function })
- }
-
- fn function(state: &mut State, type_: FunctionType) -> Result<Function> {
-    state.request_keyword(Keyword::Function)?;
+fn function(state: &mut State, type_: FunctionType) -> Result<Function> {
     state.request_token(Request::OpenCurly)?;
 
     let parameters = parameter_possibly_empty_sequence(state)?;
@@ -544,19 +556,61 @@ fn function_declaration(state: &mut State) -> Result<FunctionDeclaration> {
     } else {
         Ok(Function { type_, parameters, body })
     }
- }
+}
 
+fn let_declaration(state: &mut State) -> Result<LetDeclaration> {
+    state.request_keyword(Keyword::Let)?;
+    let name = function_name(state)?;
+    state.request_keyword(Keyword::Eq)?;
+
+
+    fn inner_let_declaration(state: &mut State, function_name: FunctionName, type_parameters: Vec<Variable>) -> Result<LetDeclaration> {
+        let typed_term = typed_term(state)?;
+        Ok(LetDeclaration { name: function_name, type_parameters, body: typed_term })
+    }
+    
+    if state.commit_if_next_token_forall()? {
+        // forall encountered
+        state.request_token(Request::OpenCurly)?;
+        let type_parameters = parameter_non_empty_sequence(state)?;
+        state.request_token(Request::BindingSeparator)?;
+
+        let declaration = inner_let_declaration(state, name, type_parameters)?;
+
+        state.request_token(Request::CloseCurly)?;
+        Ok(declaration)
+    } else {
+        // no forall
+        inner_let_declaration(state, name, vec![])
+    }
+}
+
+fn typed_term(state: &mut State) -> Result<TypedTerm> {
+    let type_ = type_annotation(state)?;
+    let term = term(state)?;
+    Ok(TypedTerm { type_ , term })
+}
 
 // Parses
 //    # type :
 // where `:` can be optional when newline is present.
-fn type_annotation<t>(state: &mut State, type_parser: Parser<t>) -> Result<t> {
+// TODO: Consider having the `:` completely optional for function declarations.
+fn function_type_annotation(state: &mut State) -> Result<FunctionType> {
     state.request_keyword(Keyword::TypeAnnotationStart)?;
-    let type_ = type_parser(state)?;
+    let type_ = function_type(state)?;
     // TODO: Consume whitespace that's not a newline until you reach a newline or ':'
     state.request_keyword(Keyword::TypeAnnotationSeparator)?;
     Ok(type_)
 }
+
+fn type_annotation(state: &mut State) -> Result<Type> {
+    state.request_keyword(Keyword::TypeAnnotationStart)?;
+    let type_ = type_(state)?;
+    // TODO: Consume whitespace that's not a newline until you reach a newline or ':'
+    state.request_keyword(Keyword::TypeAnnotationSeparator)?;
+    Ok(type_)
+}
+
 
 // ===Terms===
 fn term(state: &mut State) -> Result<Term> {
@@ -830,7 +884,7 @@ mod tests {
 
     #[test]
     fn test_function_declaration_0() -> Result<()> {
-        let s = "let square = # Nat -> Nat : fn { x . mul(x, x) }";
+        let s = "fn square = # Nat -> Nat : { x . mul(x, x) }";
         let mut state = State::new(s);
 
         let result = function_declaration(&mut state);
@@ -859,7 +913,7 @@ mod tests {
 
     #[test]
     fn test_function_declaration_1() -> Result<()> {
-        let s = "let id = forall { a . # a -> a : fn { x . x } }";
+        let s = "fn id = forall { a . # a -> a : { x . x } }";
         let mut state = State::new(s);
 
         let result = function_declaration(&mut state);
@@ -882,7 +936,7 @@ mod tests {
 
     #[test]
     fn test_function_declaration_2() -> Result<()> {
-        let s = "let map = forall { a, b . # Fn(a -> b), List(a) -> List(b) : fn { f, xs . fold xs { Nil . Nil | Cons(x, state) . Cons(f(x), state) } } }";
+        let s = "fn map = forall { a, b . # Fn(a -> b), List(a) -> List(b) : { f, xs . fold xs { Nil . Nil | Cons(x, state) . Cons(f(x), state) } } }";
         let mut state = State::new(s);
 
         let result = function_declaration(&mut state);
@@ -891,6 +945,37 @@ mod tests {
 
         assert_eq!(name.str(), "map");
         assert_eq!(type_parameters.len(), 2);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_let_declaration_0() -> Result<()> {
+        let s = "let two = # Nat : S(S(Zero))";
+        let mut state = State::new(s);
+
+        let result = let_declaration(&mut state);
+        assert!(matches!(result, Ok(_)));
+        let LetDeclaration { name, type_parameters, body: _ } = result?;
+
+        assert_eq!(name.str(), "two");
+        assert_eq!(type_parameters.len(), 0);
+
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_let_declaration_1() -> Result<()> {
+        let s = "let nil = forall { a . # List : Nil }";
+        let mut state = State::new(s);
+
+        let result = let_declaration(&mut state);
+        assert!(matches!(result, Ok(_)));
+        let LetDeclaration { name, type_parameters, body: _ } = result?;
+
+        assert_eq!(name.str(), "nil");
+        assert_eq!(type_parameters.len(), 1);
 
         Ok(())
     }

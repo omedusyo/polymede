@@ -1,6 +1,6 @@
 
-let map = forall { A B .
-  # Fn(A -> B) -> List(A) -> List(B) : fn { f xs .
+fn map = forall { a b .
+  # Fn(a -> b) -> List(a) -> List(b) : { f xs .
     fold xs {
     | Nil . Nil
     | Cons(x, result) . Cons(f(x), result)

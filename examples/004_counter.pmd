@@ -9,7 +9,7 @@ let initialState =
   # Int
   0
 
-let update =
+fn update =
   # Msg, Int -> Int
   { msg state .
     match msg {

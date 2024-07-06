@@ -1,5 +1,5 @@
 
-let compose = # forall A B C .
-  # Fn(A -> B), Fn(B -> C) -> Fn(A -> C) : fn { f g .
-    fn(# A -> C : fn { x . apply(g, apply(f, x)) })
+fn compose = forall a, b, c .
+  # Fn(a -> b), Fn(b -> c) -> Fn(a -> c) : { f, g .
+    fn(# a -> c : { x . apply(g, apply(f, x)) })
   }
