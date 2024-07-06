@@ -225,6 +225,12 @@ impl <'state> State<'state> {
         Ok(())
     }
 
+    pub fn is_next_token_open_paren(&mut self) -> Result<bool, Error> {
+        self.consume_whitespace();
+        let c = self.read_char_or_fail_when_end()?;
+        Ok(c == '(')
+    }
+
     fn nat32(&mut self, request: Request) -> Result<LocatedToken, Error> {
         fn digit(c: char) -> Option<u32> {
             match c {

@@ -95,3 +95,6 @@ node runtime/src/run.js $FILE
 ======Binaryen Installation========
 for `wasm-merge`
 https://github.com/WebAssembly/binaryen/releases
+
+
+

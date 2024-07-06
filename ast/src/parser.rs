@@ -5,14 +5,14 @@ use crate::base::{Program, PrimitiveType};
 
 type Result<A> = std::result::Result<A, Error>;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum Type {
     VarUse(Identifier),
     TypeApplication(Identifier, Vec<Type>),
     Arrow(Box<FunctionType>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct FunctionType {
     input_types: Vec<Type>,
     output_type: Type,
@@ -20,6 +20,7 @@ struct FunctionType {
 
 #[derive(Debug, Clone)]
 struct Identifier {
+    // TODO: Consider making this an interned String
     str: String,
     position: Position,
 }
@@ -33,12 +34,14 @@ struct ConstructorDeclaration {
 #[derive(Debug)]
 struct EnumDeclaration {
     name: Identifier,
+    type_parameters: Vec<Identifier>,
     constructors: Vec<ConstructorDeclaration>,
 }
 
 #[derive(Debug)]
 struct IndDeclaration {
     name: Identifier,
+    type_parameters: Vec<Identifier>,
     recursive_type_var: Identifier,
     constructors: Vec<ConstructorDeclaration>,
 }
@@ -59,6 +62,7 @@ pub enum Error {
     ExpectedTypeConstructorOrTypeVar { received: Identifier },
     ExpectedTypeConstructor { received: Identifier },
     ExpectedTypeVar { received: Identifier },
+    DuplicateVariableNames { duplicates: Vec<Identifier> },
 }
 
 
@@ -83,6 +87,22 @@ impl Identifier {
     }
 }
 
+impl PartialEq for Identifier {
+    fn eq(&self, other: &Self) -> bool {
+        self.str == other.str
+    }
+}
+
+impl Eq for Identifier {}
+
+use std::hash::{Hash, Hasher};
+
+impl Hash for Identifier {
+    fn hash<H>(&self, state: &mut H) where H: Hasher {
+        self.str.hash(state)
+    }
+}
+
 impl <'state> State<'state> {
     pub fn new<'a: 'state>(str: &'a str) -> Self {
         Self { lexer_state: lexer::State::new(str) }
@@ -98,6 +118,10 @@ impl <'state> State<'state> {
 
     pub fn consume_optional_or(&mut self) -> Result<()> {
         self.lexer_state.consume_optional_or().map_err(Error::LexError)
+    }
+
+    pub fn is_next_token_open_paren(&mut self) -> Result<bool> {
+        self.lexer_state.is_next_token_open_paren().map_err(Error::LexError)
     }
 
     pub fn lookahead_char(&self) -> Result<char> {
@@ -141,6 +165,24 @@ fn delimited_nonempty_sequence<S, A, D>(
     Ok(s)
 }
 
+fn delimited_nonempty_sequence_to_vector<A, D>(
+    state: &mut State,
+    p: Parser<A>,
+    delim: Parser<D>)
+    -> Result<Vec<A>> 
+{
+    delimited_nonempty_sequence(
+        state,
+        vec![],
+        p,
+        delim,
+        |mut xs: Vec<A>, x: A| {
+            xs.push(x);
+            xs
+        }
+    )
+}
+
 fn comma(state: &mut State) -> Result<Position> {
     let LocatedToken { position, .. } = state.request_token(Request::Separator(SeparatorSymbol::Comma))?;
     Ok(position)
@@ -173,21 +215,23 @@ fn type_(state: &mut State) -> Result<Type> {
     let c = id.first_char();
     if c.is_ascii_uppercase() {
         // constructor
-        let saved_state = state.clone();
-        let Ok(_) = state.request_token(Request::OpenParen) else {
-            *state = saved_state; // backtrack
+
+        if state.is_next_token_open_paren()? {
+            // A type constructor 
+            state.request_token(Request::OpenParen)?;
+            if id.str() == "Fn" {
+                let fn_type = function_type(state)?;
+                state.request_token(Request::CloseParen)?;
+                return Ok(Type::Arrow(Box::new(fn_type)))
+            } else {
+                let type_args = type_sequence(state)?;
+                state.request_token(Request::CloseParen)?;
+                return Ok(Type::TypeApplication(id, type_args))
+            }
+
+        } else {
             // A type constant
             return Ok(Type::TypeApplication(id, vec![]))
-        };
-        // A type constructor 
-        if id.str() == "Fn" {
-            let fn_type = function_type(state)?;
-            state.request_token(Request::CloseParen)?;
-            return Ok(Type::Arrow(Box::new(fn_type)))
-        } else {
-            let type_args = type_sequence(state)?;
-            state.request_token(Request::CloseParen)?;
-            return Ok(Type::TypeApplication(id, type_args))
         }
     } else if c.is_ascii_lowercase() {
         // type-var
@@ -199,17 +243,37 @@ fn type_(state: &mut State) -> Result<Type> {
 
 // Parses   T1, T2, T3, T4 non-empty
 fn type_sequence(state: &mut State) -> Result<Vec<Type>> {
-    delimited_nonempty_sequence(
-        state,
-        vec![],
-        type_,
-        comma,
-        |mut types: Vec<Type>, type_: Type| {
-            types.push(type_);
-            types
-        }
-    )
+    delimited_nonempty_sequence_to_vector(state, type_, comma)
 }
+
+// Parser a non-empty sequence of identifiers separated by comma
+//   x1, x2, x3
+// Also checks that no two identifiers are equal.
+fn identifier_sequence(state: &mut State) -> Result<Vec<Identifier>> {
+    fn get_duplicates(identifiers: &[Identifier]) -> Vec<Identifier> {
+        use std::collections::HashSet;
+        let mut seen: HashSet<&Identifier> = HashSet::new();
+        let mut duplicates: Vec<Identifier> = vec![];
+        // TODO: You also need the index.
+        for id in identifiers {
+            if !seen.insert(id) {
+                // id was already present.
+                duplicates.push(id.clone());
+            }
+        }
+        duplicates
+    }
+
+    let ids = delimited_nonempty_sequence_to_vector(state, identifier, comma)?;
+    let duplicate_ids = get_duplicates(&ids);
+    println!("Duplicates: {:?}", duplicate_ids);
+    if duplicate_ids.is_empty() {
+        Ok(ids)
+    } else {
+        Err(Error::DuplicateVariableNames { duplicates: duplicate_ids })
+    }
+}
+
 
 // Parses  T1, T2 -> T
 fn function_type(state: &mut State) -> Result<FunctionType> {
@@ -223,31 +287,21 @@ fn constructor_declaration(state: &mut State) -> Result<ConstructorDeclaration> 
     let id = identifier(state)?;
     if !id.first_char().is_ascii_uppercase() { return Err(Error::ExpectedTypeConstructor { received: id }) }
 
-    let saved_state = state.clone();
-    let Ok(_) = state.request_token(Request::OpenParen) else {
-        *state = saved_state; // backtrack
+    if state.is_next_token_open_paren()? {
+        // Constructor with non-zero parameters
+        state.request_token(Request::OpenParen)?;
+        let parameter_types = type_sequence(state)?;
+        state.request_token(Request::CloseParen)?;
+        Ok(ConstructorDeclaration { name: id, parameters: parameter_types, })
+    } else {
         // Constant
-        return Ok(ConstructorDeclaration { name: id, parameters: vec![] })
-    };
-    // Constructor with non-zero parameters
-    let parameter_types = type_sequence(state)?;
-    state.request_token(Request::CloseParen)?;
-    Ok(ConstructorDeclaration { name: id, parameters: parameter_types, })
+        Ok(ConstructorDeclaration { name: id, parameters: vec![] })
+    }
 }
 
 fn constructor_declaration_sequence(state: &mut State) -> Result<Vec<ConstructorDeclaration>> {
     state.consume_optional_or()?;
-
-    delimited_nonempty_sequence(
-        state,
-        vec![],
-        constructor_declaration,
-        or_separator,
-        |mut constructor_declarations: Vec<ConstructorDeclaration>, constructor_declaration: ConstructorDeclaration| {
-            constructor_declarations.push(constructor_declaration);
-            constructor_declarations
-        }
-    )
+    delimited_nonempty_sequence_to_vector( state, constructor_declaration, or_separator)
 }
 
 
@@ -257,6 +311,15 @@ fn type_declaration(state: &mut State) -> Result<TypeDeclaration> {
     let id = identifier(state)?;
     if !id.first_char().is_ascii_uppercase() { return Err(Error::ExpectedTypeConstructor { received: id }) }
 
+    let type_parameters = if state.is_next_token_open_paren()? {
+        state.request_token(Request::OpenParen)?;
+        let params = identifier_sequence(state)?;
+        state.request_token(Request::CloseParen)?;
+        params
+    } else {
+        vec![]
+    };
+
     state.request_keyword(Keyword::Eq)?;
 
     let LocatedToken { token: Token::Keyword(keyword), .. } = state.request_token(Request::TypeDeclarationKeyword)? else { unreachable!() };
@@ -265,6 +328,7 @@ fn type_declaration(state: &mut State) -> Result<TypeDeclaration> {
         Keyword::Enum => {
             TypeDeclaration::Enum(EnumDeclaration {
                 name: id,
+                type_parameters,
                 constructors: constructor_declaration_sequence(state)?
             })
         },
@@ -276,6 +340,7 @@ fn type_declaration(state: &mut State) -> Result<TypeDeclaration> {
 
             TypeDeclaration::Ind(IndDeclaration {
                 name: id,
+                type_parameters,
                 recursive_type_var,
                 constructors: constructor_declaration_sequence(state)?
             })
@@ -338,7 +403,7 @@ mod tests {
         let result = type_declaration(&mut state);
 
         assert!(matches!(result, Ok(TypeDeclaration::Enum(_))));
-        let Ok(TypeDeclaration::Enum(EnumDeclaration { name, constructors })) = result else { unreachable!() };
+        let Ok(TypeDeclaration::Enum(EnumDeclaration { name, type_parameters, constructors })) = result else { unreachable!() };
         assert_eq!(name.str(), "Bool");
 
         assert_eq!(constructors.len(), 2);
@@ -357,7 +422,7 @@ mod tests {
 
         assert!(matches!(result, Ok(TypeDeclaration::Enum(_))));
 
-        let Ok(TypeDeclaration::Enum(EnumDeclaration { name, constructors })) = result else { unreachable!() };
+        let Ok(TypeDeclaration::Enum(EnumDeclaration { name, type_parameters, constructors })) = result else { unreachable!() };
         assert_eq!(name.str(), "SomeType");
 
         assert_eq!(constructors.len(), 4);
@@ -382,7 +447,7 @@ mod tests {
         let result = type_declaration(&mut state);
 
         assert!(matches!(result, Ok(TypeDeclaration::Ind(_))));
-        let Ok(TypeDeclaration::Ind(IndDeclaration { name, recursive_type_var, constructors })) = result else { unreachable!() };
+        let Ok(TypeDeclaration::Ind(IndDeclaration { name, type_parameters, recursive_type_var, constructors })) = result else { unreachable!() };
         assert_eq!(name.str(), "Nat");
         assert_eq!(recursive_type_var.str(), "nat");
 
@@ -392,6 +457,49 @@ mod tests {
 
         assert_eq!(constructors[0].parameters.len(), 0);
         assert_eq!(constructors[1].parameters.len(), 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_type_declaration_3() -> Result<()> {
+        let s = "type List(a, ignored) = ind { list . Nil | Cons(a, list) }";
+        let mut state = State::new(s);
+
+        let result = type_declaration(&mut state);
+
+        assert!(matches!(result, Ok(TypeDeclaration::Ind(_))));
+        let Ok(TypeDeclaration::Ind(IndDeclaration { name, type_parameters, recursive_type_var, constructors })) = result else { unreachable!() };
+        assert_eq!(name.str(), "List");
+
+        assert_eq!(type_parameters.len(), 2);
+        assert_eq!(type_parameters[0].str(), "a");
+        assert_eq!(type_parameters[1].str(), "ignored");
+
+        assert_eq!(recursive_type_var.str(), "list");
+
+        assert_eq!(constructors.len(), 2);
+        assert_eq!(constructors[0].name.str(), "Nil");
+        assert_eq!(constructors[1].name.str(), "Cons");
+
+        assert_eq!(constructors[0].parameters.len(), 0);
+        assert_eq!(constructors[1].parameters.len(), 2);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_type_declaration_4() -> Result<()> {
+        let s = "type Foo(x, y, z, y, z) = enum { A | B }";
+        let mut state = State::new(s);
+
+        let result = type_declaration(&mut state);
+
+        assert!(matches!(result, Err(Error::DuplicateVariableNames {..})));
+        let Err(Error::DuplicateVariableNames { duplicates }) = result else { unreachable!() };
+        assert_eq!(duplicates.len(), 2);
+        assert_eq!(duplicates[0].str, "y");
+        assert_eq!(duplicates[1].str, "z");
 
         Ok(())
     }
