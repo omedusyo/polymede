@@ -243,6 +243,7 @@ impl <'state> State<'state> {
     }
 
     pub fn commit_if_next_token_forall(&mut self) -> Result<bool, Error> {
+        self.consume_whitespace();
         let c = self.read_char_or_fail_when_end()?;
         if c == 'f' {
             self.match_keyword(Request::Keyword(token::Keyword::Forall), token::Keyword::Forall)?;

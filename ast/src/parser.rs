@@ -48,18 +48,21 @@ enum TypeDeclaration {
     // TODO: structs
 }
 
+#[derive(Debug)]
 struct FunctionDeclaration {
     name: FunctionName,
     type_parameters: Vec<Variable>,
     function: Function,
 }
 
+#[derive(Debug)]
 struct Function {
     type_: FunctionType,
     parameters: Vec<Variable>,
     body: Term,
 }
 
+#[derive(Debug)]
 enum Term {
     VariableUse(Variable),
     FunctionApplication(Variable, Vec<Term>),
@@ -68,11 +71,13 @@ enum Term {
     Fold(Box<Term>, Vec<PatternBranch>),
 }
 
+#[derive(Debug)]
 struct PatternBranch {
     pattern: Pattern,
     body: Term,
 }
 
+#[derive(Debug)]
 pub enum Pattern {
     Constructor(ConstructorName, Vec<Pattern>),
     Variable(Variable),
@@ -365,7 +370,7 @@ fn pattern_identifier(state: &mut State) -> Result<PatternIdentifier> {
 //   x1, x2, x3
 // Also checks that no two identifiers are equal.
 fn parameter_non_empty_sequence(state: &mut State) -> Result<Vec<Identifier>> {
-    let ids = delimited_nonempty_sequence_to_vector(state, identifier, comma)?;
+    let ids = delimited_nonempty_sequence_to_vector(state, variable, comma)?;
     let duplicate_ids = identifier::duplicates(&ids);
     if duplicate_ids.is_empty() {
         Ok(ids)
@@ -375,7 +380,7 @@ fn parameter_non_empty_sequence(state: &mut State) -> Result<Vec<Identifier>> {
 }
 
 fn parameter_possibly_empty_sequence(state: &mut State) -> Result<Vec<Identifier>> {
-    let ids = delimited_possibly_empty_sequence_to_vector(state, identifier, comma)?;
+    let ids = delimited_possibly_empty_sequence_to_vector(state, variable, comma)?;
     let duplicate_ids = identifier::duplicates(&ids);
     if duplicate_ids.is_empty() {
         Ok(ids)
@@ -722,7 +727,7 @@ mod tests {
         let result = type_declaration(&mut state);
 
         assert!(matches!(result, Ok(TypeDeclaration::Enum(_))));
-        let Ok(TypeDeclaration::Enum(EnumDeclaration { name, type_parameters, constructors })) = result else { unreachable!() };
+        let Ok(TypeDeclaration::Enum(EnumDeclaration { name, type_parameters: _, constructors })) = result else { unreachable!() };
         assert_eq!(name.str(), "Bool");
 
         assert_eq!(constructors.len(), 2);
@@ -741,7 +746,7 @@ mod tests {
 
         assert!(matches!(result, Ok(TypeDeclaration::Enum(_))));
 
-        let Ok(TypeDeclaration::Enum(EnumDeclaration { name, type_parameters, constructors })) = result else { unreachable!() };
+        let Ok(TypeDeclaration::Enum(EnumDeclaration { name, type_parameters: _, constructors })) = result else { unreachable!() };
         assert_eq!(name.str(), "SomeType");
 
         assert_eq!(constructors.len(), 4);
@@ -766,7 +771,7 @@ mod tests {
         let result = type_declaration(&mut state);
 
         assert!(matches!(result, Ok(TypeDeclaration::Ind(_))));
-        let Ok(TypeDeclaration::Ind(IndDeclaration { name, type_parameters, recursive_type_var, constructors })) = result else { unreachable!() };
+        let Ok(TypeDeclaration::Ind(IndDeclaration { name, type_parameters: _, recursive_type_var, constructors })) = result else { unreachable!() };
         assert_eq!(name.str(), "Nat");
         assert_eq!(recursive_type_var.str(), "nat");
 
@@ -819,6 +824,73 @@ mod tests {
         assert_eq!(duplicates.len(), 2);
         assert_eq!(duplicates[0].str(), "y");
         assert_eq!(duplicates[1].str(), "z");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_function_declaration_0() -> Result<()> {
+        let s = "let square = # Nat -> Nat : fn { x . mul(x, x) }";
+        let mut state = State::new(s);
+
+        let result = function_declaration(&mut state);
+        assert!(matches!(result, Ok(_)));
+        let FunctionDeclaration { name, type_parameters, function } = result?;
+
+        assert_eq!(name.str(), "square");
+        assert_eq!(type_parameters.len(), 0);
+
+        let Type::TypeApplication(ref t0, _) = function.type_.input_types[0] else { unreachable!() };
+        let Type::TypeApplication(ref t, _) = function.type_.output_type else { unreachable!() };
+        assert_eq!(t0.str(), "Nat");
+        assert_eq!(t.str(), "Nat");
+
+        let Term::FunctionApplication(mul, args) = function.body else { unreachable!() };
+        let Term::VariableUse(ref arg0) = args[0] else { unreachable!() };
+        let Term::VariableUse(ref arg1) = args[1] else { unreachable!() };
+
+
+        assert_eq!(mul.str(), "mul");
+        assert_eq!(arg0.str(), "x");
+        assert_eq!(arg1.str(), "x");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_function_declaration_1() -> Result<()> {
+        let s = "let id = forall { a . # a -> a : fn { x . x } }";
+        let mut state = State::new(s);
+
+        let result = function_declaration(&mut state);
+        assert!(matches!(result, Ok(_)));
+        let FunctionDeclaration { name, type_parameters, function } = result?;
+
+        assert_eq!(name.str(), "id");
+        assert_eq!(type_parameters.len(), 1);
+
+        let Type::VariableUse(ref t0) = function.type_.input_types[0] else { unreachable!() };
+        let Type::VariableUse(ref t) = function.type_.output_type else { unreachable!() };
+        assert_eq!(t0.str(), "a");
+        assert_eq!(t.str(), "a");
+
+        let Term::VariableUse(x) = function.body else { unreachable!() };
+        assert_eq!(x.str(), "x");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_function_declaration_2() -> Result<()> {
+        let s = "let map = forall { a, b . # Fn(a -> b), List(a) -> List(b) : fn { f, xs . fold xs { Nil . Nil | Cons(x, state) . Cons(f(x), state) } } }";
+        let mut state = State::new(s);
+
+        let result = function_declaration(&mut state);
+        assert!(matches!(result, Ok(_)));
+        let FunctionDeclaration { name, type_parameters, function: _ } = result?;
+
+        assert_eq!(name.str(), "map");
+        assert_eq!(type_parameters.len(), 2);
 
         Ok(())
     }
