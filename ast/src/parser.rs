@@ -3,7 +3,7 @@ use crate::lexer::{LocatedToken, Position, Request};
 use crate::token::{Token, SeparatorSymbol, Keyword};
 use crate::base::{Program, PrimitiveType};
 use crate::identifier;
-use crate::identifier::{Identifier, Variable, ConstructorName};
+use crate::identifier::{Identifier, Variable, FunctionName, ConstructorName};
 
 type Result<A> = std::result::Result<A, Error>;
 
@@ -37,7 +37,7 @@ struct EnumDeclaration {
 struct IndDeclaration {
     name: ConstructorName,
     type_parameters: Vec<Variable>,
-    recursive_type_var: Identifier,
+    recursive_type_var: Variable,
     constructors: Vec<ConstructorDeclaration>,
 }
 
@@ -49,7 +49,7 @@ enum TypeDeclaration {
 }
 
 struct FunctionDeclaration {
-    name: Variable,
+    name: FunctionName,
     type_parameters: Vec<Variable>,
     function: Function,
 }
@@ -61,7 +61,7 @@ struct Function {
 }
 
 enum Term {
-    VarUse(Variable),
+    VariableUse(Variable),
     FunctionApplication(Variable, Vec<Term>),
     ConstructorUse(ConstructorName, Vec<Term>),
     Match(Box<Term>, Vec<PatternBranch>),
@@ -88,6 +88,7 @@ pub enum Error {
     LexError(lexer::Error),
     ExpectedTypeConstructorOrTypeVar { received: Identifier },
     ExpectedTypeConstructorOrTypeVarOrAnythingInPattern { received: Identifier },
+    ExpectedTerm { received: Identifier },
     ExpectedTypeConstructor { received: Identifier },
     ExpectedTypeVar { received: Identifier },
     DuplicateVariableNames { duplicates: Vec<Identifier> },
@@ -242,7 +243,6 @@ fn delimited_possibly_empty_sequence_to_vector<A, D>(
 }
 
 // ===Specific Parsers===
-
 fn comma(state: &mut State) -> Result<Position> {
     let LocatedToken { position, .. } = state.request_token(Request::Separator(SeparatorSymbol::Comma))?;
     Ok(position)
@@ -259,6 +259,7 @@ fn and_separator(state: &mut State) -> Result<Position> {
 }
 
 // ===Identifiers===
+// TODO: These are more appropriate for lexer.
 fn identifier(state: &mut State) -> Result<Identifier> {
     let LocatedToken { token: Token::Identifier(str), position } = state.request_token(Request::Identifier)? else { unreachable!() };
     let identifier = Identifier::new(str, position);
@@ -277,6 +278,10 @@ fn variable(state: &mut State) -> Result<Variable> {
     Ok(id)
 }
 
+fn function_name(state: &mut State) -> Result<FunctionName> {
+    variable(state)
+}
+
 enum VariableOrConstructorName {
     Variable(Variable),
     ConstructorName(ConstructorName)
@@ -293,6 +298,44 @@ fn constructor_name_or_variable(state: &mut State) -> Result<VariableOrConstruct
         Ok(VariableOrConstructorName::Variable(id))
     } else {
         Err(Error::ExpectedTypeConstructorOrTypeVar { received: id })
+    }
+}
+
+enum StartTerm {
+    VariableUse(Variable),
+    FunctionApplication(Variable),
+    ConstructorConstant(ConstructorName),
+    ConstructorApplication(ConstructorName),
+    Match,
+    Fold,
+}
+
+fn start_term(state: &mut State) -> Result<StartTerm> {
+    let id = identifier(state)?;
+    let c = id.first_char();
+    if c.is_ascii_uppercase() {
+        // constructor
+        if state.is_next_token_open_paren()? {
+            Ok(StartTerm::ConstructorApplication(id))
+        } else {
+            // constructor constant
+            Ok(StartTerm::ConstructorConstant(id))
+        }
+    } else if c.is_ascii_lowercase() {
+        // TODO: Checking for fold/match here is really wrong. This should be the job for the lexer.
+        match id.str() {
+            "fold" => Ok(StartTerm::Fold),
+            "match" => Ok(StartTerm::Match),
+            _ => {
+                if state.is_next_token_open_paren()? {
+                    Ok(StartTerm::FunctionApplication(id))
+                } else {
+                    Ok(StartTerm::VariableUse(id))
+                }
+            },
+        }
+    } else {
+        Err(Error::ExpectedTypeConstructorOrTypeVarOrAnythingInPattern { received: id })
     }
 }
 
@@ -387,6 +430,7 @@ fn function_type(state: &mut State) -> Result<FunctionType> {
     Ok(FunctionType { input_types, output_type })
 }
 
+// TODO: Check for uniqueness of constructor names.
 fn constructor_declaration(state: &mut State) -> Result<ConstructorDeclaration> {
     let constructor_name = constructor_name(state)?;
 
@@ -455,7 +499,7 @@ fn type_declaration(state: &mut State) -> Result<TypeDeclaration> {
 // ===Functions===
 fn function_declaration(state: &mut State) -> Result<FunctionDeclaration> {
     state.request_keyword(Keyword::Let)?;
-    let function_name = variable(state)?;
+    let function_name = function_name(state)?;
     state.request_keyword(Keyword::Eq)?;
 
     if state.commit_if_next_token_forall()? {
@@ -474,7 +518,7 @@ fn function_declaration(state: &mut State) -> Result<FunctionDeclaration> {
     }
 }
 
- fn inner_function_declaration(state: &mut State, function_name: Variable, type_parameters: Vec<Variable>) -> Result<FunctionDeclaration> {
+ fn inner_function_declaration(state: &mut State, function_name: FunctionName, type_parameters: Vec<Variable>) -> Result<FunctionDeclaration> {
     let type_ = type_annotation(state, function_type)?;
     let function = function(state, type_)?;
     Ok(FunctionDeclaration { name: function_name, type_parameters, function })
@@ -511,7 +555,40 @@ fn type_annotation<t>(state: &mut State, type_parser: Parser<t>) -> Result<t> {
 
 // ===Terms===
 fn term(state: &mut State) -> Result<Term> {
-    todo!()
+    match start_term(state)? {
+        StartTerm::VariableUse(variable) => Ok(Term::VariableUse(variable)),
+        StartTerm::FunctionApplication(function_name) => {
+            state.request_token(Request::OpenParen)?;
+            let args = term_possibly_empty_sequence(state)?;
+            state.request_token(Request::CloseParen)?;
+            Ok(Term::FunctionApplication(function_name, args))
+        },
+        StartTerm::ConstructorConstant(constructor_name) => Ok(Term::ConstructorUse(constructor_name, vec![])),
+        StartTerm::ConstructorApplication(constructor_name) => {
+            state.request_token(Request::OpenParen)?;
+            let args = term_nonempty_sequence(state)?;
+            state.request_token(Request::CloseParen)?;
+            Ok(Term::ConstructorUse(constructor_name, args))
+        },
+        StartTerm::Match => {
+            let arg = term(state)?;
+            let branches = pattern_branches(state)?;
+            Ok(Term::Match(Box::new(arg), branches))
+        },
+        StartTerm::Fold => {
+            let arg = term(state)?;
+            let branches = pattern_branches(state)?;
+            Ok(Term::Match(Box::new(arg), branches))
+        },
+    }
+}
+
+fn term_possibly_empty_sequence(state: &mut State) -> Result<Vec<Term>> {
+    delimited_possibly_empty_sequence_to_vector(state, term, comma)
+}
+
+fn term_nonempty_sequence(state: &mut State) -> Result<Vec<Term>> {
+    delimited_nonempty_sequence_to_vector(state, term, comma)
 }
 
 // ===Patterns===

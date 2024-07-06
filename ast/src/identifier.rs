@@ -10,6 +10,7 @@ pub struct Identifier {
 
 // Identifier that starts with lowercase letter.
 pub type Variable = Identifier;
+pub type FunctionName = Variable;
 // Identifier that starts with uppercase letter.
 pub type ConstructorName = Identifier;
 
