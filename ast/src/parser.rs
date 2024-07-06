@@ -48,6 +48,26 @@ enum TypeDeclaration {
     // TODO: structs
 }
 
+enum Term {
+    VarUse(Variable),
+    FunctionApplication(Variable, Vec<Term>),
+    ConstructorUse(ConstructorName, Vec<Term>),
+    Match(Box<Term>, Vec<PatternBranch>),
+    Fold(Box<Term>, Vec<PatternBranch>),
+}
+
+struct PatternBranch {
+    pattern: Pattern,
+    body: Term,
+}
+
+pub enum Pattern {
+    Constructor(ConstructorName, Vec<Pattern>),
+    Variable(Variable),
+    Anything(Identifier),
+}
+
+
 // Note that this is not a closure type. It's simply a function pointer.
 type Parser<A> = fn(&mut State) -> Result<A>;
 
@@ -55,6 +75,7 @@ type Parser<A> = fn(&mut State) -> Result<A>;
 pub enum Error {
     LexError(lexer::Error),
     ExpectedTypeConstructorOrTypeVar { received: Identifier },
+    ExpectedTypeConstructorOrTypeVarOrAnythingInPattern { received: Identifier },
     ExpectedTypeConstructor { received: Identifier },
     ExpectedTypeVar { received: Identifier },
     DuplicateVariableNames { duplicates: Vec<Identifier> },
@@ -199,6 +220,28 @@ fn constructor_name_or_variable(state: &mut State) -> Result<VariableOrConstruct
     }
 }
 
+enum PatternIdentifier {
+    Variable(Variable),
+    ConstructorName(ConstructorName),
+    Anything(Identifier),
+}
+
+fn pattern_identifier(state: &mut State) -> Result<PatternIdentifier> {
+    let id = identifier(state)?;
+    let c = id.first_char();
+    if c.is_ascii_uppercase() {
+        // constructor
+        Ok(PatternIdentifier::ConstructorName(id))
+    } else if c.is_ascii_lowercase() {
+        // variable
+        Ok(PatternIdentifier::Variable(id))
+    } else if c == '_' {
+        Ok(PatternIdentifier::Anything(id))
+    } else {
+        Err(Error::ExpectedTypeConstructorOrTypeVarOrAnythingInPattern { received: id })
+    }
+}
+
 // Parser a non-empty sequence of identifiers separated by comma
 //   x1, x2, x3
 // Also checks that no two identifiers are equal.
@@ -317,6 +360,73 @@ fn type_declaration(state: &mut State) -> Result<TypeDeclaration> {
     state.request_token(Request::CloseCurly)?;
 
     Ok(declaration)
+}
+
+// ===Functions===
+
+// ===Terms===
+fn term(state: &mut State) -> Result<Term> {
+    todo!()
+}
+
+// ===Patterns===
+fn pattern_sequence(state: &mut State) -> Result<Vec<Pattern>> {
+    delimited_nonempty_sequence_to_vector(state, pattern, comma)
+}
+
+impl Pattern {
+    // Gets all the variables in the pattern
+    fn variables(&self) -> Vec<Variable> {
+        let mut vars: Vec<Variable> = vec![];
+
+        fn pattern_loop(pattern: &Pattern, vars: &mut Vec<Variable>) {
+            use Pattern::*;
+            match pattern {
+                Constructor(_, patterns) => {
+                    for pattern in patterns {
+                        pattern_loop(pattern, vars)
+                    }
+                },
+                Variable(variable) => {
+                    vars.push(variable.clone())
+                },
+                Anything(_) => {},
+            }
+        }
+        pattern_loop(self, &mut vars);
+
+        vars
+    }
+}
+
+fn pattern(state: &mut State) -> Result<Pattern> {
+    fn parser(state: &mut State) -> Result<Pattern> {
+        match pattern_identifier(state)? {
+            PatternIdentifier::Variable(variable) => Ok(Pattern::Variable(variable)),
+            PatternIdentifier::ConstructorName(constructor_name) => {
+                if state.is_next_token_open_paren()? {
+                    // A constructor with multiple parameters.
+                    state.request_token(Request::OpenParen)?;
+                    let pattern_parameters = pattern_sequence(state)?;
+                    state.request_token(Request::CloseParen)?;
+                    Ok(Pattern::Constructor(constructor_name, pattern_parameters))
+                } else {
+                    // A constant
+                    Ok(Pattern::Constructor(constructor_name, vec![]))
+                }
+            },
+            PatternIdentifier::Anything(id) => {
+                Ok(Pattern::Anything(id))
+            }
+        }
+    }
+    let pattern = parser(state)?;
+    let duplicate_ids = identifier::duplicates(&pattern.variables());
+    if duplicate_ids.is_empty() {
+        Ok(pattern)
+    } else {
+        Err(Error::DuplicateVariableNames { duplicates: duplicate_ids })
+    }
 }
 
 mod tests {

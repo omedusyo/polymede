@@ -1,14 +1,14 @@
 
 // we can think that closure application is defined somehow as follows
 let apply = # forall A B .
-  # Fn[A, B], A -> B
+  # Fn(A -> B), A -> B
   fn { f, a .
     // runs the code of f in environment that's stored in the closure.
     ...
   }
 
 let closure = # forall A B .
-  # (A -> B) -> Fn[A, B]
+  # (A -> B) -> Fn(A -> B)
   // capture of local environment is happening here
   fn { f .
     ...
@@ -17,12 +17,12 @@ let closure = # forall A B .
 // Partial application.
 
 let add1 =
-  # Fn[Nat -> Nat]
+  # Fn(Nat -> Nat)
   fn { x . add(1, x) }
 
 let addClosure =
-  # Fn[Nat, Nat -> Nat]
-  fn { x, y . add(x, y) }
+  # Nat -> Fn(Nat -> Nat)
+  fn { x . # Fn(Nat -> Nat) : fn { add(x, y) } }
 
 
 // So basically `fn` is an operator, that takes in a judgment 

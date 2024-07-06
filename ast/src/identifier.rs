@@ -56,4 +56,3 @@ pub fn duplicates(identifiers: &[Identifier]) -> Vec<Identifier> {
     }
     duplicates
 }
-

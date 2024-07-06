@@ -10,7 +10,7 @@ let initialState =
   0
 
 let update =
-  # Msg -> Int -> Int
+  # Msg, Int -> Int
   { msg state .
     match msg {
     | Inc . state + 1
