@@ -22,6 +22,10 @@ pub enum Keyword {
     Ind,
     Match,
     Fold,
+    Forall,
+    TypeAnnotationStart,
+    TypeAnnotationSeparator,
+    Function,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -48,6 +52,10 @@ impl Keyword {
     pub const TYPE: &'static str = "type";
     pub const MATCH: &'static str = "match";
     pub const FOLD: &'static str = "fold";
+    pub const TYPE_OF_VALUE: &'static str = "#";
+    pub const VALUE_AFTER_TYPE: &'static str = ":";
+    pub const FORALL: &'static str = "forall";
+    pub const FUNCTION: &'static str = "fn";
 
     pub fn string(&self) -> &str {
         use Keyword::*;
@@ -60,6 +68,10 @@ impl Keyword {
             Type_ => Self::TYPE,
             Match => Self::MATCH,
             Fold => Self::FOLD,
+            Forall => Self::FORALL,
+            TypeAnnotationStart => Self::TYPE_OF_VALUE,
+            TypeAnnotationSeparator => Self::VALUE_AFTER_TYPE,
+            Function => Self::FUNCTION,
         }
     }
 }

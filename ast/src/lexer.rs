@@ -100,6 +100,17 @@ impl <'state> State<'state> {
         }
     }
 
+    pub fn consume_non_newline_whitespace(&mut self) {
+        for c in self.tokens.chars() {
+            if c == ' ' || c == '\t' {
+                self.move_column_by(1);
+                self.consume_by(1);
+            } else {
+                return
+            }
+        }
+    }
+
     // Note that this returns the position BEFORE the advancement.
     pub fn advance(&mut self) -> Position {
         let previous_position = self.position;
@@ -229,6 +240,16 @@ impl <'state> State<'state> {
         self.consume_whitespace();
         let c = self.read_char_or_fail_when_end()?;
         Ok(c == '(')
+    }
+
+    pub fn commit_if_next_token_forall(&mut self) -> Result<bool, Error> {
+        let c = self.read_char_or_fail_when_end()?;
+        if c == 'f' {
+            self.match_keyword(Request::Keyword(token::Keyword::Forall), token::Keyword::Forall)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     fn nat32(&mut self, request: Request) -> Result<LocatedToken, Error> {

@@ -48,6 +48,18 @@ enum TypeDeclaration {
     // TODO: structs
 }
 
+struct FunctionDeclaration {
+    name: Variable,
+    type_parameters: Vec<Variable>,
+    function: Function,
+}
+
+struct Function {
+    type_: FunctionType,
+    parameters: Vec<Variable>,
+    body: Term,
+}
+
 enum Term {
     VarUse(Variable),
     FunctionApplication(Variable, Vec<Term>),
@@ -79,6 +91,7 @@ pub enum Error {
     ExpectedTypeConstructor { received: Identifier },
     ExpectedTypeVar { received: Identifier },
     DuplicateVariableNames { duplicates: Vec<Identifier> },
+    FunctionHasDifferentNumberOfParametersThanDeclaredInItsType { declared_in_type: usize, parameters: usize },
 }
 
 
@@ -99,13 +112,16 @@ impl <'state> State<'state> {
     pub fn request_keyword(&mut self, keyword: Keyword) -> Result<LocatedToken> {
         self.request_token(Request::Keyword(keyword))
     }
-
     pub fn consume_optional_or(&mut self) -> Result<()> {
         self.lexer_state.consume_optional_or().map_err(Error::LexError)
     }
 
     pub fn is_next_token_open_paren(&mut self) -> Result<bool> {
         self.lexer_state.is_next_token_open_paren().map_err(Error::LexError)
+    }
+
+    pub fn commit_if_next_token_forall(&mut self) -> Result<bool> {
+        self.lexer_state.commit_if_next_token_forall().map_err(Error::LexError)
     }
 
     pub fn lookahead_char(&self) -> Result<char> {
@@ -149,6 +165,46 @@ fn delimited_nonempty_sequence<S, A, D>(
     Ok(s)
 }
 
+fn delimited_possibly_empty_sequence<S, A, D>(
+    state: &mut State,
+    mut s: S, // initial state of the computation
+    p: Parser<A>,
+    delim: Parser<D>,
+    combine: fn(S, A) -> S)
+ -> Result<S>
+{
+    let a = { 
+        // TODO
+        let saved_state = state.clone();
+        // TODO
+        match p(state) {
+            Ok(a) => a,
+            Err(_err) => {
+                // backtrack
+                *state = saved_state;
+                return Ok(s)
+            }
+        }
+    };
+    s = combine(s, a);
+
+    loop {
+        let saved_state = state.clone();
+        match delim(state) {
+            Ok(_d) => {
+                let a = p(state)?;
+                s = combine(s, a);
+            },
+            Err(_err) => {
+                // backtrack.
+                *state = saved_state;
+                break
+            }
+        }
+    }
+    Ok(s)
+}
+
 fn delimited_nonempty_sequence_to_vector<A, D>(
     state: &mut State,
     p: Parser<A>,
@@ -166,6 +222,26 @@ fn delimited_nonempty_sequence_to_vector<A, D>(
         }
     )
 }
+
+fn delimited_possibly_empty_sequence_to_vector<A, D>(
+    state: &mut State,
+    p: Parser<A>,
+    delim: Parser<D>)
+    -> Result<Vec<A>> 
+{
+    delimited_possibly_empty_sequence(
+        state,
+        vec![],
+        p,
+        delim,
+        |mut xs: Vec<A>, x: A| {
+            xs.push(x);
+            xs
+        }
+    )
+}
+
+// ===Specific Parsers===
 
 fn comma(state: &mut State) -> Result<Position> {
     let LocatedToken { position, .. } = state.request_token(Request::Separator(SeparatorSymbol::Comma))?;
@@ -242,11 +318,21 @@ fn pattern_identifier(state: &mut State) -> Result<PatternIdentifier> {
     }
 }
 
-// Parser a non-empty sequence of identifiers separated by comma
+// Parses a non-empty sequence of identifiers separated by comma
 //   x1, x2, x3
 // Also checks that no two identifiers are equal.
-fn identifier_sequence(state: &mut State) -> Result<Vec<Identifier>> {
+fn parameter_non_empty_sequence(state: &mut State) -> Result<Vec<Identifier>> {
     let ids = delimited_nonempty_sequence_to_vector(state, identifier, comma)?;
+    let duplicate_ids = identifier::duplicates(&ids);
+    if duplicate_ids.is_empty() {
+        Ok(ids)
+    } else {
+        Err(Error::DuplicateVariableNames { duplicates: duplicate_ids })
+    }
+}
+
+fn parameter_possibly_empty_sequence(state: &mut State) -> Result<Vec<Identifier>> {
+    let ids = delimited_possibly_empty_sequence_to_vector(state, identifier, comma)?;
     let duplicate_ids = identifier::duplicates(&ids);
     if duplicate_ids.is_empty() {
         Ok(ids)
@@ -272,7 +358,7 @@ fn type_(state: &mut State) -> Result<Type> {
                     state.request_token(Request::CloseParen)?;
                     Ok(Type::Arrow(Box::new(fn_type)))
                 } else {
-                    let type_args = type_sequence(state)?;
+                    let type_args = type_nonempty_sequence(state)?;
                     state.request_token(Request::CloseParen)?;
                     Ok(Type::TypeApplication(constructor_name, type_args))
                 }
@@ -284,14 +370,18 @@ fn type_(state: &mut State) -> Result<Type> {
     }
 }
 
-// Parses   T1, T2, T3, T4 non-empty
-fn type_sequence(state: &mut State) -> Result<Vec<Type>> {
+// Parses   T1, T2, T3, T4 possibly empty
+fn type_possibly_empty_sequence(state: &mut State) -> Result<Vec<Type>> {
+    delimited_possibly_empty_sequence_to_vector(state, type_, comma)
+}
+
+fn type_nonempty_sequence(state: &mut State) -> Result<Vec<Type>> {
     delimited_nonempty_sequence_to_vector(state, type_, comma)
 }
 
 // Parses  T1, T2 -> T
 fn function_type(state: &mut State) -> Result<FunctionType> {
-    let input_types = type_sequence(state)?;
+    let input_types = type_possibly_empty_sequence(state)?;
     state.request_keyword(Keyword::Arrow)?;
     let output_type = type_(state)?;
     Ok(FunctionType { input_types, output_type })
@@ -303,7 +393,7 @@ fn constructor_declaration(state: &mut State) -> Result<ConstructorDeclaration> 
     if state.is_next_token_open_paren()? {
         // Constructor with non-zero parameters
         state.request_token(Request::OpenParen)?;
-        let parameter_types = type_sequence(state)?;
+        let parameter_types = type_nonempty_sequence(state)?;
         state.request_token(Request::CloseParen)?;
         Ok(ConstructorDeclaration { name: constructor_name, parameters: parameter_types, })
     } else {
@@ -324,7 +414,7 @@ fn type_declaration(state: &mut State) -> Result<TypeDeclaration> {
 
     let type_parameters: Vec<Variable> = if state.is_next_token_open_paren()? {
         state.request_token(Request::OpenParen)?;
-        let params = identifier_sequence(state)?;
+        let params = parameter_non_empty_sequence(state)?;
         state.request_token(Request::CloseParen)?;
         params
     } else {
@@ -363,6 +453,61 @@ fn type_declaration(state: &mut State) -> Result<TypeDeclaration> {
 }
 
 // ===Functions===
+fn function_declaration(state: &mut State) -> Result<FunctionDeclaration> {
+    state.request_keyword(Keyword::Let)?;
+    let function_name = variable(state)?;
+    state.request_keyword(Keyword::Eq)?;
+
+    if state.commit_if_next_token_forall()? {
+        // forall encountered
+        state.request_token(Request::OpenCurly)?;
+        let type_parameters = parameter_non_empty_sequence(state)?;
+        state.request_token(Request::BindingSeparator)?;
+
+        let declaration = inner_function_declaration(state, function_name, type_parameters)?;
+
+        state.request_token(Request::CloseCurly)?;
+        Ok(declaration)
+    } else {
+        // no forall
+        inner_function_declaration(state, function_name, vec![])
+    }
+}
+
+ fn inner_function_declaration(state: &mut State, function_name: Variable, type_parameters: Vec<Variable>) -> Result<FunctionDeclaration> {
+    let type_ = type_annotation(state, function_type)?;
+    let function = function(state, type_)?;
+    Ok(FunctionDeclaration { name: function_name, type_parameters, function })
+ }
+
+ fn function(state: &mut State, type_: FunctionType) -> Result<Function> {
+    state.request_keyword(Keyword::Function)?;
+    state.request_token(Request::OpenCurly)?;
+
+    let parameters = parameter_possibly_empty_sequence(state)?;
+    state.request_token(Request::BindingSeparator)?;
+    let body = term(state)?;
+
+    state.request_token(Request::CloseCurly)?;
+
+    if type_.input_types.len() != parameters.len() {
+        Err(Error::FunctionHasDifferentNumberOfParametersThanDeclaredInItsType { declared_in_type: type_.input_types.len(), parameters: parameters.len() })
+    } else {
+        Ok(Function { type_, parameters, body })
+    }
+ }
+
+
+// Parses
+//    # type :
+// where `:` can be optional when newline is present.
+fn type_annotation<t>(state: &mut State, type_parser: Parser<t>) -> Result<t> {
+    state.request_keyword(Keyword::TypeAnnotationStart)?;
+    let type_ = type_parser(state)?;
+    // TODO: Consume whitespace that's not a newline until you reach a newline or ':'
+    state.request_keyword(Keyword::TypeAnnotationSeparator)?;
+    Ok(type_)
+}
 
 // ===Terms===
 fn term(state: &mut State) -> Result<Term> {
