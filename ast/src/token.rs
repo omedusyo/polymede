@@ -61,7 +61,7 @@ impl Keyword {
     pub const TYPE_OF_VALUE: &'static str = "#";
     pub const VALUE_AFTER_TYPE: &'static str = ":";
     pub const FORALL: &'static str = "forall";
-    pub const FUNCTION: &'static str = "fn";
+    pub const LAMBDA: &'static str = "fn";
     pub const APPLY: &'static str = "apply";
     pub const TO: &'static str = "to";
 
@@ -81,7 +81,7 @@ impl Keyword {
             Forall => Self::FORALL,
             TypeAnnotationStart => Self::TYPE_OF_VALUE,
             TypeAnnotationSeparator => Self::VALUE_AFTER_TYPE,
-            Function => Self::FUNCTION,
+            Function => Self::LAMBDA,
             Apply => Self::APPLY,
             To => Self::TO,
         }

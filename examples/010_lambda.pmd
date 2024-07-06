@@ -16,19 +16,22 @@ let closure = # forall A B .
 
 // Partial application.
 
-let add1 =
-  # Fn(Nat -> Nat)
-  fn { x . add(1, x) }
+let add1 = # Fn(Nat -> Nat) .
+  fn # Fn(Nat -> Nat) : { x . add(1, x) }
 
-let addClosure =
-  # Nat -> Fn(Nat -> Nat)
-  fn { x . # Fn(Nat -> Nat) : fn { add(x, y) } }
+fn addClosure = # Nat -> Fn(Nat -> Nat) { x .
+  # Fn(Nat -> Nat) : fn { add(x, y) }
+}
+
+fn showing_application = forall { a, b . # Fn(a -> b), a -> b { f, a .
+  apply f to (a)
+}}
 
 
 // So basically `fn` is an operator, that takes in a judgment 
 //     # Int -> Int { x . x * x }
 // and turns it into an actual value?
-let square = # Fn[Int -> Int] :
+let square = # Fn(Int -> Int) :
   fn # Int -> Int : { x . x * x }
 
 // hmmm, what's the point of the above?
@@ -62,7 +65,7 @@ apply squareLambda(5)
 let mapFirst =
   # forall A B .
   # Fn[A -> A'], Pair[A, B] -> Pair[A', B]
-  fn { f, Pair(x, y) . Pair(f(x), y) }
+  fn { f, Pair(x, y) . Pair(apply f to (x), y) }
 }
 
 let map = # forall A B .

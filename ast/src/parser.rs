@@ -664,10 +664,17 @@ fn term(state: &mut State) -> Result<Term> {
             Ok(Term::Let(bindings, Box::new(body)))
         },
         StartTerm::Lambda => {
-            todo!()
+            let function_type = function_type_annotation(state)?;
+            let function = function(state, function_type)?;
+            Ok(Term::Lambda(Box::new(function)))
         },
         StartTerm::Apply => {
-            todo!()
+            let function = term(state)?;
+            state.request_keyword(Keyword::To)?;
+            state.request_token(Request::OpenParen)?;
+            let args = term_possibly_empty_sequence(state)?;
+            state.request_token(Request::CloseParen)?;
+            Ok(Term::LambdaApplication(Box::new(function), args))
         },
     }
 }
@@ -1026,6 +1033,17 @@ mod tests {
     #[test]
     fn test_local_let_0() -> Result<()> {
         let s = "fn f = # Nat -> Nat : { x . let {, y = add(x, One), z = add(x, Two) . mul(y, z) } }";
+        let mut state = State::new(s);
+
+        let result = function_declaration(&mut state);
+        assert!(matches!(result, Ok(_)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_lambda_0() -> Result<()> {
+        let s = "fn twice = forall { a, b . # Fn(a -> b), a -> b : { f, a . apply f to (apply f to (a)) }}";
         let mut state = State::new(s);
 
         let result = function_declaration(&mut state);
