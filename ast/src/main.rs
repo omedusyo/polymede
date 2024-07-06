@@ -4,6 +4,7 @@ use std::fs;
 
 mod base;
 mod lexer;
+mod identifier;
 mod parser;
 mod token;
 
