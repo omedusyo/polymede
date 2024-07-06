@@ -322,7 +322,7 @@ fn type_declaration(state: &mut State) -> Result<TypeDeclaration> {
 
     let constructor_name = constructor_name(state)?;
 
-    let type_parameters = if state.is_next_token_open_paren()? {
+    let type_parameters: Vec<Variable> = if state.is_next_token_open_paren()? {
         state.request_token(Request::OpenParen)?;
         let params = identifier_sequence(state)?;
         state.request_token(Request::CloseParen)?;
@@ -370,12 +370,8 @@ fn term(state: &mut State) -> Result<Term> {
 }
 
 // ===Patterns===
-fn pattern_sequence(state: &mut State) -> Result<Vec<Pattern>> {
-    delimited_nonempty_sequence_to_vector(state, pattern, comma)
-}
-
 impl Pattern {
-    // Gets all the variables in the pattern
+    // Collect all the variables in the pattern
     fn variables(&self) -> Vec<Variable> {
         let mut vars: Vec<Variable> = vec![];
 
@@ -397,6 +393,30 @@ impl Pattern {
 
         vars
     }
+}
+
+// Parses
+//     { pattern_branch0 | pattern_branch1 | ... }
+// or  { | pattern_branch0 | pattern_branch1 | ... }
+fn pattern_branches(state: &mut State) -> Result<Vec<PatternBranch>> {
+    state.request_token(Request::OpenCurly)?;
+    state.consume_optional_or()?;
+    let branches = delimited_nonempty_sequence_to_vector( state, pattern_branch, or_separator)?;
+    state.request_token(Request::CloseCurly)?;
+    Ok(branches)
+}
+
+// Parses   pattern . body
+fn pattern_branch(state: &mut State) -> Result<PatternBranch> {
+    let pattern = pattern(state)?;
+    state.request_token(Request::BindingSeparator)?;
+    let body = term(state)?;
+
+    Ok(PatternBranch { pattern, body })
+}
+
+fn pattern_sequence(state: &mut State) -> Result<Vec<Pattern>> {
+    delimited_nonempty_sequence_to_vector(state, pattern, comma)
 }
 
 fn pattern(state: &mut State) -> Result<Pattern> {
