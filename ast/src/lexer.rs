@@ -1,6 +1,8 @@
 use crate::token;
 use crate::token::{Token, SeparatorSymbol};
 
+type Result<A> = std::result::Result<A, Error>;
+
 #[derive(Debug, Clone, Copy)]
 pub struct Position { pub column: usize, pub line : usize }
 
@@ -31,6 +33,12 @@ pub enum Request {
     End,
 }
 
+#[derive(Debug)]
+pub enum DeclarationKind {
+    Type,
+    Let,
+    Function,
+}
 
 #[derive(Debug)]
 // TODO: Introduce Committed vs Recoverable Error
@@ -38,6 +46,7 @@ pub enum Error {
     UnexpectedEnd,
     Expected { requested: Request, found: String },
     ExpectedTypeDeclarationKeyword,
+    ExpectedDeclarationKeyword,
     Nat32LiteralTooBig,
 }
 
@@ -119,14 +128,22 @@ impl <'state> State<'state> {
         previous_position
     }
 
-    pub fn read_char_or_fail_when_end(&self) -> Result<char, Error> {
+    pub fn consume_whitespace_or_fail_when_end(&mut self) -> Result<()> {
+        self.consume_whitespace();
+        match self.tokens.chars().next() {
+            Some(_) => Ok(()),
+            None => Err(Error::UnexpectedEnd)
+        }
+    }
+
+    pub fn read_char_or_fail_when_end(&self) -> Result<char> {
         match self.tokens.chars().next() {
             Some(c) => Ok(c),
             None => Err(Error::UnexpectedEnd) 
         }
     }
 
-    pub fn match_string(&mut self, str: &str, request: Request, result_token: Token) -> Result<LocatedToken, Error> {
+    pub fn match_string(&mut self, str: &str, request: Request, result_token: Token) -> Result<LocatedToken> {
         let mut chars_for_error: Vec<char> = vec![];
         let start_position = self.position();
         for c0 in str.chars() {
@@ -140,11 +157,11 @@ impl <'state> State<'state> {
         Ok(LocatedToken::new(result_token, start_position))
     }
 
-    fn match_keyword(&mut self, request: Request, keyword: token::Keyword) -> Result<LocatedToken, Error> {
+    fn match_keyword(&mut self, request: Request, keyword: token::Keyword) -> Result<LocatedToken> {
         self.match_string(keyword.string(), request, Token::Keyword(keyword))
     }
 
-    pub fn request(&mut self, request: Request) -> Result<LocatedToken, Error> {
+    pub fn request(&mut self, request: Request) -> Result<LocatedToken> {
         self.consume_whitespace();
         match request {
             Request::OpenParen => {
@@ -227,7 +244,7 @@ impl <'state> State<'state> {
 
     }
 
-    pub fn consume_optional_or(&mut self) -> Result<(), Error> {
+    pub fn consume_optional_or(&mut self) -> Result<()> {
         self.consume_whitespace();
         let c = self.read_char_or_fail_when_end()?;
         if c == SeparatorSymbol::OR {
@@ -236,7 +253,7 @@ impl <'state> State<'state> {
         Ok(())
     }
 
-    pub fn consume_optional_comma(&mut self) -> Result<(), Error> {
+    pub fn consume_optional_comma(&mut self) -> Result<()> {
         self.consume_whitespace();
         let c = self.read_char_or_fail_when_end()?;
         if c == SeparatorSymbol::COMMA {
@@ -245,13 +262,13 @@ impl <'state> State<'state> {
         Ok(())
     }
 
-    pub fn is_next_token_open_paren(&mut self) -> Result<bool, Error> {
+    pub fn is_next_token_open_paren(&mut self) -> Result<bool> {
         self.consume_whitespace();
         let c = self.read_char_or_fail_when_end()?;
         Ok(c == '(')
     }
 
-    pub fn commit_if_next_token_forall(&mut self) -> Result<bool, Error> {
+    pub fn commit_if_next_token_forall(&mut self) -> Result<bool> {
         self.consume_whitespace();
         let c = self.read_char_or_fail_when_end()?;
         if c == 'f' {
@@ -262,7 +279,18 @@ impl <'state> State<'state> {
         }
     }
 
-    fn nat32(&mut self, request: Request) -> Result<LocatedToken, Error> {
+    pub fn peek_declaration_token(&mut self) -> Result<DeclarationKind> {
+        self.consume_whitespace();
+        let c = self.read_char_or_fail_when_end()?;
+        match c {
+            't' => Ok(DeclarationKind::Type),
+            'l' => Ok(DeclarationKind::Let),
+            'f' => Ok(DeclarationKind::Function),
+            _ => Err(Error::ExpectedTypeDeclarationKeyword),
+        }
+    }
+
+    fn nat32(&mut self, request: Request) -> Result<LocatedToken> {
         fn digit(c: char) -> Option<u32> {
             match c {
                 '0' => Some(0),
@@ -337,7 +365,6 @@ impl <'state> State<'state> {
             
         Ok(LocatedToken::new(Token::Nat32(sum), token_position))
     }
-
 }
 
 // pub fn example0() {

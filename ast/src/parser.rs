@@ -1,7 +1,6 @@
 use crate::lexer;
-use crate::lexer::{LocatedToken, Position, Request};
+use crate::lexer::{LocatedToken, Position, Request, DeclarationKind};
 use crate::token::{Token, SeparatorSymbol, Keyword};
-use crate::base::{Program, PrimitiveType};
 use crate::identifier;
 use crate::identifier::{Identifier, Variable, FunctionName, ConstructorName};
 
@@ -61,12 +60,14 @@ struct Function {
     body: Term,
 }
 
+#[derive(Debug)]
 struct LetDeclaration {
     name: Variable,
     type_parameters: Vec<Variable>,
     body: TypedTerm,
 }
 
+#[derive(Debug)]
 struct TypedTerm {
     type_: Type,
     term: Term
@@ -101,6 +102,40 @@ pub enum Pattern {
     Constructor(ConstructorName, Vec<Pattern>),
     Variable(Variable),
     Anything(Identifier),
+}
+
+#[derive(Debug)]
+pub struct Program {
+    type_declarations: Vec<TypeDeclaration>,
+    function_declarations: Vec<FunctionDeclaration>,
+    let_declarations: Vec<LetDeclaration>,
+}
+
+enum Declaration {
+    Type(TypeDeclaration),
+    Let(LetDeclaration),
+    Function(FunctionDeclaration),
+}
+
+
+impl Program {
+    fn new() -> Self {
+        Self { type_declarations: vec![], function_declarations: vec![], let_declarations: vec![] }
+    }
+
+    fn add_declaration(&mut self, decl: Declaration) {
+        match decl {
+            Declaration::Type(type_declaration) => {
+                self.type_declarations.push(type_declaration)
+            },
+            Declaration::Let(let_declaration) => {
+                self.let_declarations.push(let_declaration)
+            },
+            Declaration::Function(function_declaration) => {
+                self.function_declarations.push(function_declaration)
+            },
+        }
+    }
 }
 
 
@@ -142,6 +177,10 @@ impl <'state> State<'state> {
         self.lexer_state.consume_optional_or().map_err(Error::LexError)
     }
 
+    pub fn consume_whitespace_or_fail_when_end(&mut self) -> Result<()> {
+        self.lexer_state.consume_whitespace_or_fail_when_end().map_err(Error::LexError)
+    }
+
     pub fn consume_optional_comma(&mut self) -> Result<()> {
         self.lexer_state.consume_optional_comma().map_err(Error::LexError)
     }
@@ -152,6 +191,10 @@ impl <'state> State<'state> {
 
     pub fn commit_if_next_token_forall(&mut self) -> Result<bool> {
         self.lexer_state.commit_if_next_token_forall().map_err(Error::LexError)
+    }
+
+    pub fn peek_declaration_token(&mut self) -> Result<DeclarationKind> {
+        self.lexer_state.peek_declaration_token().map_err(Error::LexError)
     }
 
     pub fn lookahead_char(&self) -> Result<char> {
@@ -283,6 +326,10 @@ fn or_separator(state: &mut State) -> Result<Position> {
 fn and_separator(state: &mut State) -> Result<Position> {
     let LocatedToken { position, .. } = state.request_token(Request::Separator(SeparatorSymbol::And))?;
     Ok(position)
+}
+
+fn do_nothing(state: &mut State) -> Result<()> {
+    state.consume_whitespace_or_fail_when_end()
 }
 
 // ===Identifiers===
@@ -634,14 +681,14 @@ fn term(state: &mut State) -> Result<Term> {
         StartTerm::VariableUse(variable) => Ok(Term::VariableUse(variable)),
         StartTerm::FunctionApplication(function_name) => {
             state.request_token(Request::OpenParen)?;
-            let args = term_possibly_empty_sequence(state)?;
+            let args = possibly_empty_term_sequence(state)?;
             state.request_token(Request::CloseParen)?;
             Ok(Term::FunctionApplication(function_name, args))
         },
         StartTerm::ConstructorConstant(constructor_name) => Ok(Term::ConstructorUse(constructor_name, vec![])),
         StartTerm::ConstructorApplication(constructor_name) => {
             state.request_token(Request::OpenParen)?;
-            let args = term_nonempty_sequence(state)?;
+            let args = nonempty_term_sequence(state)?;
             state.request_token(Request::CloseParen)?;
             Ok(Term::ConstructorUse(constructor_name, args))
         },
@@ -672,7 +719,7 @@ fn term(state: &mut State) -> Result<Term> {
             let function = term(state)?;
             state.request_keyword(Keyword::To)?;
             state.request_token(Request::OpenParen)?;
-            let args = term_possibly_empty_sequence(state)?;
+            let args = possibly_empty_term_sequence(state)?;
             state.request_token(Request::CloseParen)?;
             Ok(Term::LambdaApplication(Box::new(function), args))
         },
@@ -692,11 +739,11 @@ fn nonempty_var_binding_sequence(state: &mut State) -> Result<Vec<(Variable, Ter
     delimited_nonempty_sequence_to_vector(state, var_binding, comma)
 }
 
-fn term_possibly_empty_sequence(state: &mut State) -> Result<Vec<Term>> {
+fn possibly_empty_term_sequence(state: &mut State) -> Result<Vec<Term>> {
     delimited_possibly_empty_sequence_to_vector(state, term, comma)
 }
 
-fn term_nonempty_sequence(state: &mut State) -> Result<Vec<Term>> {
+fn nonempty_term_sequence(state: &mut State) -> Result<Vec<Term>> {
     delimited_nonempty_sequence_to_vector(state, term, comma)
 }
 
@@ -777,6 +824,23 @@ fn pattern(state: &mut State) -> Result<Pattern> {
         Ok(pattern)
     } else {
         Err(Error::DuplicateVariableNames { duplicates: duplicate_ids })
+    }
+}
+
+// ===Program===
+fn program(state: &mut State) -> Result<Program> {
+    let mut program = Program::new();
+    for declaration in delimited_possibly_empty_sequence_to_vector(state, program_declaration, do_nothing)? {
+        program.add_declaration(declaration);
+    }
+    Ok(program)
+}
+
+fn program_declaration(state: &mut State) -> Result<Declaration> {
+    match state.peek_declaration_token()? {
+        DeclarationKind::Type => Ok(Declaration::Type(type_declaration(state)?)),
+        DeclarationKind::Let => Ok(Declaration::Let(let_declaration(state)?)),
+        DeclarationKind::Function => Ok(Declaration::Function(function_declaration(state)?)),
     }
 }
 
@@ -1047,6 +1111,32 @@ mod tests {
         let mut state = State::new(s);
 
         let result = function_declaration(&mut state);
+        assert!(matches!(result, Ok(_)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_program_0() -> Result<()> {
+        let s = "\
+        type Bool = enum {\n\
+        | T\n\
+        | F\n\
+        }\n\
+        \n\
+        fn not = # Bool -> Bool : { b .\n\
+            match b {\n\
+            | T . F\n\
+            | F . T\n\
+            }\n\
+        }\n\
+        ";
+
+        let mut state = State::new(s);
+
+        let result = program(&mut state);
+        println!("{:?}", result);
+        assert!(false);
         assert!(matches!(result, Ok(_)));
 
         Ok(())
