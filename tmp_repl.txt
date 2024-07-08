@@ -6,6 +6,13 @@ cargo build
 cargo test
 
 
+# ===AST===
+
+cargo run --bin ast -- -f examples/simple_bool.pmd
+
+cargo test -p ast
+
+
 # ===Expressions===
 
 rm $TMP_WASM/$FILE.wasm
@@ -88,3 +95,6 @@ node runtime/src/run.js $FILE
 ======Binaryen Installation========
 for `wasm-merge`
 https://github.com/WebAssembly/binaryen/releases
+
+
+

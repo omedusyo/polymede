@@ -1,28 +1,15 @@
 
-let map = forall { A B .
-  # (A -> B) -> List[A] -> List[B] : fn { f xs .
-    fold xs {
-    | Nil . Nil
-    | Cons(x, result) . Cons(f(x), result)
-    }
+fn f = # Nat -> Nat { x .
+  let {
+  , y = add(x, 1) .
+    let { z = mul(x, y) . square(z) }
   }
 }
 
-
-fold Cons(1, Cons(2, Cons(3, Cons(4, Nil)))) {
-| Nil . Nil
-| Cons(x, result) . Cons(f(x), result)
+fn g = # Nat -> Nat { x.
+  let {
+  , y = add(x, 1)
+  , z = mul(y, z)
+  . mul(y, z)
 }
 
-
-// ===Stack Machine===
-fold Cons(1, Cons(2, Cons(3, Cons(4, Nil)))) { ... }
-fold Cons(2, Cons(3, Cons(4, Nil))) { ... }    Cons(1, _)
-fold Cons(3, Cons(4, Nil)) { ... }    Cons(2, _) :: Cons(1, _)
-fold Cons(4, Nil) { ... }    Cons(3, _) :: Cons(2, _) :: Cons(1, _)
-fold Nil { ... }     Cons(4, _) :: Cons(3, _) :: Cons(2, _) :: Cons(1, _)
-state0     Cons(4, _) :: Cons(3, _) :: Cons(2, _) :: Cons(1, _)
-f(4, state0)     Cons(3, _) :: Cons(2, _) :: Cons(1, _)
-f(3, f(4, state0))     Cons(2, _) :: Cons(1, _)
-f(2, f(3, f(4, state0)))     Cons(1, _)
-f(1, f(2, f(3, f(4, state0))))

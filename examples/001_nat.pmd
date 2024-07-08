@@ -1,7 +1,7 @@
 
-type Nat = ind { Nat .
+type Nat = ind { nat .
 | Zero
-| Succ(Nat)
+| Succ(nat)
 }
 
 let zero =
@@ -21,14 +21,14 @@ let three =
   Succ(Succ(Succ(Zero)))
   
 
-let plus = # Nat, Nat -> Nat : fn { x, y .
+fn plus = # Nat, Nat -> Nat : { x, y .
   fold x {
   | Zero . y
   | Succ(result) . Succ(result)
   }
 }
 
-let mul = # Nat, Nat -> Nat : fn { x, y .
+fn mul = # Nat, Nat -> Nat : { x, y .
   fold x {
   | Zero . Zero
   | Succ(result) . plus(x, y)

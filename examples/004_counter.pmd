@@ -9,8 +9,8 @@ let initialState =
   # Int
   0
 
-let update =
-  # Msg -> Int -> Int
+fn update =
+  # Msg, Int -> Int
   { msg state .
     match msg {
     | Inc . state + 1
