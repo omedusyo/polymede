@@ -1,0 +1,17 @@
+
+type Nat = ind { nat .
+| Zero
+| Succ(nat)
+}
+
+type Nat = ind { nat .
+| Foo
+| Foo(nat)
+}
+
+
+fn square = # Nat -> Nat : { x . x }
+
+fn square = # Nat -> Nat : { x . x }
+
+

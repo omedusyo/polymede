@@ -4,6 +4,7 @@ use crate::parser::lex::{
 };
 use crate::parser::{
     base::{State, Result, Error, Program, Declaration, LetDeclaration, Function, FunctionType, FunctionDeclaration, IndDeclaration, EnumDeclaration, TypeDeclaration, ConstructorDeclaration},
+    identifier,
     identifier::{Variable, FunctionName, variable, constructor_name, function_name},
     term::{term, typed_term},
     types::{type_nonempty_sequence, function_type_annotation},
@@ -17,7 +18,25 @@ pub fn program(state: &mut State) -> Result<Program> {
     for declaration in delimited_possibly_empty_sequence_to_vector(state, program_declaration, do_nothing)? {
         program.add_declaration(declaration);
     }
+    check_program_uniqueness(&program)?;
     Ok(program)
+}
+
+fn check_program_uniqueness(program: &Program) -> Result<()> {
+    let type_duplicates = identifier::duplicates(&program.type_names());
+    let constructor_duplicates = identifier::duplicates(&program.constructor_names());
+    let function_duplicates = identifier::duplicates(&program.function_names());
+    let let_duplicates = identifier::duplicates(&program.let_names());
+    if !(type_duplicates.is_empty() && constructor_duplicates.is_empty() && function_duplicates.is_empty() && let_duplicates.is_empty()) {
+        Err(Error::DuplicateNames {
+            type_duplicates,
+            constructor_duplicates,
+            function_duplicates,
+            let_duplicates,
+        })
+    } else {
+        Ok(())
+    }
 }
 
 fn program_declaration(state: &mut State) -> Result<Declaration> {

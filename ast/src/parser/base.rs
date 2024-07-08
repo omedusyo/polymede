@@ -19,8 +19,16 @@ pub enum Error {
     ExpectedTypeConstructor { received: Identifier },
     ExpectedTypeVar { received: Identifier },
     DuplicateVariableNames { duplicates: Vec<Identifier> },
+    // Atleast one vector is non-empty.
+    DuplicateNames {
+        type_duplicates: Vec<Identifier>,
+        constructor_duplicates: Vec<Identifier>,
+        function_duplicates: Vec<Identifier>,
+        let_duplicates: Vec<Identifier>
+    },
     FunctionHasDifferentNumberOfParametersThanDeclaredInItsType { declared_in_type: usize, parameters: usize },
 }
+
 
 #[derive(Debug)]
 pub struct State<'a> {
@@ -161,6 +169,51 @@ impl Program {
             },
         }
     }
+
+    pub fn type_names(&self) -> Vec<Variable> {
+        let mut names = vec![];
+        for declaration in &self.type_declarations {
+            match declaration {
+                TypeDeclaration::Enum(declaration) => {
+                    names.push(declaration.name.clone())
+                },
+                TypeDeclaration::Ind(declaration) => {
+                    names.push(declaration.name.clone())
+                },
+            }
+        }
+        names
+    }
+
+    pub fn constructor_names(&self) -> Vec<ConstructorName> {
+        let mut names = vec![];
+        for declaration in &self.type_declarations {
+            let constructors = match &declaration {
+                TypeDeclaration::Enum(declaration) => &declaration.constructors[..],
+                TypeDeclaration::Ind(declaration) => &declaration.constructors[..],
+            };
+            for constructor_declaration in constructors {
+                names.push(constructor_declaration.name.clone())
+            }
+        }
+        names
+    }
+
+    pub fn function_names(&self) -> Vec<FunctionName> {
+        let mut names = vec![];
+        for declaration in &self.function_declarations {
+            names.push(declaration.name.clone())
+        }
+        names
+    }
+
+    pub fn let_names(&self) -> Vec<Variable> {
+        let mut names = vec![];
+        for declaration in &self.let_declarations {
+            names.push(declaration.name.clone())
+        }
+        names
+    }
 }
 
 impl <'state> State<'state> {
@@ -198,10 +251,6 @@ impl <'state> State<'state> {
 
     pub fn peek_declaration_token(&mut self) -> Result<DeclarationKind> {
         self.lexer_state.peek_declaration_token().map_err(Error::LexError)
-    }
-
-    pub fn lookahead_char(&self) -> Result<char> {
-        self.lexer_state.read_char_or_fail_when_end().map_err(Error::LexError)
     }
 
     pub fn clone(&self) -> State<'state> {
