@@ -1,3 +1,4 @@
+
 type Bool = enum {
 | T
 | F
@@ -22,7 +23,6 @@ type List(a) = ind { x .
 fn id = forall { a .
   # a -> a : { x . x }
 }
-
 
 fn twice = forall { a, b . # Fn(a -> b), a -> b : { f, a . apply f to (apply f to (a)) }}
 
