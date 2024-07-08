@@ -1,7 +1,25 @@
-use crate::token;
-use crate::token::{Token, SeparatorSymbol};
+use crate::parser::lex::{
+    token,
+    token::{Token, SeparatorSymbol}
+};
 
 type Result<A> = std::result::Result<A, Error>;
+
+#[derive(Debug)]
+pub struct State<'a> {
+    tokens: &'a str,
+    position: Position
+}
+
+#[derive(Debug)]
+// TODO: Introduce Committed vs Recoverable Error
+pub enum Error {
+    UnexpectedEnd,
+    Expected { requested: Request, found: String },
+    ExpectedTypeDeclarationKeyword,
+    ExpectedDeclarationKeyword,
+    Nat32LiteralTooBig,
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Position { pub column: usize, pub line : usize }
@@ -38,22 +56,6 @@ pub enum DeclarationKind {
     Type,
     Let,
     Function,
-}
-
-#[derive(Debug)]
-// TODO: Introduce Committed vs Recoverable Error
-pub enum Error {
-    UnexpectedEnd,
-    Expected { requested: Request, found: String },
-    ExpectedTypeDeclarationKeyword,
-    ExpectedDeclarationKeyword,
-    Nat32LiteralTooBig,
-}
-
-#[derive(Debug)]
-pub struct State<'a> {
-    tokens: &'a str,
-    position: Position
 }
 
 impl <'state> State<'state> {
@@ -244,6 +246,10 @@ impl <'state> State<'state> {
 
     }
 
+    pub fn request_keyword(&mut self, keyword: token::Keyword) -> Result<LocatedToken> {
+        self.request(Request::Keyword(keyword))
+    }
+
     pub fn consume_optional_or(&mut self) -> Result<()> {
         self.consume_whitespace();
         let c = self.read_char_or_fail_when_end()?;
@@ -366,61 +372,3 @@ impl <'state> State<'state> {
         Ok(LocatedToken::new(Token::Nat32(sum), token_position))
     }
 }
-
-// pub fn example0() {
-//     use Token::*;
-//     use OperatorSymbol::*;
-//     // let x = lex("(   1 + 2  * 3 )")
-//     let l = vec![OpenParen, Nat32(1), Operator(Add), Nat32(2), Operator(Mul), Nat32(3), CloseParen];
-// }
-
-// pub fn example1() {
-//     let s = "123x  foo";
-//     let x = lex_int32(s);
-//     println!("Result of lex: {:?}", x);
-// }
-
-// pub fn example2() {
-//     let s = "(x  foo";
-//     let x = lex_simple_symbol(s);
-//     println!("Result of lex: {:?}", x);
-// }
-
-// pub fn example3() {
-//     let s = "123+3+5*6";
-
-//     println!("===========");
-//     lex_until_end(s);
-// }
-
-// pub fn example4() {
-//     let mut state = State::new("    xxx");
-//     state.consume_whitespace();
-//     println!("WS removed: {:?}", state.tokens());
-// }
-
-// pub fn example5() -> Result<(), Error> {
-//     let s = " 000123555555 *  3  + 5*6";
-
-//     let mut state = State::new(s);
-
-//     let token = state.request(Request::Nat32)?;
-//     println!("{:?}", token);
-//     let token = state.request(Request::Separator(SeparatorSymbol::Mul))?;
-//     println!("{:?}", token);
-//     let token = state.request(Request::Nat32)?;
-//     println!("{:?}", token);
-//     let token = state.request(Request::Separator(SeparatorSymbol::Add))?;
-//     println!("{:?}", token);
-//     let token = state.request(Request::Nat32)?;
-//     println!("{:?}", token);
-//     let token = state.request(Request::Separator(SeparatorSymbol::Mul))?;
-//     println!("{:?}", token);
-//     let token = state.request(Request::Nat32)?;
-//     println!("{:?}", token);
-//     let token = state.request(Request::End)?;
-//     println!("{:?}", token);
-
-//     Ok(())
-// }
-
