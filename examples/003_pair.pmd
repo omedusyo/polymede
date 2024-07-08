@@ -1,5 +1,5 @@
 
-ind Pair[A, B] :=
+enum Pair[A, B] :=
 | Pair(A, B)
 
 type Pair = # forall A B .
@@ -7,11 +7,11 @@ type Pair = # forall A B .
   | Pair(A, B)
   }
 
-let first = forall { A B .
-  # Pair[A, B] -> A { Pair(x, _) . x }
+fn first = forall { A B .
+  # Pair(A, B) -> A : { Pair(x, _) . x }
 }
 
-let second = forall { A B .
+fn second = forall { A B .
   # Pair[A, B] -> A {
   | Pair(_, y) . y 
   }
