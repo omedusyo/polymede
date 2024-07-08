@@ -277,7 +277,7 @@ mod tests {
 
     #[test]
     fn test_local_let_0() -> Result<()> {
-        let s = "fn f = # Nat -> Nat : { x . let {, y = add(x, One), z = add(x, Two) . mul(y, z) } }";
+        let s = "fn f = # Nat -> Nat : { x . let {, y = # Nat : add(x, One), z = # Nat : add(x, Two) . mul(y, z) } }";
         let mut state = State::new(s);
 
         let result = function_declaration(&mut state);

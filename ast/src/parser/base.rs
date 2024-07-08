@@ -121,12 +121,12 @@ pub enum Term {
     Fold(Box<Term>, Vec<PatternBranch>),
     Lambda(Box<Function>),
     LambdaApplication(Box<Term>, Vec<Term>),
-    Let(Vec<(Variable, Term)>, Box<Term>),
+    Let(Vec<(Variable, TypedTerm)>, Box<Term>),
 }
 
 #[derive(Debug)]
 pub struct LocalLetBinding {
-    pub bindings: Vec<(Variable, Term)>,
+    pub bindings: Vec<(Variable, TypedTerm)>,
     pub body: Term,
 }
 

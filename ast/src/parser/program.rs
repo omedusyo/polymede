@@ -3,13 +3,13 @@ use crate::parser::lex::{
     lexer::{Request, LocatedToken, DeclarationKind},
 };
 use crate::parser::{
-    base::{State, Result, Error, Program, Declaration, TypedTerm, LetDeclaration, Function, FunctionType, FunctionDeclaration, IndDeclaration, EnumDeclaration, TypeDeclaration, ConstructorDeclaration},
+    base::{State, Result, Error, Program, Declaration, LetDeclaration, Function, FunctionType, FunctionDeclaration, IndDeclaration, EnumDeclaration, TypeDeclaration, ConstructorDeclaration},
     identifier::{Variable, FunctionName, variable, constructor_name, function_name},
-    term::term,
-    types::{type_nonempty_sequence, type_annotation, function_type_annotation},
+    term::{term, typed_term},
+    types::{type_nonempty_sequence, function_type_annotation},
     pattern::{parameter_non_empty_sequence, parameter_possibly_empty_sequence},
     special::{or_separator, do_nothing},
-    combinator::{delimited_nonempty_sequence_to_vector, delimited_possibly_empty_sequence_to_vector},
+    combinator::delimited_possibly_empty_sequence_to_vector,
 };
 
 pub fn program(state: &mut State) -> Result<Program> {
@@ -164,10 +164,4 @@ pub fn let_declaration(state: &mut State) -> Result<LetDeclaration> {
         // no forall
         inner_let_declaration(state, name, vec![])
     }
-}
-
-fn typed_term(state: &mut State) -> Result<TypedTerm> {
-    let type_ = type_annotation(state)?;
-    let term = term(state)?;
-    Ok(TypedTerm { type_ , term })
 }

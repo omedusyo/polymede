@@ -3,9 +3,9 @@ use crate::parser::lex::{
     lexer::Request,
 };
 use crate::parser::{
-    base::{State, Result, Term},
+    base::{State, Result, Term, TypedTerm},
     identifier::{Variable, variable},
-    types::function_type_annotation,
+    types::{function_type_annotation, type_annotation},
     pattern::pattern_branches,
     program::function,
     special::{StartTerm, start_term, comma},
@@ -64,15 +64,21 @@ pub fn term(state: &mut State) -> Result<Term> {
     }
 }
 
-// Parses    x = expr
-fn var_binding(state: &mut State) -> Result<(Variable, Term)> {
+pub fn typed_term(state: &mut State) -> Result<TypedTerm> {
+    let type_ = type_annotation(state)?;
+    let term = term(state)?;
+    Ok(TypedTerm { type_ , term })
+}
+
+// Parses    x = # type : expr
+fn var_binding(state: &mut State) -> Result<(Variable, TypedTerm)> {
     let var = variable(state)?;
     state.request_keyword(Keyword::Eq)?;
-    let term = term(state)?;
+    let term = typed_term(state)?;
     Ok((var, term))
 }
 
-fn nonempty_var_binding_sequence(state: &mut State) -> Result<Vec<(Variable, Term)>> {
+fn nonempty_var_binding_sequence(state: &mut State) -> Result<Vec<(Variable, TypedTerm)>> {
     state.consume_optional_comma()?;
     delimited_nonempty_sequence_to_vector(state, var_binding, comma)
 }
