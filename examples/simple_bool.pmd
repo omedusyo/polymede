@@ -10,16 +10,70 @@ type Unit = enum {
 | Unit
 }
 
+type Pair(a, b) = enum {
+| Pair(a, b)
+}
+
 type List(a) = ind { x .
 | Nil
 | Cons(a, x)
 }
 
 fn id = forall { a .
-  # Fn(a -> a) -> a : { x . x }
+  # a -> a : { x . x }
 }
 
 
-let x = forall { a . # List(Nat) : Nil }
+fn twice = forall { a, b . # Fn(a -> b), a -> b : { f, a . apply f to (apply f to (a)) }}
+
+fn map = forall { a, b . # Fn(a -> b), List(a) -> List(b) : { f, xs .
+  fold xs {
+  | Nil . Nil
+  | Cons(x, state) . Cons(f(x), state)
+  }
+}}
+
+fn filter = forall { a . # Fn(a -> Bool), List(a) -> List(a) : { f, xs .
+  fold xs {
+  | Nil . Nil
+  | Cons(x, filtered_tail) .
+    match f(x) {
+    | T . Cons(x, filtered_tail)
+    | F . filtered_tail
+    }
+  }
+}}
+
+fn contradict = forall { a . # Empty -> a : { c .
+  match c {}
+}}
+
+fn first = forall { a, b . # Pair(a, b) -> a : { pair .
+  match pair {
+  | Pair(x, _) . x
+  }
+}}
+
+fn second = forall { a, b . # Pair(a, b) -> a : { pair .
+  match pair { Pair(_, y) . y }
+}}
+
+fn tuple = forall { a, b, x . # Fn(x -> a), Fn(x -> b) -> Fn(x -> Pair(a, b)) : { f, g .
+  fn # x -> Pair(a, b) : { x . Pair(apply f to (x), apply g to (x)) }
+}}
+
+fn curry = forall { a, b, c . # Fn(a, b -> c) -> Fn(a -> Fn(b -> c)) : { f .
+  fn # a -> Fn(b -> c) : { x .
+    fn # b -> c : { y .
+      apply f to (x, y)
+    }
+  }
+}}
+
+let empty_list = forall { a . # List(a) : Nil }
 
 let y = # List(Nat) : f(Nil)
+
+let z = # List(Nat) : Nil
+
+let u = # List(Nat) : empty_list

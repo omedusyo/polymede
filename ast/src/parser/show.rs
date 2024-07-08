@@ -4,10 +4,10 @@ use crate::parser::{
 };
 
 pub fn show_program_declarations(program: Program) -> String {
-    let type_declarations = program.type_declarations.into_iter().map(show_type_declaration).collect::<Vec<_>>().join("\n");
+    let type_declarations = program.type_declarations.into_iter().map(show_type_declaration).collect::<Vec<_>>().join("\n\n");
     let function_declarations = program.function_declarations.into_iter().map(show_function_declaration).collect::<Vec<_>>().join("\n");
     let let_declarations = program.let_declarations.into_iter().map(show_let_declaration).collect::<Vec<_>>().join("\n");
-    format!("{type_declarations}\n{function_declarations}\n{let_declarations}")
+    format!("{type_declarations}\n\n{function_declarations}\n{let_declarations}")
 }
 
 fn show_type_declaration(type_declaration: TypeDeclaration) -> String {

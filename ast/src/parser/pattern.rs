@@ -84,7 +84,7 @@ impl Pattern {
 pub fn pattern_branches(state: &mut State) -> Result<Vec<PatternBranch>> {
     state.request_token(Request::OpenCurly)?;
     state.consume_optional_or()?;
-    let branches = delimited_nonempty_sequence_to_vector( state, pattern_branch, or_separator)?;
+    let branches = delimited_possibly_empty_sequence_to_vector( state, pattern_branch, or_separator)?;
     state.request_token(Request::CloseCurly)?;
     Ok(branches)
 }
