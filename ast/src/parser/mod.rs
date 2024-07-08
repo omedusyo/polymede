@@ -1,12 +1,24 @@
-mod base;
+pub mod base;
+pub mod identifier;
+pub mod show;
 mod combinator;
-mod identifier;
 mod pattern;
 mod program;
 mod special;
 mod term;
 mod types;
 mod lex;
+
+use crate::parser::{
+    base::{State, Error, Program},
+    program::program,
+};
+
+pub fn parse_program(s: &str) -> Result<Program, Error> {
+    let mut state = State::new(s);
+    let result = program(&mut state);
+    result
+}
 
 #[cfg(test)]
 mod tests {
@@ -299,6 +311,20 @@ mod tests {
             | F . T\n\
             }\n\
         }\n\
+        ";
+
+        let mut state = State::new(s);
+
+        let result = program(&mut state);
+        assert!(matches!(result, Ok(_)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_program_1() -> Result<()> {
+        let s = "\
+        let y = # List(Nat) : Nil\n\
         ";
 
         let mut state = State::new(s);

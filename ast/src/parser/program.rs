@@ -46,7 +46,7 @@ fn constructor_declaration(state: &mut State) -> Result<ConstructorDeclaration> 
 
 fn constructor_declaration_sequence(state: &mut State) -> Result<Vec<ConstructorDeclaration>> {
     state.consume_optional_or()?;
-    delimited_nonempty_sequence_to_vector( state, constructor_declaration, or_separator)
+    delimited_possibly_empty_sequence_to_vector( state, constructor_declaration, or_separator)
 }
 
 pub fn type_declaration(state: &mut State) -> Result<TypeDeclaration> {

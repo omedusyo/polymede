@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 bimap = "0.6.3"
+clap = { version = "4.5.8", features = ["derive"] }
 compiler = { path = "../compiler" }

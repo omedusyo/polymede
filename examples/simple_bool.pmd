@@ -1,0 +1,25 @@
+type Bool = enum {
+| T
+| F
+}
+
+type Empty = enum {
+}
+
+type Unit = enum {
+| Unit
+}
+
+type List(a) = ind { x .
+| Nil
+| Cons(a, x)
+}
+
+fn id = forall { a .
+  # Fn(a -> a) -> a : { x . x }
+}
+
+
+let x = forall { a . # List(Nat) : Nil }
+
+let y = # List(Nat) : f(Nil)

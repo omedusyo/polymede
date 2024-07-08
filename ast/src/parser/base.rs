@@ -30,9 +30,9 @@ pub struct State<'a> {
 // ===Program===
 #[derive(Debug)]
 pub struct Program {
-    type_declarations: Vec<TypeDeclaration>,
-    function_declarations: Vec<FunctionDeclaration>,
-    let_declarations: Vec<LetDeclaration>,
+    pub type_declarations: Vec<TypeDeclaration>,
+    pub function_declarations: Vec<FunctionDeclaration>,
+    pub let_declarations: Vec<LetDeclaration>,
 }
 
 // ===Declarations===

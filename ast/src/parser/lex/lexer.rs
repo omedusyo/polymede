@@ -270,8 +270,11 @@ impl <'state> State<'state> {
 
     pub fn is_next_token_open_paren(&mut self) -> Result<bool> {
         self.consume_whitespace();
-        let c = self.read_char_or_fail_when_end()?;
-        Ok(c == '(')
+        match self.read_char_or_fail_when_end() {
+            Ok(c) => Ok(c == '('),
+            Err(Error::UnexpectedEnd) => Ok(false),
+            Err(e) => Err(e)
+        }
     }
 
     pub fn commit_if_next_token_forall(&mut self) -> Result<bool> {

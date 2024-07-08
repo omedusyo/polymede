@@ -8,7 +8,7 @@ cargo test
 
 # ===AST===
 
-cargo run --bin ast
+cargo run --bin ast -- -f examples/simple_bool.pmd
 
 cargo test -p ast
 

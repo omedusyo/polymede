@@ -21,7 +21,9 @@ pub fn term(state: &mut State) -> Result<Term> {
             state.request_token(Request::CloseParen)?;
             Ok(Term::FunctionApplication(function_name, args))
         },
-        StartTerm::ConstructorConstant(constructor_name) => Ok(Term::ConstructorUse(constructor_name, vec![])),
+        StartTerm::ConstructorConstant(constructor_name) => {
+            Ok(Term::ConstructorUse(constructor_name, vec![]))
+        },
         StartTerm::ConstructorApplication(constructor_name) => {
             state.request_token(Request::OpenParen)?;
             let args = nonempty_term_sequence(state)?;
@@ -82,3 +84,4 @@ fn possibly_empty_term_sequence(state: &mut State) -> Result<Vec<Term>> {
 fn nonempty_term_sequence(state: &mut State) -> Result<Vec<Term>> {
     delimited_nonempty_sequence_to_vector(state, term, comma)
 }
+
