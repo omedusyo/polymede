@@ -18,11 +18,11 @@ pub fn program(state: &mut State) -> Result<Program> {
     for declaration in delimited_possibly_empty_sequence_to_vector(state, program_declaration, do_nothing)? {
         program.add_declaration(declaration);
     }
-    check_program_uniqueness(&program)?;
+    check_program_names_uniqueness(&program)?;
     Ok(program)
 }
 
-fn check_program_uniqueness(program: &Program) -> Result<()> {
+fn check_program_names_uniqueness(program: &Program) -> Result<()> {
     let type_duplicates = identifier::duplicates(&program.type_names());
     let constructor_duplicates = identifier::duplicates(&program.constructor_names());
     let function_duplicates = identifier::duplicates(&program.function_names());
