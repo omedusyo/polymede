@@ -5,6 +5,13 @@ type Nat = ind { nat .
 }
 
 
+type Bar(a) = enum {
+| A(a, List(a), Fn(a -> a))
+}
+
+type F = ind { x .
+| Foo(Fn(x -> a))
+}
 
 fn square = # Nat -> Nat : { x . x }
 
