@@ -11,6 +11,9 @@ use std::collections::HashMap;
 
 pub type Result<A> = std::result::Result<A, Error>;
 
+// TODO: Consider moving the type definitions out of the parsing module, since this seems to be
+// shared between checking and parsing.
+
 // Note that this is not a closure type. It's simply a function pointer.
 pub type Parser<A> = fn(&mut State) -> Result<A>;
 
@@ -44,7 +47,7 @@ pub struct State<'lex_state, 'interner> {
 #[derive(Debug)]
 pub struct Program {
     interner: Interner,
-    pub type_declarations: HashMap<Variable, TypeDeclaration>,
+    pub type_declarations: HashMap<ConstructorName, TypeDeclaration>,
     pub function_declarations: HashMap<FunctionName, FunctionDeclaration>,
     pub let_declarations: HashMap<Variable, LetDeclaration>,
 }
@@ -76,6 +79,18 @@ impl Program {
         }
 
         Ok(program)
+    }
+
+    pub fn get_type_declaration(&self, type_constructor_name: &ConstructorName) -> Option<&TypeDeclaration> {
+        self.type_declarations.get(type_constructor_name)
+    }
+
+    pub fn get_function_declaration(&self, function_name: &FunctionName) -> Option<&FunctionDeclaration> {
+        self.function_declarations.get(function_name)
+    }
+
+    pub fn get_let_declaration(&self, let_name: &FunctionName) -> Option<&LetDeclaration> {
+        self.let_declarations.get(let_name)
     }
 }
 
@@ -127,6 +142,14 @@ impl TypeDeclaration {
         match self {
             Enum(decl) => decl.name.clone(),
             Ind(decl) => decl.name.clone(),
+        }
+    }
+
+    pub fn arity(&self) -> usize {
+        use TypeDeclaration::*;
+        match self {
+            Enum(decl) => decl.type_parameters.len(),
+            Ind(decl) => decl.type_parameters.len(),
         }
     }
 }
