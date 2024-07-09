@@ -1,4 +1,5 @@
 mod parser;
+mod validation;
 
 use std::io;
 use std::io::Write;
@@ -25,7 +26,7 @@ fn main() -> Result<()> {
     let str = fs::read_to_string(args.file)?;
     match parser::parse_program(&str) {
         Ok(program) => {
-            println!("{}", parser::show::show_program_declarations(program));
+            println!("{}", parser::show::Show::new(&program.interner()).show_program_declarations(&program));
             //println!("{:?}", program);
         },
         Err(err) => {

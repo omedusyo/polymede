@@ -3,7 +3,7 @@ use crate::parser::lex::{
     lexer::{Request, LocatedToken, DeclarationKind},
     token::Keyword,
 };
-use crate::parser::identifier::{Variable, ConstructorName, FunctionName, Identifier};
+use crate::parser::identifier::{Interner, interner, Symbol, Variable, ConstructorName, FunctionName, Identifier};
 
 pub type Result<A> = std::result::Result<A, Error>;
 
@@ -31,13 +31,15 @@ pub enum Error {
 
 
 #[derive(Debug)]
-pub struct State<'a> {
-    lexer_state: lexer::State<'a>
+pub struct State<'lex_state, 'interner> {
+    lexer_state: lexer::State<'lex_state>,
+    interner: &'interner mut Interner,
 }
 
 // ===Program===
 #[derive(Debug)]
 pub struct Program {
+    interner: Interner,
     pub type_declarations: Vec<TypeDeclaration>,
     pub function_declarations: Vec<FunctionDeclaration>,
     pub let_declarations: Vec<LetDeclaration>,
@@ -153,7 +155,15 @@ pub enum Pattern {
 
 impl Program {
     pub fn new() -> Self {
-        Self { type_declarations: vec![], function_declarations: vec![], let_declarations: vec![] }
+        Self { interner: interner(), type_declarations: vec![], function_declarations: vec![], let_declarations: vec![] }
+    }
+
+    pub fn interner(&self) -> &Interner {
+        &self.interner
+    }
+
+    pub fn mut_interner(&mut self) -> &mut Interner {
+        &mut self.interner
     }
 
     pub fn add_declaration(&mut self, decl: Declaration) {
@@ -216,9 +226,16 @@ impl Program {
     }
 }
 
-impl <'state> State<'state> {
-    pub fn new<'a: 'state>(str: &'a str) -> Self {
-        Self { lexer_state: lexer::State::new(str) }
+impl <'lex_state, 'interner> State<'lex_state, 'interner> {
+    pub fn new<'a: 'lex_state>(str: &'a str, interner: &'interner mut Interner) -> Self {
+        Self {
+            interner,
+            lexer_state: lexer::State::new(str)
+        }
+    }
+
+    pub fn interner(&mut self) -> &mut Interner {
+        &mut self.interner
     }
 
     pub fn request_token(&mut self, request: Request) -> Result<LocatedToken> {
@@ -253,7 +270,11 @@ impl <'state> State<'state> {
         self.lexer_state.peek_declaration_token().map_err(Error::LexError)
     }
 
-    pub fn clone(&self) -> State<'state> {
-        Self { lexer_state: self.lexer_state.clone() }
+    pub fn clone(&self) -> lexer::State<'lex_state> {
+        self.lexer_state.clone()
+    }
+
+    pub fn restore(&mut self, lexer_state: lexer::State<'lex_state>) {
+        self.lexer_state = lexer_state;
     }
 }

@@ -13,9 +13,11 @@ use crate::parser::{
     combinator::delimited_possibly_empty_sequence_to_vector,
 };
 
-pub fn program(state: &mut State) -> Result<Program> {
+pub fn parse_program(s: &str) -> Result<Program> {
     let mut program = Program::new();
-    for declaration in delimited_possibly_empty_sequence_to_vector(state, program_declaration, do_nothing)? {
+    let mut state = State::new(s, program.mut_interner());
+
+    for declaration in delimited_possibly_empty_sequence_to_vector(&mut state, program_declaration, do_nothing)? {
         program.add_declaration(declaration);
     }
     check_program_names_uniqueness(&program)?;

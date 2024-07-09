@@ -16,7 +16,7 @@ enum PatternIdentifier {
 
 fn pattern_identifier(state: &mut State) -> Result<PatternIdentifier> {
     let id = identifier(state)?;
-    let c = id.first_char();
+    let c = id.first_char(state.interner());
     if c.is_ascii_uppercase() {
         // constructor
         Ok(PatternIdentifier::ConstructorName(id))

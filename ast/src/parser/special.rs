@@ -34,7 +34,7 @@ pub enum VariableOrConstructorName {
 
 pub fn constructor_name_or_variable(state: &mut State) -> Result<VariableOrConstructorName> {
     let id = identifier(state)?;
-    let c = id.first_char();
+    let c = id.first_char(state.interner());
     if c.is_ascii_uppercase() {
         // constructor
         Ok(VariableOrConstructorName::ConstructorName(id))
@@ -60,7 +60,7 @@ pub enum StartTerm {
 
 pub fn start_term(state: &mut State) -> Result<StartTerm> {
     let id = identifier(state)?;
-    let c = id.first_char();
+    let c = id.first_char(state.interner());
     if c.is_ascii_uppercase() {
         // constructor
         if state.is_next_token_open_paren()? {
@@ -71,7 +71,7 @@ pub fn start_term(state: &mut State) -> Result<StartTerm> {
         }
     } else if c.is_ascii_lowercase() {
         // TODO: Checking for fold/match here is really wrong. This should be the job for the lexer.
-        match id.str() {
+        match id.str(state.interner()) {
             "fold" => Ok(StartTerm::Fold),
             "match" => Ok(StartTerm::Match),
             "let" => Ok(StartTerm::Let),

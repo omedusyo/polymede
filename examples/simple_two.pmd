@@ -4,14 +4,7 @@ type Nat = ind { nat .
 | Succ(nat)
 }
 
-type Nat = ind { nat .
-| Foo
-| Foo(nat)
-}
 
 
 fn square = # Nat -> Nat : { x . x }
-
-fn square = # Nat -> Nat : { x . x }
-
 
