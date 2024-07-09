@@ -3,7 +3,7 @@ use crate::parser::lex::{
     lexer::{Request, LocatedToken, DeclarationKind},
 };
 use crate::parser::{
-    base::{State, Result, Error, Program, Declaration, LetDeclaration, Function, FunctionType, FunctionDeclaration, IndDeclaration, EnumDeclaration, TypeDeclaration, ConstructorDeclaration},
+    base::{State, Result, Error, PreProgram, Declaration, LetDeclaration, Function, FunctionType, FunctionDeclaration, IndDeclaration, EnumDeclaration, TypeDeclaration, ConstructorDeclaration},
     identifier,
     identifier::{Variable, FunctionName, variable, constructor_name, function_name},
     term::{term, typed_term},
@@ -13,18 +13,17 @@ use crate::parser::{
     combinator::delimited_possibly_empty_sequence_to_vector,
 };
 
-pub fn parse_program(s: &str) -> Result<Program> {
-    let mut program = Program::new();
-    let mut state = State::new(s, program.mut_interner());
+pub fn pre_program(state: &mut State) -> Result<PreProgram> {
+    let mut program = PreProgram::new();
 
-    for declaration in delimited_possibly_empty_sequence_to_vector(&mut state, program_declaration, do_nothing)? {
+    for declaration in delimited_possibly_empty_sequence_to_vector(state, program_declaration, do_nothing)? {
         program.add_declaration(declaration);
     }
     check_program_names_uniqueness(&program)?;
     Ok(program)
 }
 
-fn check_program_names_uniqueness(program: &Program) -> Result<()> {
+fn check_program_names_uniqueness(program: &PreProgram) -> Result<()> {
     let type_duplicates = identifier::duplicates(&program.type_names());
     let constructor_duplicates = identifier::duplicates(&program.constructor_names());
     let function_duplicates = identifier::duplicates(&program.function_names());

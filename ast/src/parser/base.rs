@@ -3,7 +3,11 @@ use crate::parser::lex::{
     lexer::{Request, LocatedToken, DeclarationKind},
     token::Keyword,
 };
-use crate::parser::identifier::{Interner, interner, Symbol, Variable, ConstructorName, FunctionName, Identifier};
+use crate::parser::{
+    program::pre_program,
+    identifier::{Interner, interner, Variable, ConstructorName, FunctionName, Identifier}
+};
+use std::collections::HashMap;
 
 pub type Result<A> = std::result::Result<A, Error>;
 
@@ -40,6 +44,44 @@ pub struct State<'lex_state, 'interner> {
 #[derive(Debug)]
 pub struct Program {
     interner: Interner,
+    pub type_declarations: HashMap<Variable, TypeDeclaration>,
+    pub function_declarations: HashMap<FunctionName, FunctionDeclaration>,
+    pub let_declarations: HashMap<Variable, LetDeclaration>,
+}
+
+impl Program {
+    pub fn interner(&self) -> &Interner {
+        &self.interner
+    }
+
+    pub fn parse(s: &str) -> Result<Self> {
+        let mut interner: Interner = interner();
+        let mut state = State::new(s, &mut interner);
+        let pre_program = pre_program(&mut state)?;
+        let mut program = Self {
+            interner,
+            type_declarations: HashMap::new(),
+            function_declarations: HashMap::new(),
+            let_declarations: HashMap::new(),
+        };
+
+        for decl in pre_program.type_declarations {
+            program.type_declarations.insert(decl.name(), decl);
+        }
+        for decl in pre_program.function_declarations {
+            program.function_declarations.insert(decl.name(), decl);
+        }
+        for decl in pre_program.let_declarations {
+            program.let_declarations.insert(decl.name(), decl);
+        }
+
+        Ok(program)
+    }
+}
+
+
+#[derive(Debug)]
+pub struct PreProgram {
     pub type_declarations: Vec<TypeDeclaration>,
     pub function_declarations: Vec<FunctionDeclaration>,
     pub let_declarations: Vec<LetDeclaration>,
@@ -79,11 +121,27 @@ pub enum TypeDeclaration {
     Ind(IndDeclaration),
 }
 
+impl TypeDeclaration {
+    fn name(&self) -> ConstructorName {
+        use TypeDeclaration::*;
+        match self {
+            Enum(decl) => decl.name.clone(),
+            Ind(decl) => decl.name.clone(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct FunctionDeclaration {
     pub name: FunctionName,
     pub type_parameters: Vec<Variable>,
     pub function: Function,
+}
+
+impl FunctionDeclaration {
+    fn name(&self) -> FunctionName {
+        self.name.clone()
+    }
 }
 
 #[derive(Debug)]
@@ -98,6 +156,12 @@ pub struct LetDeclaration {
     pub name: Variable,
     pub type_parameters: Vec<Variable>,
     pub body: TypedTerm,
+}
+
+impl LetDeclaration {
+    fn name(&self) -> Variable {
+        self.name.clone()
+    }
 }
 
 // ===Types===
@@ -153,17 +217,9 @@ pub enum Pattern {
     Anything(Identifier),
 }
 
-impl Program {
+impl PreProgram {
     pub fn new() -> Self {
-        Self { interner: interner(), type_declarations: vec![], function_declarations: vec![], let_declarations: vec![] }
-    }
-
-    pub fn interner(&self) -> &Interner {
-        &self.interner
-    }
-
-    pub fn mut_interner(&mut self) -> &mut Interner {
-        &mut self.interner
+        Self { type_declarations: vec![], function_declarations: vec![], let_declarations: vec![] }
     }
 
     pub fn add_declaration(&mut self, decl: Declaration) {

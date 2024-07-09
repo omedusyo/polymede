@@ -12,7 +12,7 @@ mod lex;
 use crate::parser:: base::{Error, Program};
 
 pub fn parse_program(s: &str) -> Result<Program, Error> {
-    program::parse_program(s)
+    Program::parse(s)
 }
 
 #[cfg(test)]
@@ -21,7 +21,7 @@ mod tests {
         base::{State, Result, Error, Term, Type, TypeDeclaration, FunctionDeclaration, LetDeclaration, EnumDeclaration, IndDeclaration},
         identifier::interner,
         types::type_,
-        program::{parse_program, let_declaration, function_declaration, type_declaration},
+        program::{pre_program, let_declaration, function_declaration, type_declaration},
     };
 
     #[test]
@@ -322,9 +322,10 @@ mod tests {
             }\n\
         }\n\
         ";
+        let mut interner = interner();
+        let mut state = State::new(s, &mut interner);
 
-
-        let result = parse_program(s);
+        let result = pre_program(&mut state);
         assert!(matches!(result, Ok(_)));
 
         Ok(())
@@ -335,8 +336,10 @@ mod tests {
         let s = "\
         let y = # List(Nat) : Nil\n\
         ";
+        let mut interner = interner();
+        let mut state = State::new(s, &mut interner);
 
-        let result = parse_program(s);
+        let result = pre_program(&mut state);
         assert!(matches!(result, Ok(_)));
 
         Ok(())

@@ -17,9 +17,9 @@ impl <'show>Show<'show> {
     }
 
     pub fn show_program_declarations(&self, program: &Program) -> String {
-        let type_declarations = program.type_declarations.iter().map(|decl| self.show_type_declaration(decl)).collect::<Vec<_>>().join("\n\n");
-        let function_declarations = program.function_declarations.iter().map(|decl| self.show_function_declaration(decl)).collect::<Vec<_>>().join("\n");
-        let let_declarations = program.let_declarations.iter().map(|decl| self.show_let_declaration(decl)).collect::<Vec<_>>().join("\n");
+        let type_declarations = program.type_declarations.values().map(|decl| self.show_type_declaration(decl)).collect::<Vec<_>>().join("\n\n");
+        let function_declarations = program.function_declarations.values().map(|decl| self.show_function_declaration(decl)).collect::<Vec<_>>().join("\n");
+        let let_declarations = program.let_declarations.values().map(|decl| self.show_let_declaration(decl)).collect::<Vec<_>>().join("\n");
         format!("{type_declarations}\n\n{function_declarations}\n{let_declarations}")
     }
 
