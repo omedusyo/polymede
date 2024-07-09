@@ -3,9 +3,9 @@ use crate::parser::{
     base::{Program, TypeDeclaration, Type, ConstructorDeclaration}
 };
 
-pub type Result<A> = std::result::Result<A, Error>;
-
 use std::collections::HashSet;
+
+pub type Result<A> = std::result::Result<A, Error>;
 
 #[derive(Debug)]
 pub enum Error {
@@ -16,11 +16,34 @@ pub enum Error {
 }
 
 fn check_type_declaration(program: &Program, decl: &TypeDeclaration) -> Result<()> {
-    todo!()
+    match decl {
+        TypeDeclaration::Enum(decl) => {
+            let type_env: TypeEnvironment = TypeEnvironment::new(&decl.type_parameters);
+            for constructor_decl in &decl.constructors {
+                check_constructor_declaration(program, &type_env, constructor_decl, None)?
+            }
+            Ok(())
+        },
+        TypeDeclaration::Ind(decl) => {
+            let mut type_env: TypeEnvironment = TypeEnvironment::new(&decl.type_parameters);
+            type_env.add(&decl.recursive_type_var);
+            for constructor_decl in &decl.constructors {
+                check_constructor_declaration(program, &type_env, constructor_decl, Some(&decl.recursive_type_var))?
+            }
+            Ok(())
+        }
+    }
 }
 
-fn check_constructor_declaration(program: &Program, type_env: &TypeEnvironment, decl: &ConstructorDeclaration) {
-    todo!()
+fn check_constructor_declaration(program: &Program, type_env: &TypeEnvironment, decl: &ConstructorDeclaration, rec_var: Option<&Variable>) -> Result<()> {
+    for type_ in &decl.parameters {
+        check_type(program, type_env, type_)?;
+        match rec_var {
+            Some(rec_var) => check_positive_occurance(rec_var, type_)?,
+            _ => {},
+        }
+    }
+    Ok(())
 }
 
 struct TypeEnvironment {
@@ -28,6 +51,18 @@ struct TypeEnvironment {
 }
 
 impl TypeEnvironment {
+    pub fn new(vars: &[Variable]) -> Self {
+        let mut set = HashSet::new();
+        for var in vars {
+            set.insert(var.clone());
+        }
+        Self { variables: set }
+    }
+
+    pub fn add(&mut self, var: &Variable) {
+        self.variables.insert(var.clone());
+    }
+
     pub fn exists(&self, variable: &Variable) -> bool {
         self.variables.contains(variable)
     }
