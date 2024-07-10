@@ -27,6 +27,7 @@ fn main() -> Result<()> {
     match parser::parse_program(&str) {
         Ok(program) => {
             println!("{}", parser::show::Show::new(&program.interner()).show_program_declarations(&program));
+            println!("{:?}", validation::type_checker::check_type_formation(&program));
             //println!("{:?}", program);
         },
         Err(err) => {

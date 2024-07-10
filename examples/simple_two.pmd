@@ -1,7 +1,14 @@
 
+type Bool = enum { T | F }
+
 type Nat = ind { nat .
 | Zero
 | Succ(nat)
+}
+
+type List(a) = ind { x .
+| Nil
+| Cons(a, x)
 }
 
 
@@ -10,7 +17,7 @@ type Bar(a) = enum {
 }
 
 type F = ind { x .
-| Foo(Fn(x -> a))
+| Foo(Fn(Fn(x -> Bool) -> Bool))
 }
 
 fn square = # Nat -> Nat : { x . x }

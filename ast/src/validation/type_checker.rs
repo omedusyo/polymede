@@ -1,6 +1,6 @@
 use crate::parser::{
     identifier::{Variable, ConstructorName},
-    base::{Program, TypeDeclaration, Type, ConstructorDeclaration}
+    base::{Program, TypeDeclaration, Type, FunctionType, ConstructorDeclaration, FunctionDeclaration, LetDeclaration, Term},
 };
 
 use std::collections::HashSet;
@@ -13,6 +13,23 @@ pub enum Error {
     TypeConstructorIsApplliedToWrongNumberOfArguments { expected: usize, received: usize },
     UndefinedTypeVaraible { variable: Variable },
     NegativeOccuranceOfRecursiveTypeVariableInInductiveDeclaration { variable: Variable }
+}
+
+// ===Type Formation===
+pub fn check_type_formation(program: &Program) -> Result<()> {
+    for decl in program.type_declarations.values() {
+        check_type_declaration(program, decl)?
+    }
+
+    for decl in program.function_declarations.values() {
+        check_types_in_function_declaration(program, decl)?
+    }
+
+    for decl in program.let_declarations.values() {
+        check_types_in_let_declaration(program, decl)?
+    }
+
+    Ok(())
 }
 
 fn check_type_declaration(program: &Program, decl: &TypeDeclaration) -> Result<()> {
@@ -44,6 +61,16 @@ fn check_constructor_declaration(program: &Program, type_env: &TypeEnvironment, 
         }
     }
     Ok(())
+}
+
+fn check_types_in_function_declaration(program: &Program, decl: &FunctionDeclaration) -> Result<()> {
+    let type_env: TypeEnvironment = TypeEnvironment::new(&decl.type_parameters);
+    check_function_type(program, &type_env, &decl.function.type_)
+}
+
+fn check_types_in_let_declaration(program: &Program, decl: &LetDeclaration) -> Result<()> {
+    let type_env: TypeEnvironment = TypeEnvironment::new(&decl.type_parameters);
+    check_type(program, &type_env, &decl.body.type_)
 }
 
 struct TypeEnvironment {
@@ -94,12 +121,16 @@ fn check_type(program: &Program, type_env: &TypeEnvironment, type_: &Type) -> Re
             }
         },
         Arrow(function_type) => {
-            for type_ in &function_type.input_types {
-                check_type(program, type_env, type_)?
-            }
-            check_type(program, type_env, &function_type.output_type)
+            check_function_type(program, type_env, function_type)
         }
     }
+}
+
+fn check_function_type(program: &Program, type_env: &TypeEnvironment, function_type: &FunctionType) -> Result<()> {
+    for type_ in &function_type.input_types {
+        check_type(program, type_env, type_)?
+    }
+    check_type(program, type_env, &function_type.output_type)
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -118,6 +149,10 @@ impl Polarity {
     }
 }
 
+// Foo(Bar(x), a)      positive occurance of x
+// Fn(x -> a)          negative occurance of x
+// Fn(Fn(x -> a) -> b) positive occurance of x
+// Fn(x, a -> x)          has both positive and negative occurance of x
 fn check_positive_occurance(type_var0: &Variable, type_: &Type) -> Result<()> {
 
     fn check(type_var0: &Variable, type_: &Type, polarity: Polarity) -> Result<()> {
@@ -149,6 +184,11 @@ fn check_positive_occurance(type_var0: &Variable, type_: &Type) -> Result<()> {
     }
 
     check(type_var0, type_, Polarity::Positive)
+}
+
+// ===Term Formation===
+fn type_check(program: &Program, term: &Term, type_: &Type) -> Result<()> {
+    todo!()
 }
 
 #[cfg(test)]

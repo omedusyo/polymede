@@ -15,6 +15,11 @@ type Pair(a, b) = enum {
 | Pair(a, b)
 }
 
+type Nat = ind { x .
+| Z
+| S(x)
+}
+
 type List(a) = ind { x .
 | Nil
 | Cons(a, x)
