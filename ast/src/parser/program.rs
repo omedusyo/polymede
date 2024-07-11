@@ -69,6 +69,8 @@ fn constructor_declaration_sequence(state: &mut State) -> Result<Vec<Constructor
     delimited_possibly_empty_sequence_to_vector( state, constructor_declaration, or_separator)
 }
 
+// TODO: Make sure that for ind type declarations the recursive type-variable doesn't shadow any of
+// its parameters.
 pub fn type_declaration(state: &mut State) -> Result<PreTypeDeclaration> {
     state.request_keyword(Keyword::Type_)?;
 

@@ -38,7 +38,7 @@ pub fn term(state: &mut State) -> Result<Term> {
         StartTerm::Fold => {
             let arg = term(state)?;
             let branches = pattern_branches(state)?;
-            Ok(Term::Match(Box::new(arg), branches))
+            Ok(Term::Fold(Box::new(arg), branches))
         },
         StartTerm::Let => {
             state.request_token(Request::OpenCurly)?;

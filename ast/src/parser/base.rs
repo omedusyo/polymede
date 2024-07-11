@@ -72,7 +72,7 @@ impl Program {
 
         for pre_decl in pre_program.type_declarations {
             let decl = TypeDeclaration::new(pre_decl,  &mut program.constructor_to_type_mapping);
-            program.type_declarations.insert(decl.name(), decl);
+            program.type_declarations.insert(decl.name().clone(), decl);
         }
         for decl in pre_program.function_declarations {
             program.function_declarations.insert(decl.name(), decl);
@@ -212,11 +212,11 @@ impl TypeDeclaration {
         }
     }
 
-    fn name(&self) -> ConstructorName {
+    pub fn name(&self) -> &ConstructorName {
         use TypeDeclaration::*;
         match self {
-            Enum(decl) => decl.name.clone(),
-            Ind(decl) => decl.name.clone(),
+            Enum(decl) => &decl.name,
+            Ind(decl) => &decl.name,
         }
     }
 
@@ -225,6 +225,48 @@ impl TypeDeclaration {
         match self {
             Enum(decl) => decl.type_parameters.len(),
             Ind(decl) => decl.type_parameters.len(),
+        }
+    }
+
+    // WARNING: Assumes number of elements of `type_args` matches arity of the constructor.
+    // e.g. consider type declaration
+    //   type BinTree(a, b) = ind { tree .
+    //   | Leaf(a)
+    //   | Branch(b, Fn(Two -> tree))
+    //   }
+    // then type-applying the type arguments [Bool, Int] to the Branch constructor leads to
+    //   Branch(Int, Fn(Two -> BinTree(Bool, Int)))
+    pub fn type_apply_constructor(&self, constructor_name: &ConstructorName, type_args: &[Type]) -> Option<(&ConstructorDeclaration, Vec<Type>)> {
+        use TypeDeclaration::*;
+        match self {
+            Enum(decl) => {
+                let constructor_decl = decl.constructors.get(constructor_name)?;
+                let specialized_constructor_type_arguments: Vec<Type> = constructor_decl.parameters
+                    .iter()
+                    .map(|type_body| type_apply(&decl.type_parameters, type_body, type_args))
+                    .collect();
+                Some((constructor_decl, specialized_constructor_type_arguments))
+            },
+            Ind(decl) => {
+                // TODO: This assumes that type_parameters + rec_type_var are all unique, and that
+                // the rec_type_var doesn't shadow anything. But I don't yet check this!
+                let self_type: Type = Type::TypeApplication(self.name().clone(), type_args.to_vec());
+                let constructor_decl = decl.constructors.get(constructor_name)?;
+
+                // I need to extend type_args and decl.type_parameters with the recursive
+                // variable/self type
+                let mut type_parameters: Vec<Variable> = decl.type_parameters.to_vec();
+                type_parameters.push(decl.recursive_type_var.clone());
+
+                let mut type_args: Vec<Type> = type_args.to_vec();
+                type_args.push(self_type);
+
+                let specialized_constructor_type_arguments: Vec<Type> = constructor_decl.parameters
+                    .iter()
+                    .map(|type_body| type_apply(&type_parameters, type_body, &type_args))
+                    .collect();
+                Some((constructor_decl, specialized_constructor_type_arguments))
+            }
         }
     }
 }
@@ -379,6 +421,49 @@ impl PreProgram {
         }
         names
     }
+}
+
+impl ConstructorDeclaration {
+    pub fn arity(&self) -> usize { 
+        self.parameters.len()
+    }
+}
+
+
+pub fn type_apply(type_parameters: &[Variable], type_body: &Type, type_arguments: &[Type]) -> Type {
+    // TODO: What are the assumptions? Am I responsible for checking the arities are correct here?
+    //
+    // given a variable in type_body, I need to know which argument to substitute...
+    // So I actually need to have Variable ~> index mapping...
+    //
+    // This is not very efficient.
+    let mut position_map: HashMap<&Variable, usize> = HashMap::new();
+    for (i, var) in type_parameters.iter().enumerate() {
+        position_map.insert(var, i);
+    }
+    
+    fn traverse(position_map: &HashMap<&Variable, usize>, type_body: &Type, type_arguments: &[Type]) -> Type {
+        use Type::*;
+        match type_body {
+            VariableUse(var) => {
+                match position_map.get(var) {
+                    Some(i) => type_arguments[*i].clone(),
+                    None => unreachable!(),
+                }
+            },
+            TypeApplication(type_name, args) => {
+                let applied_args: Vec<Type> = args.into_iter().map(|type_| traverse(position_map, type_, type_arguments)).collect();
+                TypeApplication(type_name.clone(), applied_args)
+            }
+            Arrow(fn_type) => {
+                let applied_input_types: Vec<Type> = fn_type.input_types.iter().map(|type_| traverse(position_map, type_, type_arguments)).collect();
+                let applied_output_type = traverse(position_map, &fn_type.output_type, type_arguments);
+                Arrow(Box::new(FunctionType { input_types: applied_input_types, output_type: applied_output_type }))
+            },
+        }
+    }
+
+    traverse(&position_map, type_body, type_arguments)
 }
 
 impl <'lex_state, 'interner> State<'lex_state, 'interner> {
