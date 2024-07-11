@@ -47,9 +47,10 @@ pub struct State<'lex_state, 'interner> {
 #[derive(Debug)]
 pub struct Program {
     interner: Interner,
-    pub type_declarations: HashMap<ConstructorName, TypeDeclaration>,
+    pub type_declarations: HashMap<ConstructorName, TypeDeclarationProper>,
     pub function_declarations: HashMap<FunctionName, FunctionDeclaration>,
     pub let_declarations: HashMap<Variable, LetDeclaration>,
+    constructor_to_type_mapping: HashMap<ConstructorName, Variable>,
 }
 
 impl Program {
@@ -66,9 +67,11 @@ impl Program {
             type_declarations: HashMap::new(),
             function_declarations: HashMap::new(),
             let_declarations: HashMap::new(),
+            constructor_to_type_mapping: HashMap::new(),
         };
 
-        for decl in pre_program.type_declarations {
+        for pre_decl in pre_program.type_declarations {
+            let decl = TypeDeclarationProper::new(pre_decl,  &mut program.constructor_to_type_mapping);
             program.type_declarations.insert(decl.name(), decl);
         }
         for decl in pre_program.function_declarations {
@@ -81,7 +84,7 @@ impl Program {
         Ok(program)
     }
 
-    pub fn get_type_declaration(&self, type_constructor_name: &ConstructorName) -> Option<&TypeDeclaration> {
+    pub fn get_type_declaration(&self, type_constructor_name: &ConstructorName) -> Option<&TypeDeclarationProper> {
         self.type_declarations.get(type_constructor_name)
     }
 
@@ -91,6 +94,11 @@ impl Program {
 
     pub fn get_let_declaration(&self, let_name: &FunctionName) -> Option<&LetDeclaration> {
         self.let_declarations.get(let_name)
+    }
+
+    pub fn get_type_declaration_of_constructor(&self, constructor_name: &ConstructorName) -> Option<&TypeDeclarationProper> {
+        let type_name = self.constructor_to_type_mapping.get(constructor_name)?;
+        self.get_type_declaration_of_constructor(type_name)
     }
 }
 
@@ -116,10 +124,25 @@ pub struct ConstructorDeclaration {
 }
 
 #[derive(Debug)]
+pub struct EnumDeclarationProper {
+    pub name: ConstructorName,
+    pub type_parameters: Vec<Variable>,
+    pub constructors: HashMap<ConstructorName, ConstructorDeclaration>,
+}
+
+#[derive(Debug)]
 pub struct EnumDeclaration {
     pub name: ConstructorName,
     pub type_parameters: Vec<Variable>,
     pub constructors: Vec<ConstructorDeclaration>,
+}
+
+#[derive(Debug)]
+pub struct IndDeclarationProper {
+    pub name: ConstructorName,
+    pub type_parameters: Vec<Variable>,
+    pub recursive_type_var: Variable,
+    pub constructors: HashMap<ConstructorName, ConstructorDeclaration>,
 }
 
 #[derive(Debug)]
@@ -131,14 +154,66 @@ pub struct IndDeclaration {
 }
 
 #[derive(Debug)]
+pub enum TypeDeclarationProper {
+    Enum(EnumDeclarationProper),
+    Ind(IndDeclarationProper),
+}
+
+#[derive(Debug)]
 pub enum TypeDeclaration {
     Enum(EnumDeclaration),
     Ind(IndDeclaration),
 }
 
-impl TypeDeclaration {
+impl EnumDeclarationProper {
+    // Returns type_parameters together with declaration.
+    pub fn get_constructor(&self, constructor_name: &ConstructorName) -> Option<(&[Variable], &ConstructorDeclaration)> {
+        let constructor_decl = self.constructors.get(constructor_name)?;
+        Some((&self.type_parameters, constructor_decl))
+    }
+}
+
+impl IndDeclarationProper {
+    // Returns type_parameters (and a special recursive variable) together with declaration.
+    pub fn get_constructor(&self, constructor_name: &ConstructorName) -> Option<(&[Variable], &Variable, &ConstructorDeclaration)> {
+        let constructor_decl = self.constructors.get(constructor_name)?;
+        Some((&self.type_parameters, &self.recursive_type_var, constructor_decl))
+    }
+}
+
+impl TypeDeclarationProper {
+    fn new(pre_decl: TypeDeclaration, constructor_to_type_mapping: &mut HashMap<ConstructorName, Variable>) -> Self {
+        match pre_decl {
+            TypeDeclaration::Enum(pre_decl) => {
+                let mut constructors = HashMap::new();
+                for constructor_decl in pre_decl.constructors {
+                    constructor_to_type_mapping.insert(constructor_decl.name.clone(), pre_decl.name.clone());
+                    constructors.insert(constructor_decl.name.clone(), constructor_decl);
+                }
+                Self::Enum(EnumDeclarationProper {
+                    name: pre_decl.name,
+                    type_parameters: pre_decl.type_parameters,
+                    constructors,
+                })
+            },
+            TypeDeclaration::Ind(pre_decl) => {
+                let mut constructors = HashMap::new();
+                for constructor_decl in pre_decl.constructors {
+                    constructor_to_type_mapping.insert(constructor_decl.name.clone(), pre_decl.name.clone());
+                    constructors.insert(constructor_decl.name.clone(), constructor_decl);
+                }
+                Self::Ind(IndDeclarationProper {
+                    name: pre_decl.name,
+                    recursive_type_var: pre_decl.recursive_type_var,
+                    type_parameters: pre_decl.type_parameters,
+                    constructors,
+                })
+            }
+        }
+    }
+
     fn name(&self) -> ConstructorName {
-        use TypeDeclaration::*;
+        use TypeDeclarationProper::*;
         match self {
             Enum(decl) => decl.name.clone(),
             Ind(decl) => decl.name.clone(),
@@ -146,7 +221,7 @@ impl TypeDeclaration {
     }
 
     pub fn arity(&self) -> usize {
-        use TypeDeclaration::*;
+        use TypeDeclarationProper::*;
         match self {
             Enum(decl) => decl.type_parameters.len(),
             Ind(decl) => decl.type_parameters.len(),
@@ -188,14 +263,14 @@ impl LetDeclaration {
 }
 
 // ===Types===
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Type {
     VariableUse(Variable),
     TypeApplication(ConstructorName, Vec<Type>),
     Arrow(Box<FunctionType>),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FunctionType {
     pub input_types: Vec<Type>,
     pub output_type: Type,
@@ -211,6 +286,7 @@ pub struct TypedTerm {
 
 #[derive(Debug)]
 pub enum Term {
+    TypedTerm(Box<TypedTerm>),
     VariableUse(Variable),
     FunctionApplication(Variable, Vec<Term>),
     ConstructorUse(ConstructorName, Vec<Term>),

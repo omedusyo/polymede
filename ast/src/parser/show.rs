@@ -1,5 +1,5 @@
 use crate::parser::{
-    base::{Program, Type, FunctionType, TypeDeclaration, FunctionDeclaration, LetDeclaration, EnumDeclaration, IndDeclaration, ConstructorDeclaration},
+    base::{Program, Type, FunctionType, TypeDeclarationProper, FunctionDeclaration, LetDeclaration, EnumDeclarationProper, IndDeclarationProper, ConstructorDeclaration},
     identifier::{Identifier, Interner},
 };
 
@@ -23,17 +23,17 @@ impl <'show>Show<'show> {
         format!("{type_declarations}\n\n{function_declarations}\n{let_declarations}")
     }
 
-    fn show_type_declaration(&self, type_declaration: &TypeDeclaration) -> String {
-        use TypeDeclaration::*;
+    fn show_type_declaration(&self, type_declaration: &TypeDeclarationProper) -> String {
+        use TypeDeclarationProper::*;
         match type_declaration {
             Enum(enum_declaration) => self.show_enum_declaration(enum_declaration),
             Ind(ind_declaration) => self.show_ind_declaration(ind_declaration),
         }
     }
 
-    fn show_enum_declaration(&self, declaration: &EnumDeclaration) -> String {
+    fn show_enum_declaration(&self, declaration: &EnumDeclarationProper) -> String {
         let name_str = declaration.name.str(self.interner());
-        let constructor_strs = declaration.constructors.iter().map(|cons| self.show_constructor_declaration(cons)).collect::<Vec<_>>().join("\n");
+        let constructor_strs = declaration.constructors.values().map(|cons| self.show_constructor_declaration(cons)).collect::<Vec<_>>().join("\n");
         let after_equals_str = format!("enum {{\n{constructor_strs}\n}}");
         if declaration.type_parameters.is_empty() {
             format!("type {name_str} = {after_equals_str}")
@@ -43,10 +43,10 @@ impl <'show>Show<'show> {
         }
     }
 
-    fn show_ind_declaration(&self, declaration: &IndDeclaration) -> String {
+    fn show_ind_declaration(&self, declaration: &IndDeclarationProper) -> String {
         let name_str = declaration.name.str(self.interner());
         let rec_var_str = declaration.recursive_type_var.str(self.interner());
-        let constructor_strs = declaration.constructors.iter().map(|cons| self.show_constructor_declaration(cons)).collect::<Vec<_>>().join("\n");
+        let constructor_strs = declaration.constructors.values().map(|cons| self.show_constructor_declaration(cons)).collect::<Vec<_>>().join("\n");
         let after_equals_str = format!("ind {{ {rec_var_str} .\n{constructor_strs}\n}}");
         if declaration.type_parameters.is_empty() {
             format!("type {name_str} = {after_equals_str}")

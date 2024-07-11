@@ -12,6 +12,7 @@ use crate::parser::{
     special::{or_separator, do_nothing},
     combinator::delimited_possibly_empty_sequence_to_vector,
 };
+use std::collections::HashMap;
 
 pub fn pre_program(state: &mut State) -> Result<PreProgram> {
     let mut program = PreProgram::new();
@@ -48,7 +49,6 @@ fn program_declaration(state: &mut State) -> Result<Declaration> {
     }
 }
 
-// TODO: Check for uniqueness of constructor names.
 fn constructor_declaration(state: &mut State) -> Result<ConstructorDeclaration> {
     let constructor_name = constructor_name(state)?;
 
@@ -89,6 +89,8 @@ pub fn type_declaration(state: &mut State) -> Result<TypeDeclaration> {
     state.request_token(Request::OpenCurly)?;
     let declaration = match keyword {
         Keyword::Enum => {
+            // TODO
+            //let constructors = HashMap::new();
             TypeDeclaration::Enum(EnumDeclaration {
                 name: constructor_name,
                 type_parameters,

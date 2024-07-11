@@ -90,4 +90,3 @@ fn possibly_empty_term_sequence(state: &mut State) -> Result<Vec<Term>> {
 fn nonempty_term_sequence(state: &mut State) -> Result<Vec<Term>> {
     delimited_nonempty_sequence_to_vector(state, term, comma)
 }
-
