@@ -3,7 +3,7 @@ use crate::parser::lex::{
     lexer::{Request, LocatedToken, DeclarationKind},
 };
 use crate::parser::{
-    base::{State, Result, Error, PreProgram, Declaration, LetDeclaration, Function, FunctionType, FunctionDeclaration, IndDeclaration, EnumDeclaration, TypeDeclaration, ConstructorDeclaration},
+    base::{State, Result, Error, PreProgram, Declaration, LetDeclaration, Function, FunctionType, FunctionDeclaration, PreIndDeclaration, PreEnumDeclaration, PreTypeDeclaration, ConstructorDeclaration},
     identifier,
     identifier::{Variable, FunctionName, variable, constructor_name, function_name},
     term::{term, typed_term},
@@ -69,7 +69,7 @@ fn constructor_declaration_sequence(state: &mut State) -> Result<Vec<Constructor
     delimited_possibly_empty_sequence_to_vector( state, constructor_declaration, or_separator)
 }
 
-pub fn type_declaration(state: &mut State) -> Result<TypeDeclaration> {
+pub fn type_declaration(state: &mut State) -> Result<PreTypeDeclaration> {
     state.request_keyword(Keyword::Type_)?;
 
     let constructor_name = constructor_name(state)?;
@@ -89,9 +89,7 @@ pub fn type_declaration(state: &mut State) -> Result<TypeDeclaration> {
     state.request_token(Request::OpenCurly)?;
     let declaration = match keyword {
         Keyword::Enum => {
-            // TODO
-            //let constructors = HashMap::new();
-            TypeDeclaration::Enum(EnumDeclaration {
+            PreTypeDeclaration::Enum(PreEnumDeclaration {
                 name: constructor_name,
                 type_parameters,
                 constructors: constructor_declaration_sequence(state)?
@@ -102,7 +100,7 @@ pub fn type_declaration(state: &mut State) -> Result<TypeDeclaration> {
 
             state.request_token(Request::BindingSeparator)?;
 
-            TypeDeclaration::Ind(IndDeclaration {
+            PreTypeDeclaration::Ind(PreIndDeclaration {
                 name: constructor_name,
                 type_parameters,
                 recursive_type_var,

@@ -18,7 +18,7 @@ pub fn parse_program(s: &str) -> Result<Program, Error> {
 #[cfg(test)]
 mod tests {
     use crate::parser::{
-        base::{State, Result, Error, Term, Type, TypeDeclaration, FunctionDeclaration, LetDeclaration, EnumDeclaration, IndDeclaration},
+        base::{State, Result, Error, Term, Type, PreTypeDeclaration, FunctionDeclaration, LetDeclaration, PreEnumDeclaration, PreIndDeclaration},
         identifier::interner,
         types::type_,
         program::{pre_program, let_declaration, function_declaration, type_declaration},
@@ -74,8 +74,8 @@ mod tests {
 
         let result = type_declaration(&mut state);
 
-        assert!(matches!(result, Ok(TypeDeclaration::Enum(_))));
-        let Ok(TypeDeclaration::Enum(EnumDeclaration { name, type_parameters: _, constructors })) = result else { unreachable!() };
+        assert!(matches!(result, Ok(PreTypeDeclaration::Enum(_))));
+        let Ok(PreTypeDeclaration::Enum(PreEnumDeclaration { name, type_parameters: _, constructors })) = result else { unreachable!() };
         assert_eq!(name.str(&mut interner), "Bool");
 
         assert_eq!(constructors.len(), 2);
@@ -93,9 +93,9 @@ mod tests {
 
         let result = type_declaration(&mut state);
 
-        assert!(matches!(result, Ok(TypeDeclaration::Enum(_))));
+        assert!(matches!(result, Ok(PreTypeDeclaration::Enum(_))));
 
-        let Ok(TypeDeclaration::Enum(EnumDeclaration { name, type_parameters: _, constructors })) = result else { unreachable!() };
+        let Ok(PreTypeDeclaration::Enum(PreEnumDeclaration { name, type_parameters: _, constructors })) = result else { unreachable!() };
         assert_eq!(name.str(&mut interner), "SomeType");
 
         assert_eq!(constructors.len(), 4);
@@ -120,8 +120,8 @@ mod tests {
 
         let result = type_declaration(&mut state);
 
-        assert!(matches!(result, Ok(TypeDeclaration::Ind(_))));
-        let Ok(TypeDeclaration::Ind(IndDeclaration { name, type_parameters: _, recursive_type_var, constructors })) = result else { unreachable!() };
+        assert!(matches!(result, Ok(PreTypeDeclaration::Ind(_))));
+        let Ok(PreTypeDeclaration::Ind(PreIndDeclaration { name, type_parameters: _, recursive_type_var, constructors })) = result else { unreachable!() };
         assert_eq!(name.str(&mut interner), "Nat");
         assert_eq!(recursive_type_var.str(&mut interner), "nat");
 
@@ -143,8 +143,8 @@ mod tests {
 
         let result = type_declaration(&mut state);
 
-        assert!(matches!(result, Ok(TypeDeclaration::Ind(_))));
-        let Ok(TypeDeclaration::Ind(IndDeclaration { name, type_parameters, recursive_type_var, constructors })) = result else { unreachable!() };
+        assert!(matches!(result, Ok(PreTypeDeclaration::Ind(_))));
+        let Ok(PreTypeDeclaration::Ind(PreIndDeclaration { name, type_parameters, recursive_type_var, constructors })) = result else { unreachable!() };
         assert_eq!(name.str(&mut interner), "List");
 
         assert_eq!(type_parameters.len(), 2);

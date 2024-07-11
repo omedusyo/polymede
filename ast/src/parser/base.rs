@@ -47,7 +47,7 @@ pub struct State<'lex_state, 'interner> {
 #[derive(Debug)]
 pub struct Program {
     interner: Interner,
-    pub type_declarations: HashMap<ConstructorName, TypeDeclarationProper>,
+    pub type_declarations: HashMap<ConstructorName, TypeDeclaration>,
     pub function_declarations: HashMap<FunctionName, FunctionDeclaration>,
     pub let_declarations: HashMap<Variable, LetDeclaration>,
     constructor_to_type_mapping: HashMap<ConstructorName, Variable>,
@@ -71,7 +71,7 @@ impl Program {
         };
 
         for pre_decl in pre_program.type_declarations {
-            let decl = TypeDeclarationProper::new(pre_decl,  &mut program.constructor_to_type_mapping);
+            let decl = TypeDeclaration::new(pre_decl,  &mut program.constructor_to_type_mapping);
             program.type_declarations.insert(decl.name(), decl);
         }
         for decl in pre_program.function_declarations {
@@ -84,7 +84,7 @@ impl Program {
         Ok(program)
     }
 
-    pub fn get_type_declaration(&self, type_constructor_name: &ConstructorName) -> Option<&TypeDeclarationProper> {
+    pub fn get_type_declaration(&self, type_constructor_name: &ConstructorName) -> Option<&TypeDeclaration> {
         self.type_declarations.get(type_constructor_name)
     }
 
@@ -96,7 +96,7 @@ impl Program {
         self.let_declarations.get(let_name)
     }
 
-    pub fn get_type_declaration_of_constructor(&self, constructor_name: &ConstructorName) -> Option<&TypeDeclarationProper> {
+    pub fn get_type_declaration_of_constructor(&self, constructor_name: &ConstructorName) -> Option<&TypeDeclaration> {
         let type_name = self.constructor_to_type_mapping.get(constructor_name)?;
         self.get_type_declaration_of_constructor(type_name)
     }
@@ -105,14 +105,14 @@ impl Program {
 
 #[derive(Debug)]
 pub struct PreProgram {
-    pub type_declarations: Vec<TypeDeclaration>,
+    pub type_declarations: Vec<PreTypeDeclaration>,
     pub function_declarations: Vec<FunctionDeclaration>,
     pub let_declarations: Vec<LetDeclaration>,
 }
 
 // ===Declarations===
 pub enum Declaration {
-    Type(TypeDeclaration),
+    Type(PreTypeDeclaration),
     Let(LetDeclaration),
     Function(FunctionDeclaration),
 }
@@ -124,25 +124,17 @@ pub struct ConstructorDeclaration {
 }
 
 #[derive(Debug)]
-pub struct EnumDeclarationProper {
-    pub name: ConstructorName,
-    pub type_parameters: Vec<Variable>,
-    pub constructors: HashMap<ConstructorName, ConstructorDeclaration>,
-}
-
-#[derive(Debug)]
 pub struct EnumDeclaration {
     pub name: ConstructorName,
     pub type_parameters: Vec<Variable>,
-    pub constructors: Vec<ConstructorDeclaration>,
+    pub constructors: HashMap<ConstructorName, ConstructorDeclaration>,
 }
 
 #[derive(Debug)]
-pub struct IndDeclarationProper {
+pub struct PreEnumDeclaration {
     pub name: ConstructorName,
     pub type_parameters: Vec<Variable>,
-    pub recursive_type_var: Variable,
-    pub constructors: HashMap<ConstructorName, ConstructorDeclaration>,
+    pub constructors: Vec<ConstructorDeclaration>,
 }
 
 #[derive(Debug)]
@@ -150,13 +142,15 @@ pub struct IndDeclaration {
     pub name: ConstructorName,
     pub type_parameters: Vec<Variable>,
     pub recursive_type_var: Variable,
-    pub constructors: Vec<ConstructorDeclaration>,
+    pub constructors: HashMap<ConstructorName, ConstructorDeclaration>,
 }
 
 #[derive(Debug)]
-pub enum TypeDeclarationProper {
-    Enum(EnumDeclarationProper),
-    Ind(IndDeclarationProper),
+pub struct PreIndDeclaration {
+    pub name: ConstructorName,
+    pub type_parameters: Vec<Variable>,
+    pub recursive_type_var: Variable,
+    pub constructors: Vec<ConstructorDeclaration>,
 }
 
 #[derive(Debug)]
@@ -165,7 +159,13 @@ pub enum TypeDeclaration {
     Ind(IndDeclaration),
 }
 
-impl EnumDeclarationProper {
+#[derive(Debug)]
+pub enum PreTypeDeclaration {
+    Enum(PreEnumDeclaration),
+    Ind(PreIndDeclaration),
+}
+
+impl EnumDeclaration {
     // Returns type_parameters together with declaration.
     pub fn get_constructor(&self, constructor_name: &ConstructorName) -> Option<(&[Variable], &ConstructorDeclaration)> {
         let constructor_decl = self.constructors.get(constructor_name)?;
@@ -173,7 +173,7 @@ impl EnumDeclarationProper {
     }
 }
 
-impl IndDeclarationProper {
+impl IndDeclaration {
     // Returns type_parameters (and a special recursive variable) together with declaration.
     pub fn get_constructor(&self, constructor_name: &ConstructorName) -> Option<(&[Variable], &Variable, &ConstructorDeclaration)> {
         let constructor_decl = self.constructors.get(constructor_name)?;
@@ -181,28 +181,28 @@ impl IndDeclarationProper {
     }
 }
 
-impl TypeDeclarationProper {
-    fn new(pre_decl: TypeDeclaration, constructor_to_type_mapping: &mut HashMap<ConstructorName, Variable>) -> Self {
+impl TypeDeclaration {
+    fn new(pre_decl: PreTypeDeclaration, constructor_to_type_mapping: &mut HashMap<ConstructorName, Variable>) -> Self {
         match pre_decl {
-            TypeDeclaration::Enum(pre_decl) => {
+            PreTypeDeclaration::Enum(pre_decl) => {
                 let mut constructors = HashMap::new();
                 for constructor_decl in pre_decl.constructors {
                     constructor_to_type_mapping.insert(constructor_decl.name.clone(), pre_decl.name.clone());
                     constructors.insert(constructor_decl.name.clone(), constructor_decl);
                 }
-                Self::Enum(EnumDeclarationProper {
+                Self::Enum(EnumDeclaration {
                     name: pre_decl.name,
                     type_parameters: pre_decl.type_parameters,
                     constructors,
                 })
             },
-            TypeDeclaration::Ind(pre_decl) => {
+            PreTypeDeclaration::Ind(pre_decl) => {
                 let mut constructors = HashMap::new();
                 for constructor_decl in pre_decl.constructors {
                     constructor_to_type_mapping.insert(constructor_decl.name.clone(), pre_decl.name.clone());
                     constructors.insert(constructor_decl.name.clone(), constructor_decl);
                 }
-                Self::Ind(IndDeclarationProper {
+                Self::Ind(IndDeclaration {
                     name: pre_decl.name,
                     recursive_type_var: pre_decl.recursive_type_var,
                     type_parameters: pre_decl.type_parameters,
@@ -213,7 +213,7 @@ impl TypeDeclarationProper {
     }
 
     fn name(&self) -> ConstructorName {
-        use TypeDeclarationProper::*;
+        use TypeDeclaration::*;
         match self {
             Enum(decl) => decl.name.clone(),
             Ind(decl) => decl.name.clone(),
@@ -221,7 +221,7 @@ impl TypeDeclarationProper {
     }
 
     pub fn arity(&self) -> usize {
-        use TypeDeclarationProper::*;
+        use TypeDeclaration::*;
         match self {
             Enum(decl) => decl.type_parameters.len(),
             Ind(decl) => decl.type_parameters.len(),
@@ -339,10 +339,10 @@ impl PreProgram {
         let mut names = vec![];
         for declaration in &self.type_declarations {
             match declaration {
-                TypeDeclaration::Enum(declaration) => {
+                PreTypeDeclaration::Enum(declaration) => {
                     names.push(declaration.name.clone())
                 },
-                TypeDeclaration::Ind(declaration) => {
+                PreTypeDeclaration::Ind(declaration) => {
                     names.push(declaration.name.clone())
                 },
             }
@@ -354,8 +354,8 @@ impl PreProgram {
         let mut names = vec![];
         for declaration in &self.type_declarations {
             let constructors = match &declaration {
-                TypeDeclaration::Enum(declaration) => &declaration.constructors[..],
-                TypeDeclaration::Ind(declaration) => &declaration.constructors[..],
+                PreTypeDeclaration::Enum(declaration) => &declaration.constructors[..],
+                PreTypeDeclaration::Ind(declaration) => &declaration.constructors[..],
             };
             for constructor_declaration in constructors {
                 names.push(constructor_declaration.name.clone())
