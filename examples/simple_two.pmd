@@ -22,6 +22,13 @@ type F = ind { x .
 
 fn square = # Nat -> Nat : { x . x }
 
+fn test_let = # Nat -> Nat : { x .
+  let {
+  , y = mul(x, x)
+  . y
+  }
+}
+
 fn map = forall { a, b . # Fn(a -> b), List(a) -> List(b) : { f, xs .
   fold xs {
   | Nil . Nil

@@ -74,15 +74,15 @@ pub fn typed_term(state: &mut State) -> Result<TypedTerm> {
     Ok(TypedTerm { type_ , term })
 }
 
-// Parses    x = # type : expr
-fn var_binding(state: &mut State) -> Result<(Variable, TypedTerm)> {
+// Parses    x = expr
+fn var_binding(state: &mut State) -> Result<(Variable, Term)> {
     let var = variable(state)?;
     state.request_keyword(Keyword::Eq)?;
-    let term = typed_term(state)?;
+    let term = term(state)?;
     Ok((var, term))
 }
 
-fn nonempty_var_binding_sequence(state: &mut State) -> Result<Vec<(Variable, TypedTerm)>> {
+fn nonempty_var_binding_sequence(state: &mut State) -> Result<Vec<(Variable, Term)>> {
     state.consume_optional_comma()?;
     delimited_nonempty_sequence_to_vector(state, var_binding, comma)
 }

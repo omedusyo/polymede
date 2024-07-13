@@ -84,8 +84,8 @@ impl Program {
         Ok(program)
     }
 
-    pub fn get_type_declaration(&self, type_constructor_name: &ConstructorName) -> Option<&TypeDeclaration> {
-        self.type_declarations.get(type_constructor_name)
+    pub fn get_type_declaration(&self, type_name: &Variable) -> Option<&TypeDeclaration> {
+        self.type_declarations.get(type_name)
     }
 
     pub fn get_function_declaration(&self, function_name: &FunctionName) -> Option<&FunctionDeclaration> {
@@ -239,35 +239,40 @@ impl TypeDeclaration {
     pub fn type_apply_constructor(&self, constructor_name: &ConstructorName, type_args: &[Type]) -> Option<(&ConstructorDeclaration, Vec<Type>)> {
         use TypeDeclaration::*;
         match self {
-            Enum(decl) => {
-                let constructor_decl = decl.constructors.get(constructor_name)?;
-                let specialized_constructor_type_arguments: Vec<Type> = constructor_decl.parameters
-                    .iter()
-                    .map(|type_body| type_apply(&decl.type_parameters, type_body, type_args))
-                    .collect();
-                Some((constructor_decl, specialized_constructor_type_arguments))
-            },
-            Ind(decl) => {
-                // TODO: This assumes that type_parameters + rec_type_var are all unique, and that
-                // the rec_type_var doesn't shadow anything. But I don't yet check this!
-                let self_type: Type = Type::TypeApplication(self.name().clone(), type_args.to_vec());
-                let constructor_decl = decl.constructors.get(constructor_name)?;
-
-                // I need to extend type_args and decl.type_parameters with the recursive
-                // variable/self type
-                let mut type_parameters: Vec<Variable> = decl.type_parameters.to_vec();
-                type_parameters.push(decl.recursive_type_var.clone());
-
-                let mut type_args: Vec<Type> = type_args.to_vec();
-                type_args.push(self_type);
-
-                let specialized_constructor_type_arguments: Vec<Type> = constructor_decl.parameters
-                    .iter()
-                    .map(|type_body| type_apply(&type_parameters, type_body, &type_args))
-                    .collect();
-                Some((constructor_decl, specialized_constructor_type_arguments))
-            }
+            Enum(decl) => decl.type_apply_constructor(constructor_name, type_args),
+            Ind(decl) => decl.type_apply_constructor(constructor_name, type_args, &Type::TypeApplication(self.name().clone(), type_args.to_vec())),
         }
+    }
+}
+
+impl EnumDeclaration {
+    pub fn type_apply_constructor(&self, constructor_name: &ConstructorName, type_args: &[Type]) -> Option<(&ConstructorDeclaration, Vec<Type>)> {
+        let constructor_decl = self.constructors.get(constructor_name)?;
+        let specialized_constructor_type_arguments: Vec<Type> = constructor_decl.parameters
+            .iter()
+            .map(|type_body| type_apply(&self.type_parameters, type_body, type_args))
+            .collect();
+        Some((constructor_decl, specialized_constructor_type_arguments))
+    }
+}
+
+impl IndDeclaration {
+    pub fn type_apply_constructor(&self, constructor_name: &ConstructorName, type_args: &[Type], recursive_type: &Type) -> Option<(&ConstructorDeclaration, Vec<Type>)> {
+        let constructor_decl = self.constructors.get(constructor_name)?;
+
+        // TODO: This assumes that type_parameters + rec_type_var are all unique, and that
+        // the rec_type_var doesn't shadow anything. But I don't yet check this!
+        let mut type_parameters: Vec<Variable> = self.type_parameters.to_vec();
+        type_parameters.push(self.recursive_type_var.clone());
+
+        let mut type_args: Vec<Type> = type_args.to_vec();
+        type_args.push(recursive_type.clone());
+
+        let specialized_constructor_type_arguments: Vec<Type> = constructor_decl.parameters
+            .iter()
+            .map(|type_body| type_apply(&type_parameters, type_body, &type_args))
+            .collect();
+        Some((constructor_decl, specialized_constructor_type_arguments))
     }
 }
 
@@ -341,13 +346,7 @@ pub enum Term {
     Fold(Box<Term>, Vec<PatternBranch>),
     Lambda(Box<Function>),
     LambdaApplication(Box<Term>, Vec<Term>),
-    Let(Vec<(Variable, TypedTerm)>, Box<Term>),
-}
-
-#[derive(Debug)]
-pub struct LocalLetBinding {
-    pub bindings: Vec<(Variable, TypedTerm)>,
-    pub body: Term,
+    Let(Vec<(Variable, Term)>, Box<Term>),
 }
 
 #[derive(Debug)]
