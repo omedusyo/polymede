@@ -198,7 +198,7 @@ mod tests {
         assert_eq!(t0.str(&mut interner), "Nat");
         assert_eq!(t.str(&mut interner), "Nat");
 
-        let Term::FunctionApplication(mul, args) = function.body else { unreachable!() };
+        let Term::FunctionApplication(mul, args) = function.function.body else { unreachable!() };
         let Term::VariableUse(ref arg0) = args[0] else { unreachable!() };
         let Term::VariableUse(ref arg1) = args[1] else { unreachable!() };
 
@@ -228,7 +228,7 @@ mod tests {
         assert_eq!(t0.str(&mut interner), "a");
         assert_eq!(t.str(&mut interner), "a");
 
-        let Term::VariableUse(x) = function.body else { unreachable!() };
+        let Term::VariableUse(x) = function.function.body else { unreachable!() };
         assert_eq!(x.str(&mut interner), "x");
 
         Ok(())

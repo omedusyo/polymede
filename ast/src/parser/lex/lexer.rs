@@ -268,13 +268,21 @@ impl <'state> State<'state> {
         Ok(())
     }
 
-    pub fn is_next_token_open_paren(&mut self) -> Result<bool> {
+    fn is_next_char(&mut self, c0: char) -> Result<bool> {
         self.consume_whitespace();
         match self.read_char_or_fail_when_end() {
-            Ok(c) => Ok(c == '('),
+            Ok(c) => Ok(c == c0),
             Err(Error::UnexpectedEnd) => Ok(false),
             Err(e) => Err(e)
         }
+    }
+
+    pub fn is_next_token_open_paren(&mut self) -> Result<bool> {
+        self.is_next_char('(')
+    }
+
+    pub fn is_next_token_start_type_annotation(&mut self) -> Result<bool> {
+        self.is_next_char('#')
     }
 
     pub fn commit_if_next_token_forall(&mut self) -> Result<bool> {

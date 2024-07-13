@@ -3,7 +3,7 @@ use crate::parser::lex::{
     lexer::{Request, LocatedToken, DeclarationKind},
 };
 use crate::parser::{
-    base::{State, Result, Error, PreProgram, Declaration, LetDeclaration, Function, FunctionType, FunctionDeclaration, PreIndDeclaration, PreEnumDeclaration, PreTypeDeclaration, ConstructorDeclaration},
+    base::{State, Result, Error, PreProgram, Declaration, LetDeclaration, TypedFunction, Function, FunctionType, FunctionDeclaration, PreIndDeclaration, PreEnumDeclaration, PreTypeDeclaration, ConstructorDeclaration},
     identifier,
     identifier::{Variable, FunctionName, variable, constructor_name, function_name},
     term::{term, typed_term},
@@ -125,7 +125,7 @@ pub fn function_declaration(state: &mut State) -> Result<FunctionDeclaration> {
 
     fn inner_function_declaration(state: &mut State, function_name: FunctionName, type_parameters: Vec<Variable>) -> Result<FunctionDeclaration> {
         let type_ = function_type_annotation(state)?;
-        let function = function(state, type_)?;
+        let function = typed_function(state, type_)?;
         Ok(FunctionDeclaration { name: function_name, type_parameters, function })
     }
 
@@ -145,7 +145,7 @@ pub fn function_declaration(state: &mut State) -> Result<FunctionDeclaration> {
     }
 }
 
-pub fn function(state: &mut State, type_: FunctionType) -> Result<Function> {
+pub fn function(state: &mut State) -> Result<Function> {
     state.request_token(Request::OpenCurly)?;
 
     let parameters = parameter_possibly_empty_sequence(state)?;
@@ -154,12 +154,19 @@ pub fn function(state: &mut State, type_: FunctionType) -> Result<Function> {
 
     state.request_token(Request::CloseCurly)?;
 
-    if type_.input_types.len() != parameters.len() {
-        Err(Error::FunctionHasDifferentNumberOfParametersThanDeclaredInItsType { declared_in_type: type_.input_types.len(), parameters: parameters.len() })
+    Ok(Function { parameters, body })
+}
+
+pub fn typed_function(state: &mut State, type_: FunctionType) -> Result<TypedFunction> {
+    let function = function(state)?;
+
+    if type_.input_types.len() != function.parameters.len() {
+        Err(Error::FunctionHasDifferentNumberOfParametersThanDeclaredInItsType { declared_in_type: type_.input_types.len(), parameters: function.parameters.len() })
     } else {
-        Ok(Function { type_, parameters, body })
+        Ok(TypedFunction { type_, function })
     }
 }
+
 
 pub fn let_declaration(state: &mut State) -> Result<LetDeclaration> {
     state.request_keyword(Keyword::Let)?;

@@ -64,12 +64,12 @@ fn second = forall { a, b . # Pair(a, b) -> a : { pair .
 }}
 
 fn tuple = forall { a, b, x . # Fn(x -> a), Fn(x -> b) -> Fn(x -> Pair(a, b)) : { f, g .
-  fn # x -> Pair(a, b) : { x . Pair(apply f to (x), apply g to (x)) }
+  fn { x . Pair(apply f to (x), apply g to (x)) }
 }}
 
 fn curry = forall { a, b, c . # Fn(a, b -> c) -> Fn(a -> Fn(b -> c)) : { f .
-  fn # a -> Fn(b -> c) : { x .
-    fn # b -> c : { y .
+  fn { x .
+    fn { y .
       apply f to (x, y)
     }
   }

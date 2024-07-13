@@ -5,7 +5,7 @@ use crate::parser::lex::{
 use crate::parser::{
     base::{State, Result, Term, TypedTerm},
     identifier::{Variable, variable},
-    types::{function_type_annotation, type_annotation},
+    types::type_annotation,
     pattern::pattern_branches,
     program::function,
     special::{StartTerm, start_term, comma},
@@ -14,6 +14,11 @@ use crate::parser::{
 
 pub fn term(state: &mut State) -> Result<Term> {
     match start_term(state)? {
+        StartTerm::TypeAnnotation => {
+            let type_ = type_annotation(state)?;
+            let term = term(state)?;
+            Ok(Term::TypedTerm(Box::new(TypedTerm {type_, term})))
+        },
         StartTerm::VariableUse(variable) => Ok(Term::VariableUse(variable)),
         StartTerm::FunctionApplication(function_name) => {
             state.request_token(Request::OpenParen)?;
@@ -49,8 +54,7 @@ pub fn term(state: &mut State) -> Result<Term> {
             Ok(Term::Let(bindings, Box::new(body)))
         },
         StartTerm::Lambda => {
-            let function_type = function_type_annotation(state)?;
-            let function = function(state, function_type)?;
+            let function = function(state)?;
             Ok(Term::Lambda(Box::new(function)))
         },
         StartTerm::Apply => {

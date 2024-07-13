@@ -22,3 +22,10 @@ type F = ind { x .
 
 fn square = # Nat -> Nat : { x . x }
 
+fn map = forall { a, b . # Fn(a -> b), List(a) -> List(b) : { f, xs .
+  fold xs {
+  | Nil . Nil
+  | Cons(x, state) . Cons(apply f to (x), state)
+  }
+}}
+

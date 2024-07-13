@@ -275,7 +275,7 @@ impl TypeDeclaration {
 pub struct FunctionDeclaration {
     pub name: FunctionName,
     pub type_parameters: Vec<Variable>,
-    pub function: Function,
+    pub function: TypedFunction,
 }
 
 impl FunctionDeclaration {
@@ -285,8 +285,13 @@ impl FunctionDeclaration {
 }
 
 #[derive(Debug)]
-pub struct Function {
+pub struct TypedFunction {
     pub type_: FunctionType,
+    pub function: Function,
+}
+
+#[derive(Debug)]
+pub struct Function {
     pub parameters: Vec<Variable>,
     pub body: Term,
 }
@@ -500,6 +505,10 @@ impl <'lex_state, 'interner> State<'lex_state, 'interner> {
 
     pub fn is_next_token_open_paren(&mut self) -> Result<bool> {
         self.lexer_state.is_next_token_open_paren().map_err(Error::LexError)
+    }
+
+    pub fn is_next_token_start_type_annotation(&mut self) -> Result<bool> {
+        self.lexer_state.is_next_token_start_type_annotation().map_err(Error::LexError)
     }
 
     pub fn commit_if_next_token_forall(&mut self) -> Result<bool> {
