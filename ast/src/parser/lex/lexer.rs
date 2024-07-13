@@ -40,6 +40,8 @@ impl LocatedToken {
 pub enum Request {
     OpenParen,
     CloseParen,
+    OpenAngle,
+    CloseAngle,
     OpenCurly,
     CloseCurly,
     Keyword(token::Keyword),
@@ -172,6 +174,12 @@ impl <'state> State<'state> {
             Request::CloseParen => {
                 self.match_string(")", request, Token::CloseParen)
             },
+            Request::OpenAngle => {
+                self.match_string("<", request, Token::OpenAngle)
+            },
+            Request::CloseAngle => {
+                self.match_string(">", request, Token::CloseAngle)
+            },
             Request::OpenCurly => {
                 self.match_string("{", request, Token::OpenCurly)
             },
@@ -279,6 +287,10 @@ impl <'state> State<'state> {
 
     pub fn is_next_token_open_paren(&mut self) -> Result<bool> {
         self.is_next_char('(')
+    }
+
+    pub fn is_next_token_open_angle(&mut self) -> Result<bool> {
+        self.is_next_char('<')
     }
 
     pub fn is_next_token_start_type_annotation(&mut self) -> Result<bool> {

@@ -86,7 +86,7 @@ pub fn start_term(state: &mut State) -> Result<StartTerm> {
                 "apply" => Ok(StartTerm::Apply),
                 "fn" => Ok(StartTerm::Lambda),
                 _ => {
-                    if state.is_next_token_open_paren()? {
+                    if state.is_next_token_open_paren()? || state.is_next_token_open_angle()? {
                         Ok(StartTerm::FunctionApplication(id))
                     } else {
                         Ok(StartTerm::VariableUse(id))

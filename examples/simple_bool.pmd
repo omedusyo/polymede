@@ -25,6 +25,13 @@ type List(a) = ind { x .
 | Cons(a, x)
 }
 
+fn add = # Nat, Nat -> Nat : { x, y .
+  fold x {
+  | Z . y
+  | S(result) . S(result)
+  }
+}
+
 fn id = forall { a .
   # a -> a : { x . x }
 }
@@ -82,4 +89,21 @@ let y = # List(Nat) : f(Nil)
 let z = # List(Nat) : Nil
 
 let u = # List(Nat) : empty_list
+
+fn range_reverse_iter = # Nat -> Pair(List(Nat), Nat) : { n .
+  fold n {
+  | Z . Pair(Nil, Z)
+  | S(Pair(xs, count)) . Pair(Cons(count, xs), add(count, S(Z)))
+  }
+}
+
+fn range_reverse = # Nat -> List(Nat) : { n .
+  first(range_reverse_iter(n))
+}
+
+let n1 = # Nat : S(Z)
+let n2 = # Nat : S(S(Z))
+let n3 = # Nat : S(S(S(Z)))
+
+let xs = # List(Nat) : map<Nat, Nat>(fn { x . x }, range_reverse(n3))
 

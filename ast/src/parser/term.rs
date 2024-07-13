@@ -3,9 +3,9 @@ use crate::parser::lex::{
     lexer::Request,
 };
 use crate::parser::{
-    base::{State, Result, Term, TypedTerm},
+    base::{State, Result, Term, TypedTerm, Type},
     identifier::{Variable, variable},
-    types::type_annotation,
+    types::{type_annotation, type_nonempty_sequence},
     pattern::pattern_branches,
     program::function,
     special::{StartTerm, start_term, comma},
@@ -21,10 +21,18 @@ pub fn term(state: &mut State) -> Result<Term> {
         },
         StartTerm::VariableUse(variable) => Ok(Term::VariableUse(variable)),
         StartTerm::FunctionApplication(function_name) => {
+            let type_args: Vec<Type> = if state.is_next_token_open_angle()? {
+                state.request_token(Request::OpenAngle)?;
+                let type_args = type_nonempty_sequence(state)?;
+                state.request_token(Request::CloseAngle)?;
+                type_args
+            } else {
+                vec![]
+            };
             state.request_token(Request::OpenParen)?;
             let args = possibly_empty_term_sequence(state)?;
             state.request_token(Request::CloseParen)?;
-            Ok(Term::FunctionApplication(function_name, args))
+            Ok(Term::FunctionApplication(function_name, type_args, args))
         },
         StartTerm::ConstructorConstant(constructor_name) => {
             Ok(Term::ConstructorUse(constructor_name, vec![]))

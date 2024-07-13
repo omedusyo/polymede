@@ -1,5 +1,5 @@
 use crate::parser::{
-    identifier::Variable,
+    identifier::{Variable, FunctionName},
     base::{Program, TypeDeclaration, Type, FunctionType, ConstructorDeclaration, FunctionDeclaration, LetDeclaration, Term, Pattern, PatternBranch },
 };
 use crate::validation:: base::{Result, Error};
@@ -31,7 +31,14 @@ impl <'env>Environment<'env> {
     }
 
     pub fn is_ind_type_declaration(&self, type_name: &Variable) -> bool {
-        todo!()
+        match self.program.get_type_declaration(type_name) {
+            Some(TypeDeclaration::Ind(_)) => true,
+            _ => false,
+        }
+    }
+
+    pub fn get_function_declaration(&self, function_name: &FunctionName) -> Option<&FunctionDeclaration> {
+        self.program.get_function_declaration(function_name)
     }
 
     pub fn open_env(&mut self) {
@@ -64,6 +71,45 @@ fn eq_type(type0: &Type, type1: &Type) -> bool {
     type0 == type1
 }
 
+// We are expecting the `term` to be of Arrow type.
+fn type_infer_arrow_inputs(env: &mut Environment, term: &Term, expected_out_type: &Type) -> Result<Vec<Type>> {
+    use Term::*;
+    match term {
+        TypedTerm(typed_term) => {
+            todo!()
+        },
+        VariableUse(var) => {
+            match env.get_type(var) {
+                Some(type_) => todo!(),
+                None => Err(Error::VariableOutOfScope { variable: var.clone() }),
+            }
+        },
+        Lambda(function) => {
+            todo!()
+        },
+        FunctionApplication(fn_name, type_args, args) => {
+            // type infer args, then feed them into fn_name
+            todo!()
+        },
+        Match(arg, branches) => {
+            todo!()
+        },
+        Fold(arg, branches) => {
+            todo!()
+        },
+        LambdaApplication(fn_term, args) => {
+            todo!()
+        },
+        Let(bindings, body) => {
+            todo!()
+        },
+        ConstructorUse(_, _) => {
+            // TODO: Error: Can't possibly be of Arrow type
+            todo!()
+        }
+    }
+}
+
 fn type_infer(env: &mut Environment, term: &Term) -> Result<Type> {
     use Term::*;
     match term {
@@ -87,7 +133,7 @@ fn type_infer(env: &mut Environment, term: &Term) -> Result<Type> {
         Lambda(function) => {
             todo!()
         },
-        FunctionApplication(fn_name, args) => {
+        FunctionApplication(fn_name, type_args, args) => {
             // type infer args, then feed them into fn_name
             todo!()
         },
@@ -116,7 +162,7 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
                 let term = &typed_term.term;
                 type_check(env, term, expected_type)
             } else {
-                Err(Error::TypeAnnotationDoesntMatchExpectedType { expected_type: expected_type.clone(), type_annotation: type_annotation.clone() })
+                Err(Error::TypeAnnotationDoesntMatchExpectedType { expected_type: expected_type.clone(), received: type_annotation.clone() })
             }
         },
         VariableUse(var) => {
@@ -171,14 +217,18 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
                 _ => Err(Error::TermIsLambdaButExpectedTypeIsNotArrowType { expected_type: expected_type.clone() })
             }
         },
-        FunctionApplication(fn_name, args) => {
-            // Infer types of `args`
-            // TODO: 1. lookup the function type (what if it is polymorphic? We need to know how to
-            // instantiate these types...)
-            //       2. for each argument type_check that it has correct type (given by the
-            //          function)
-            //       3. type_check that the output type has expected_type
-            todo!()
+        FunctionApplication(function_name, type_args, args) => {
+            let Some(fn_decl) = env.get_function_declaration(function_name) else { return Err(Error::FunctionDoesntExist { function_name: function_name.clone() }) };
+            let fn_type = fn_decl.type_apply(type_args);
+            if fn_type.input_types.len() != args.len() { return Err(Error::ApplyingWrongNumberOfArgumentsToFunction { expected: fn_type.input_types.len(), received: args.len() }); }
+            for (arg, type_) in args.iter().zip(&fn_type.input_types) {
+                type_check(env, arg, type_)?
+            }
+            if eq_type(&fn_type.output_type, expected_type) {
+                Ok(())
+            } else {
+                Err(Error::FunctionOutputTypeDoesntMatchExpectedType { expected_type: expected_type.clone(), received: fn_type.output_type })
+            }
         },
         Match(arg, branches) => {
             let arg_type = type_infer(env, arg)?;
@@ -207,21 +257,26 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
             // 2. infer args then check fn_term
             // We take the 1. approach.
 
-            // TODO: Which approach should be taken?
-            // 1. infer fn_term (it should be a Fn(... -> ...)
-            // 2. check that arities of `args` and the input types match
-            // 3. check that args have correct types as infered for the lambda
-            // 4. check that the out type of the lambda has expected type
-            //
-            // or...
-            // 1. infer each argument...
-            // 2. then check that fn_term has correct Fn(...) type.
-            todo!()
+            let input_types = type_infer_arrow_inputs(env, fn_term, expected_type)?;
+            if input_types.len() != args.len() {
+                return Err(Error::ApplyingWrongNumberOfArgumentsToLambda { expected: input_types.len(), received: args.len() });
+            }
+
+            for (arg, type_) in args.iter().zip(&input_types) {
+                type_check(env, arg, type_)?
+            }
+
+            Ok(())
         },
         Let(bindings, body) => {
-            // Infer each arguments of the let bindings,
-            // then extend the environment and type check body.
-            todo!()
+            env.open_env();
+            for (var, term) in bindings {
+                let type_ = type_infer(env, term)?;
+                env.extend(var, &type_);
+            }
+            type_check(env, body, expected_type)?;
+            env.close_env();
+            Ok(())
         },
     }
 }

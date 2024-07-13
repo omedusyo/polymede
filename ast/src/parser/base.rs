@@ -287,6 +287,16 @@ impl FunctionDeclaration {
     fn name(&self) -> FunctionName {
         self.name.clone()
     }
+
+    // Assumes arity matches.
+    pub fn type_apply(&self, type_arguments: &[Type]) -> FunctionType {
+        // TODO: This can be pretty space-expensive substitution. Consider having proper closures as type
+        //       expressions.
+        FunctionType {
+            input_types: self.function.type_.input_types.iter().map(|type_| type_apply(&self.type_parameters, type_, type_arguments)).collect(),
+            output_type: type_apply(&self.type_parameters, &self.function.type_.output_type, type_arguments)
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -340,7 +350,7 @@ pub struct TypedTerm {
 pub enum Term {
     TypedTerm(Box<TypedTerm>),
     VariableUse(Variable),
-    FunctionApplication(Variable, Vec<Term>),
+    FunctionApplication(Variable, Vec<Type>, Vec<Term>),
     ConstructorUse(ConstructorName, Vec<Term>),
     Match(Box<Term>, Vec<PatternBranch>),
     Fold(Box<Term>, Vec<PatternBranch>),
@@ -504,6 +514,10 @@ impl <'lex_state, 'interner> State<'lex_state, 'interner> {
 
     pub fn is_next_token_open_paren(&mut self) -> Result<bool> {
         self.lexer_state.is_next_token_open_paren().map_err(Error::LexError)
+    }
+
+    pub fn is_next_token_open_angle(&mut self) -> Result<bool> {
+        self.lexer_state.is_next_token_open_angle().map_err(Error::LexError)
     }
 
     pub fn is_next_token_start_type_annotation(&mut self) -> Result<bool> {

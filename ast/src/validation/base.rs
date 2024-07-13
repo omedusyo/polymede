@@ -1,5 +1,5 @@
 use crate::parser::{
-    identifier::{Variable, ConstructorName},
+    identifier::{Variable, ConstructorName, FunctionName},
     base::Type,
 };
 
@@ -15,7 +15,7 @@ pub enum Error {
     VariableOutOfScope { variable: Variable },
     VariableDoesntHaveExpectedType { expected_type: Type, received_type: Type },
 
-    TypeAnnotationDoesntMatchExpectedType { expected_type: Type, type_annotation: Type },
+    TypeAnnotationDoesntMatchExpectedType { expected_type: Type, received: Type },
     TermIsConstructorButExpectedTypeIsNot { expected_type: Type },
     TermIsLambdaButExpectedTypeIsNotArrowType { expected_type: Type },
     ConstructorDoesntBelongToExpectedTypeDeclaration { constructor_name: ConstructorName, type_name: Variable },
@@ -24,5 +24,10 @@ pub enum Error {
     AttemptToMatchNonEnumerableType { received: Type },
     PatternHasWrongNumberOfArguments { expected: usize, received: usize },
     AttemptToFoldNonIndType { received: Type },
+    AttemptToApplyToNonArrowType { received: Type },
+    ApplyingWrongNumberOfArgumentsToLambda { expected: usize, received: usize },
+    FunctionDoesntExist { function_name: FunctionName },
+    ApplyingWrongNumberOfArgumentsToFunction { expected: usize, received: usize },
+    FunctionOutputTypeDoesntMatchExpectedType { expected_type: Type, received: Type },
 }
 
