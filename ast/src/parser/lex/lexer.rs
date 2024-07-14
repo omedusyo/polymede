@@ -40,6 +40,8 @@ impl LocatedToken {
 pub enum Request {
     OpenParen,
     CloseParen,
+    OpenAngle,
+    CloseAngle,
     OpenCurly,
     CloseCurly,
     Keyword(token::Keyword),
@@ -56,6 +58,11 @@ pub enum DeclarationKind {
     Type,
     Let,
     Function,
+}
+
+enum WhitespaceState {
+    ConsumeWhitespace,
+    ConsumeAllUntilNewline,
 }
 
 impl <'state> State<'state> {
@@ -98,28 +105,45 @@ impl <'state> State<'state> {
     }
 
     pub fn consume_whitespace(&mut self) {
-        for c in self.tokens.chars() {
-            if c == '\n' {
-                self.new_line();
-                self.consume_by(1);
-            } else if c == ' ' || c == '\t' {
-                self.move_column_by(1);
-                self.consume_by(1);
-            } else {
-                return
+        fn consume(state: &mut State, ws_state: &mut WhitespaceState) {
+            for c in state.tokens.chars() {
+                use WhitespaceState::*;
+                match ws_state {
+                    ConsumeWhitespace => match c {
+                        '\n' => {
+                            state.new_line();
+                            state.consume_by(1);
+                        },
+                        ' ' | '\t' => {
+                            state.move_column_by(1);
+                            state.consume_by(1);
+                        },
+                        '/' => {
+                            state.move_column_by(1);
+                            state.consume_by(1);
+                            *ws_state = ConsumeAllUntilNewline;
+                        },
+                        _ => {
+                            return
+                        }
+                    },
+                    ConsumeAllUntilNewline => match c {
+                        '\n' => {
+                            state.move_column_by(1);
+                            state.consume_by(1);
+                            *ws_state = ConsumeWhitespace;
+                        }
+                        _ => {
+                            state.move_column_by(1);
+                            state.consume_by(1);
+                        }
+                    },
+                }
             }
+            
         }
-    }
 
-    pub fn consume_non_newline_whitespace(&mut self) {
-        for c in self.tokens.chars() {
-            if c == ' ' || c == '\t' {
-                self.move_column_by(1);
-                self.consume_by(1);
-            } else {
-                return
-            }
-        }
+        consume(self, &mut WhitespaceState::ConsumeWhitespace)
     }
 
     // Note that this returns the position BEFORE the advancement.
@@ -171,6 +195,12 @@ impl <'state> State<'state> {
             },
             Request::CloseParen => {
                 self.match_string(")", request, Token::CloseParen)
+            },
+            Request::OpenAngle => {
+                self.match_string("<", request, Token::OpenAngle)
+            },
+            Request::CloseAngle => {
+                self.match_string(">", request, Token::CloseAngle)
             },
             Request::OpenCurly => {
                 self.match_string("{", request, Token::OpenCurly)
@@ -268,13 +298,25 @@ impl <'state> State<'state> {
         Ok(())
     }
 
-    pub fn is_next_token_open_paren(&mut self) -> Result<bool> {
+    fn is_next_char(&mut self, c0: char) -> Result<bool> {
         self.consume_whitespace();
         match self.read_char_or_fail_when_end() {
-            Ok(c) => Ok(c == '('),
+            Ok(c) => Ok(c == c0),
             Err(Error::UnexpectedEnd) => Ok(false),
             Err(e) => Err(e)
         }
+    }
+
+    pub fn is_next_token_open_paren(&mut self) -> Result<bool> {
+        self.is_next_char('(')
+    }
+
+    pub fn is_next_token_open_angle(&mut self) -> Result<bool> {
+        self.is_next_char('<')
+    }
+
+    pub fn is_next_token_start_type_annotation(&mut self) -> Result<bool> {
+        self.is_next_char('#')
     }
 
     pub fn commit_if_next_token_forall(&mut self) -> Result<bool> {

@@ -23,7 +23,7 @@ fn delimited_nonempty_sequence<S, A, D>(
             },
             Err(_) => {
                 // backtrack.
-                *state = saved_state;
+                state.restore(saved_state);
                 break
             }
         }
@@ -45,7 +45,7 @@ fn delimited_possibly_empty_sequence<S, A, D>(
             Ok(a) => a,
             Err(_err) => {
                 // backtrack
-                *state = saved_state;
+                state.restore(saved_state);
                 return Ok(s)
             }
         }
@@ -61,7 +61,7 @@ fn delimited_possibly_empty_sequence<S, A, D>(
             },
             Err(_err) => {
                 // backtrack.
-                *state = saved_state;
+                state.restore(saved_state);
                 break
             }
         }

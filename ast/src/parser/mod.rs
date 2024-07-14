@@ -9,29 +9,26 @@ mod term;
 mod types;
 mod lex;
 
-use crate::parser::{
-    base::{State, Error, Program},
-    program::program,
-};
+use crate::parser:: base::{Error, Program};
 
 pub fn parse_program(s: &str) -> Result<Program, Error> {
-    let mut state = State::new(s);
-    let result = program(&mut state);
-    result
+    Program::parse(s)
 }
 
 #[cfg(test)]
 mod tests {
     use crate::parser::{
-        base::{State, Result, Error, Term, Type, TypeDeclaration, FunctionDeclaration, LetDeclaration, EnumDeclaration, IndDeclaration},
+        base::{State, Result, Error, Term, Type, PreTypeDeclaration, FunctionDeclaration, LetDeclaration, PreEnumDeclaration, PreIndDeclaration},
+        identifier::interner,
         types::type_,
-        program::{program, let_declaration, function_declaration, type_declaration},
+        program::{pre_program, let_declaration, function_declaration, type_declaration},
     };
 
     #[test]
     fn test_type_0() -> Result<()> {
+        let mut interner = interner();
         let s = "Result(  Error,   x )";
-        let mut state = State::new(s);
+        let mut state = State::new(s, &mut interner);
 
         let result = type_(&mut state);
 
@@ -39,24 +36,25 @@ mod tests {
         let Ok(Type::TypeApplication(identifier, type_args)) = result else { unreachable!() };
         assert_eq!(type_args.len(), 2);
 
-        assert_eq!(identifier.str(), "Result");
+        assert_eq!(identifier.str(&mut interner), "Result");
         assert!(matches!(type_args[0], Type::TypeApplication(_, _)));
         assert!(matches!(type_args[1], Type::VariableUse(_)));
 
         let Type::TypeApplication(ref err_identifier, ref err_type_args) = type_args[0] else { unreachable!() };
         assert_eq!(err_type_args.len(), 0);
-        assert_eq!(err_identifier.str(), "Error");
+        assert_eq!(err_identifier.str(&mut interner), "Error");
 
         let Type::VariableUse(ref var_name) = type_args[1] else { unreachable!() };
-        assert_eq!(var_name.str(), "x");
+        assert_eq!(var_name.str(&mut interner), "x");
 
         Ok(())
     }
 
     #[test]
     fn test_type_1() -> Result<()> {
+        let mut interner = interner();
         let s = "Fn(A1, A2 -> A3)";
-        let mut state = State::new(s);
+        let mut state = State::new(s, &mut interner);
 
         let result = type_(&mut state);
 
@@ -70,39 +68,41 @@ mod tests {
 
     #[test]
     fn test_type_declaration_0() -> Result<()> {
+        let mut interner = interner();
         let s = "type Bool = enum { T | F }";
-        let mut state = State::new(s);
+        let mut state = State::new(s, &mut interner);
 
         let result = type_declaration(&mut state);
 
-        assert!(matches!(result, Ok(TypeDeclaration::Enum(_))));
-        let Ok(TypeDeclaration::Enum(EnumDeclaration { name, type_parameters: _, constructors })) = result else { unreachable!() };
-        assert_eq!(name.str(), "Bool");
+        assert!(matches!(result, Ok(PreTypeDeclaration::Enum(_))));
+        let Ok(PreTypeDeclaration::Enum(PreEnumDeclaration { name, type_parameters: _, constructors })) = result else { unreachable!() };
+        assert_eq!(name.str(&mut interner), "Bool");
 
         assert_eq!(constructors.len(), 2);
-        assert_eq!(constructors[0].name.str(), "T");
-        assert_eq!(constructors[1].name.str(), "F");
+        assert_eq!(constructors[0].name.str(&mut interner), "T");
+        assert_eq!(constructors[1].name.str(&mut interner), "F");
 
         Ok(())
     }
 
     #[test]
     fn test_type_declaration_1() -> Result<()> {
+        let mut interner = interner();
         let s = "type SomeType = enum { | Const | Unary(a) | Binary(Foo(x, Bar), y) | Ternary(a, b, c) }";
-        let mut state = State::new(s);
+        let mut state = State::new(s, &mut interner);
 
         let result = type_declaration(&mut state);
 
-        assert!(matches!(result, Ok(TypeDeclaration::Enum(_))));
+        assert!(matches!(result, Ok(PreTypeDeclaration::Enum(_))));
 
-        let Ok(TypeDeclaration::Enum(EnumDeclaration { name, type_parameters: _, constructors })) = result else { unreachable!() };
-        assert_eq!(name.str(), "SomeType");
+        let Ok(PreTypeDeclaration::Enum(PreEnumDeclaration { name, type_parameters: _, constructors })) = result else { unreachable!() };
+        assert_eq!(name.str(&mut interner), "SomeType");
 
         assert_eq!(constructors.len(), 4);
-        assert_eq!(constructors[0].name.str(), "Const");
-        assert_eq!(constructors[1].name.str(), "Unary");
-        assert_eq!(constructors[2].name.str(), "Binary");
-        assert_eq!(constructors[3].name.str(), "Ternary");
+        assert_eq!(constructors[0].name.str(&mut interner), "Const");
+        assert_eq!(constructors[1].name.str(&mut interner), "Unary");
+        assert_eq!(constructors[2].name.str(&mut interner), "Binary");
+        assert_eq!(constructors[3].name.str(&mut interner), "Ternary");
 
         assert_eq!(constructors[0].parameters.len(), 0);
         assert_eq!(constructors[1].parameters.len(), 1);
@@ -114,19 +114,20 @@ mod tests {
 
     #[test]
     fn test_type_declaration_2() -> Result<()> {
+        let mut interner = interner();
         let s = "type Nat = ind { nat . Zero | Succ(nat) }";
-        let mut state = State::new(s);
+        let mut state = State::new(s, &mut interner);
 
         let result = type_declaration(&mut state);
 
-        assert!(matches!(result, Ok(TypeDeclaration::Ind(_))));
-        let Ok(TypeDeclaration::Ind(IndDeclaration { name, type_parameters: _, recursive_type_var, constructors })) = result else { unreachable!() };
-        assert_eq!(name.str(), "Nat");
-        assert_eq!(recursive_type_var.str(), "nat");
+        assert!(matches!(result, Ok(PreTypeDeclaration::Ind(_))));
+        let Ok(PreTypeDeclaration::Ind(PreIndDeclaration { name, type_parameters: _, recursive_type_var, constructors })) = result else { unreachable!() };
+        assert_eq!(name.str(&mut interner), "Nat");
+        assert_eq!(recursive_type_var.str(&mut interner), "nat");
 
         assert_eq!(constructors.len(), 2);
-        assert_eq!(constructors[0].name.str(), "Zero");
-        assert_eq!(constructors[1].name.str(), "Succ");
+        assert_eq!(constructors[0].name.str(&mut interner), "Zero");
+        assert_eq!(constructors[1].name.str(&mut interner), "Succ");
 
         assert_eq!(constructors[0].parameters.len(), 0);
         assert_eq!(constructors[1].parameters.len(), 1);
@@ -136,24 +137,25 @@ mod tests {
 
     #[test]
     fn test_type_declaration_3() -> Result<()> {
+        let mut interner = interner();
         let s = "type List(a, ignored) = ind { list . Nil | Cons(a, list) }";
-        let mut state = State::new(s);
+        let mut state = State::new(s, &mut interner);
 
         let result = type_declaration(&mut state);
 
-        assert!(matches!(result, Ok(TypeDeclaration::Ind(_))));
-        let Ok(TypeDeclaration::Ind(IndDeclaration { name, type_parameters, recursive_type_var, constructors })) = result else { unreachable!() };
-        assert_eq!(name.str(), "List");
+        assert!(matches!(result, Ok(PreTypeDeclaration::Ind(_))));
+        let Ok(PreTypeDeclaration::Ind(PreIndDeclaration { name, type_parameters, recursive_type_var, constructors })) = result else { unreachable!() };
+        assert_eq!(name.str(&mut interner), "List");
 
         assert_eq!(type_parameters.len(), 2);
-        assert_eq!(type_parameters[0].str(), "a");
-        assert_eq!(type_parameters[1].str(), "ignored");
+        assert_eq!(type_parameters[0].str(&mut interner), "a");
+        assert_eq!(type_parameters[1].str(&mut interner), "ignored");
 
-        assert_eq!(recursive_type_var.str(), "list");
+        assert_eq!(recursive_type_var.str(&mut interner), "list");
 
         assert_eq!(constructors.len(), 2);
-        assert_eq!(constructors[0].name.str(), "Nil");
-        assert_eq!(constructors[1].name.str(), "Cons");
+        assert_eq!(constructors[0].name.str(&mut interner), "Nil");
+        assert_eq!(constructors[1].name.str(&mut interner), "Cons");
 
         assert_eq!(constructors[0].parameters.len(), 0);
         assert_eq!(constructors[1].parameters.len(), 2);
@@ -163,82 +165,86 @@ mod tests {
 
     #[test]
     fn test_type_declaration_4() -> Result<()> {
+        let mut interner = interner();
         let s = "type Foo(x, y, z, y, z) = enum { A | B }";
-        let mut state = State::new(s);
+        let mut state = State::new(s, &mut interner);
 
         let result = type_declaration(&mut state);
 
         assert!(matches!(result, Err(Error::DuplicateVariableNames {..})));
         let Err(Error::DuplicateVariableNames { duplicates }) = result else { unreachable!() };
         assert_eq!(duplicates.len(), 2);
-        assert_eq!(duplicates[0].str(), "y");
-        assert_eq!(duplicates[1].str(), "z");
+        assert_eq!(duplicates[0].str(&mut interner), "y");
+        assert_eq!(duplicates[1].str(&mut interner), "z");
 
         Ok(())
     }
 
     #[test]
     fn test_function_declaration_0() -> Result<()> {
+        let mut interner = interner();
         let s = "fn square = # Nat -> Nat : { x . mul(x, x) }";
-        let mut state = State::new(s);
+        let mut state = State::new(s, &mut interner);
 
         let result = function_declaration(&mut state);
         assert!(matches!(result, Ok(_)));
         let FunctionDeclaration { name, type_parameters, function } = result?;
 
-        assert_eq!(name.str(), "square");
+        assert_eq!(name.str(&mut interner), "square");
         assert_eq!(type_parameters.len(), 0);
 
         let Type::TypeApplication(ref t0, _) = function.type_.input_types[0] else { unreachable!() };
         let Type::TypeApplication(ref t, _) = function.type_.output_type else { unreachable!() };
-        assert_eq!(t0.str(), "Nat");
-        assert_eq!(t.str(), "Nat");
+        assert_eq!(t0.str(&mut interner), "Nat");
+        assert_eq!(t.str(&mut interner), "Nat");
 
-        let Term::FunctionApplication(mul, args) = function.body else { unreachable!() };
+        let Term::FunctionApplication(mul, _, args) = function.function.body else { unreachable!() };
         let Term::VariableUse(ref arg0) = args[0] else { unreachable!() };
         let Term::VariableUse(ref arg1) = args[1] else { unreachable!() };
 
 
-        assert_eq!(mul.str(), "mul");
-        assert_eq!(arg0.str(), "x");
-        assert_eq!(arg1.str(), "x");
+        assert_eq!(mul.str(&mut interner), "mul");
+        assert_eq!(arg0.str(&mut interner), "x");
+        assert_eq!(arg1.str(&mut interner), "x");
 
         Ok(())
     }
 
     #[test]
     fn test_function_declaration_1() -> Result<()> {
+        let mut interner = interner();
         let s = "fn id = forall { a . # a -> a : { x . x } }";
-        let mut state = State::new(s);
+        let mut state = State::new(s, &mut interner);
 
         let result = function_declaration(&mut state);
         assert!(matches!(result, Ok(_)));
         let FunctionDeclaration { name, type_parameters, function } = result?;
 
-        assert_eq!(name.str(), "id");
+        assert_eq!(name.str(&mut interner), "id");
         assert_eq!(type_parameters.len(), 1);
 
         let Type::VariableUse(ref t0) = function.type_.input_types[0] else { unreachable!() };
         let Type::VariableUse(ref t) = function.type_.output_type else { unreachable!() };
-        assert_eq!(t0.str(), "a");
-        assert_eq!(t.str(), "a");
+        assert_eq!(t0.str(&mut interner), "a");
+        assert_eq!(t.str(&mut interner), "a");
 
-        let Term::VariableUse(x) = function.body else { unreachable!() };
-        assert_eq!(x.str(), "x");
+        let Term::VariableUse(x) = function.function.body else { unreachable!() };
+        assert_eq!(x.str(&mut interner), "x");
 
         Ok(())
     }
 
     #[test]
     fn test_function_declaration_2() -> Result<()> {
+        let mut interner = interner();
         let s = "fn map = forall { a, b . # Fn(a -> b), List(a) -> List(b) : { f, xs . fold xs { Nil . Nil | Cons(x, state) . Cons(f(x), state) } } }";
-        let mut state = State::new(s);
+        let mut state = State::new(s, &mut interner);
 
         let result = function_declaration(&mut state);
         assert!(matches!(result, Ok(_)));
         let FunctionDeclaration { name, type_parameters, function: _ } = result?;
 
-        assert_eq!(name.str(), "map");
+        assert_eq!(name.str(&mut interner), "map");
         assert_eq!(type_parameters.len(), 2);
 
         Ok(())
@@ -246,14 +252,15 @@ mod tests {
 
     #[test]
     fn test_let_declaration_0() -> Result<()> {
+        let mut interner = interner();
         let s = "let two = # Nat : S(S(Zero))";
-        let mut state = State::new(s);
+        let mut state = State::new(s, &mut interner);
 
         let result = let_declaration(&mut state);
         assert!(matches!(result, Ok(_)));
         let LetDeclaration { name, type_parameters, body: _ } = result?;
 
-        assert_eq!(name.str(), "two");
+        assert_eq!(name.str(&mut interner), "two");
         assert_eq!(type_parameters.len(), 0);
 
 
@@ -262,14 +269,15 @@ mod tests {
 
     #[test]
     fn test_let_declaration_1() -> Result<()> {
+        let mut interner = interner();
         let s = "let nil = forall { a . # List : Nil }";
-        let mut state = State::new(s);
+        let mut state = State::new(s, &mut interner);
 
         let result = let_declaration(&mut state);
         assert!(matches!(result, Ok(_)));
         let LetDeclaration { name, type_parameters, body: _ } = result?;
 
-        assert_eq!(name.str(), "nil");
+        assert_eq!(name.str(&mut interner), "nil");
         assert_eq!(type_parameters.len(), 1);
 
         Ok(())
@@ -277,8 +285,9 @@ mod tests {
 
     #[test]
     fn test_local_let_0() -> Result<()> {
+        let mut interner = interner();
         let s = "fn f = # Nat -> Nat : { x . let {, y = # Nat : add(x, One), z = # Nat : add(x, Two) . mul(y, z) } }";
-        let mut state = State::new(s);
+        let mut state = State::new(s, &mut interner);
 
         let result = function_declaration(&mut state);
         assert!(matches!(result, Ok(_)));
@@ -288,8 +297,9 @@ mod tests {
 
     #[test]
     fn test_lambda_0() -> Result<()> {
+        let mut interner = interner();
         let s = "fn twice = forall { a, b . # Fn(a -> b), a -> b : { f, a . apply f to (apply f to (a)) }}";
-        let mut state = State::new(s);
+        let mut state = State::new(s, &mut interner);
 
         let result = function_declaration(&mut state);
         assert!(matches!(result, Ok(_)));
@@ -312,10 +322,10 @@ mod tests {
             }\n\
         }\n\
         ";
+        let mut interner = interner();
+        let mut state = State::new(s, &mut interner);
 
-        let mut state = State::new(s);
-
-        let result = program(&mut state);
+        let result = pre_program(&mut state);
         assert!(matches!(result, Ok(_)));
 
         Ok(())
@@ -326,10 +336,10 @@ mod tests {
         let s = "\
         let y = # List(Nat) : Nil\n\
         ";
+        let mut interner = interner();
+        let mut state = State::new(s, &mut interner);
 
-        let mut state = State::new(s);
-
-        let result = program(&mut state);
+        let result = pre_program(&mut state);
         assert!(matches!(result, Ok(_)));
 
         Ok(())

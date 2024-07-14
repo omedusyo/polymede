@@ -2,6 +2,8 @@
 pub enum Token {
     OpenParen,
     CloseParen,
+    OpenAngle,
+    CloseAngle,
     OpenCurly,
     CloseCurly,
     Keyword(Keyword),
