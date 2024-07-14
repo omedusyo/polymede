@@ -1,8 +1,9 @@
 mod parser;
 mod validation;
+mod base;
+mod identifier;
 
 use std::io;
-use std::io::Write;
 use std::fs;
 use clap::Parser;
 
@@ -15,7 +16,7 @@ struct Args {
     file: String,
 }
 
-fn check_program(program: &parser::base::Program) -> Result<(), Vec<validation::base::ErrorWithLocation>> {
+fn check_program(program: &base::Program) -> Result<(), Vec<validation::base::ErrorWithLocation>> {
     validation::type_formation::check_program(&program)?;
     validation::term_formation::check_program(&program)?;
     Ok(())

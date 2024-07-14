@@ -1,7 +1,5 @@
-use crate::parser::{
-    identifier::Variable,
-    base::{Program, TypeDeclaration, Type, FunctionType, ConstructorDeclaration, FunctionDeclaration, LetDeclaration, Term, Pattern, PatternBranch },
-};
+use crate::base::{Program, TypeDeclaration, Type, FunctionType, ConstructorDeclaration, FunctionDeclaration, LetDeclaration};
+use crate::identifier::Variable;
 use crate::validation:: base::{Result, Error, ErrorWithLocation};
 use std::collections::HashSet;
 

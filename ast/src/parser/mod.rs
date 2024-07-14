@@ -1,25 +1,28 @@
 pub mod base;
 pub mod identifier;
 pub mod show;
+pub mod lex;
 mod combinator;
 mod pattern;
 mod program;
 mod special;
 mod term;
 mod types;
-mod lex;
 
-use crate::parser:: base::{Error, Program};
+
+use crate::base::Program;
+use crate::parser:: base::Error;
 
 pub fn parse_program(s: &str) -> Result<Program, Error> {
-    Program::parse(s)
+    base::parse_program(s)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::base::{Term, Type, FunctionDeclaration, LetDeclaration};
+    use crate::identifier::interner;
     use crate::parser::{
-        base::{State, Result, Error, Term, Type, PreTypeDeclaration, FunctionDeclaration, LetDeclaration, PreEnumDeclaration, PreIndDeclaration},
-        identifier::interner,
+        base::{State, Result, Error, PreTypeDeclaration, PreEnumDeclaration, PreIndDeclaration},
         types::type_,
         program::{pre_program, let_declaration, function_declaration, type_declaration},
     };

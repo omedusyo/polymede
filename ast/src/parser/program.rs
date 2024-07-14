@@ -1,18 +1,19 @@
+use crate::base::{LetDeclaration, TypedFunction, Function, FunctionType, FunctionDeclaration, ConstructorDeclaration};
+use crate::identifier;
+use crate::identifier::{Variable, FunctionName};
 use crate::parser::lex::{
     token::{Token, Keyword},
     lexer::{Request, LocatedToken, DeclarationKind},
 };
 use crate::parser::{
-    base::{State, Result, Error, PreProgram, Declaration, LetDeclaration, TypedFunction, Function, FunctionType, FunctionDeclaration, PreIndDeclaration, PreEnumDeclaration, PreTypeDeclaration, ConstructorDeclaration},
-    identifier,
-    identifier::{Variable, FunctionName, variable, constructor_name, function_name},
+    base::{State, Result, Error, PreProgram, Declaration, PreIndDeclaration, PreEnumDeclaration, PreTypeDeclaration},
+    identifier::{variable, constructor_name, function_name},
     term::{term, typed_term},
     types::{type_nonempty_sequence, function_type_annotation},
     pattern::{parameter_non_empty_sequence, parameter_possibly_empty_sequence},
     special::{or_separator, do_nothing},
     combinator::delimited_possibly_empty_sequence_to_vector,
 };
-use std::collections::HashMap;
 
 pub fn pre_program(state: &mut State) -> Result<PreProgram> {
     let mut program = PreProgram::new();

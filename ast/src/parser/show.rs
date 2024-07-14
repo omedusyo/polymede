@@ -1,7 +1,5 @@
-use crate::parser::{
-    base::{Program, Type, FunctionType, TypeDeclaration, FunctionDeclaration, LetDeclaration, EnumDeclaration, IndDeclaration, ConstructorDeclaration},
-    identifier::{Identifier, Interner},
-};
+use crate::base::{Program, Type, FunctionType, TypeDeclaration, FunctionDeclaration, LetDeclaration, EnumDeclaration, IndDeclaration, ConstructorDeclaration};
+use crate::identifier::{Identifier, Interner};
 
 pub struct Show<'a> {
     interner: &'a Interner,

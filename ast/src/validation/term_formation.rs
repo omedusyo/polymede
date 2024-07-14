@@ -1,7 +1,5 @@
-use crate::parser::{
-    identifier::{Variable, FunctionName, ConstructorName},
-    base::{Program, TypeDeclaration, Type, FunctionType, ConstructorDeclaration, FunctionDeclaration, LetDeclaration, Term, Pattern, PatternBranch },
-};
+use crate::base::{Program, TypeDeclaration, Type, FunctionDeclaration, LetDeclaration, Term, Pattern, PatternBranch};
+use crate::identifier::{Variable, FunctionName, ConstructorName};
 use crate::validation:: {
     base::{Result, Error, ErrorWithLocation},
     type_formation,
@@ -127,55 +125,6 @@ impl <'env>Environment<'env> {
 fn eq_type(type0: &Type, type1: &Type) -> bool {
     // TODO: Is this really enough?
     type0 == type1
-}
-
-// We are expecting the `term` to be of Arrow type.
-fn type_infer_arrow_inputs(env: &mut Environment, term: &Term, expected_out_type: &Type) -> Result<Vec<Type>> {
-    use Term::*;
-    match term {
-        TypedTerm(typed_term) => {
-            // TODO: You need to check that the type of the type annotation is well-formed.
-            //let type_ = &typed_term.type_;
-            //let term = &typed_term.term;
-            //
-            //let Type::Arrow(fn_type) = type_ else { return Err(Error::TermDoesntHaveExpectedArrowType { received: type_.clone() }) };
-            //type_check(env, term, type_)?;
-            //
-            //eq_type(fn_type.output_type)
-            //
-            //Ok(fn_type.input_types.clone())
-            todo!()
-        },
-        VariableUse(var) => {
-            match env.get_type(var) {
-                Some(type_) => todo!(),
-                None => Err(Error::VariableOutOfScope { variable: var.clone() }),
-            }
-        },
-        Lambda(function) => {
-            todo!()
-        },
-        FunctionApplication(fn_name, type_args, args) => {
-            // type infer args, then feed them into fn_name
-            todo!()
-        },
-        Match(arg, branches) => {
-            todo!()
-        },
-        Fold(arg, branches) => {
-            todo!()
-        },
-        LambdaApplication(fn_term, args) => {
-            todo!()
-        },
-        Let(bindings, body) => {
-            todo!()
-        },
-        ConstructorUse(_, _) => {
-            // TODO: Error: Can't possibly be of Arrow type
-            todo!()
-        }
-    }
 }
 
 fn type_infer(env: &mut Environment, term: &Term) -> Result<Type> {
