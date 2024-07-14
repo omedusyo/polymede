@@ -1,0 +1,54 @@
+
+type Bool = enum { T | F }
+
+type Nat = ind { nat .
+| Z
+| S(nat)
+}
+
+type List(a) = ind { x .
+| Nil
+| Cons(a, x)
+}
+
+
+type Bar(a) = enum {
+| A(a, List(a), Fn(a -> a))
+}
+
+type F = ind { x .
+| Foo(Fn(Fn(x -> Bool) -> Bool))
+}
+
+fn add = # Nat, Nat -> Nat : { x, y .
+  fold x {
+  | Z . y
+  | S(result) . S(result)
+  }
+}
+
+fn mul = # Nat, Nat -> Nat : { x, y .
+  fold x {
+  | Z . Z
+  | S(result) . add(y, result)
+  }
+}
+
+fn square = # Nat -> Nat : { x .
+  mul(x, x)
+}
+
+fn test_let = # Nat -> Nat : { x .
+  let {
+  , y = mul(x, x)
+  , z = # Fn(Nat -> Nat) : fn { x . x }
+  . y
+  }
+}
+
+fn map = forall { a, b . # Fn(a -> b), List(a) -> List(b) : { f, xs .
+  fold xs {
+  | Nil . Nil
+  | Cons(x, state) . Cons(apply f to (x), state)
+  }
+}}

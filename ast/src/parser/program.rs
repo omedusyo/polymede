@@ -3,7 +3,8 @@ use crate::parser::lex::{
     lexer::{Request, LocatedToken, DeclarationKind},
 };
 use crate::parser::{
-    base::{State, Result, Error, Program, Declaration, LetDeclaration, Function, FunctionType, FunctionDeclaration, IndDeclaration, EnumDeclaration, TypeDeclaration, ConstructorDeclaration},
+    base::{State, Result, Error, PreProgram, Declaration, LetDeclaration, TypedFunction, Function, FunctionType, FunctionDeclaration, PreIndDeclaration, PreEnumDeclaration, PreTypeDeclaration, ConstructorDeclaration},
+    identifier,
     identifier::{Variable, FunctionName, variable, constructor_name, function_name},
     term::{term, typed_term},
     types::{type_nonempty_sequence, function_type_annotation},
@@ -11,13 +12,33 @@ use crate::parser::{
     special::{or_separator, do_nothing},
     combinator::delimited_possibly_empty_sequence_to_vector,
 };
+use std::collections::HashMap;
 
-pub fn program(state: &mut State) -> Result<Program> {
-    let mut program = Program::new();
+pub fn pre_program(state: &mut State) -> Result<PreProgram> {
+    let mut program = PreProgram::new();
+
     for declaration in delimited_possibly_empty_sequence_to_vector(state, program_declaration, do_nothing)? {
         program.add_declaration(declaration);
     }
+    check_program_names_uniqueness(&program)?;
     Ok(program)
+}
+
+fn check_program_names_uniqueness(program: &PreProgram) -> Result<()> {
+    let type_duplicates = identifier::duplicates(&program.type_names());
+    let constructor_duplicates = identifier::duplicates(&program.constructor_names());
+    let function_duplicates = identifier::duplicates(&program.function_names());
+    let let_duplicates = identifier::duplicates(&program.let_names());
+    if !(type_duplicates.is_empty() && constructor_duplicates.is_empty() && function_duplicates.is_empty() && let_duplicates.is_empty()) {
+        Err(Error::DuplicateNames {
+            type_duplicates,
+            constructor_duplicates,
+            function_duplicates,
+            let_duplicates,
+        })
+    } else {
+        Ok(())
+    }
 }
 
 fn program_declaration(state: &mut State) -> Result<Declaration> {
@@ -28,7 +49,6 @@ fn program_declaration(state: &mut State) -> Result<Declaration> {
     }
 }
 
-// TODO: Check for uniqueness of constructor names.
 fn constructor_declaration(state: &mut State) -> Result<ConstructorDeclaration> {
     let constructor_name = constructor_name(state)?;
 
@@ -49,7 +69,9 @@ fn constructor_declaration_sequence(state: &mut State) -> Result<Vec<Constructor
     delimited_possibly_empty_sequence_to_vector( state, constructor_declaration, or_separator)
 }
 
-pub fn type_declaration(state: &mut State) -> Result<TypeDeclaration> {
+// TODO: Make sure that for ind type declarations the recursive type-variable doesn't shadow any of
+// its parameters.
+pub fn type_declaration(state: &mut State) -> Result<PreTypeDeclaration> {
     state.request_keyword(Keyword::Type_)?;
 
     let constructor_name = constructor_name(state)?;
@@ -69,7 +91,7 @@ pub fn type_declaration(state: &mut State) -> Result<TypeDeclaration> {
     state.request_token(Request::OpenCurly)?;
     let declaration = match keyword {
         Keyword::Enum => {
-            TypeDeclaration::Enum(EnumDeclaration {
+            PreTypeDeclaration::Enum(PreEnumDeclaration {
                 name: constructor_name,
                 type_parameters,
                 constructors: constructor_declaration_sequence(state)?
@@ -80,7 +102,7 @@ pub fn type_declaration(state: &mut State) -> Result<TypeDeclaration> {
 
             state.request_token(Request::BindingSeparator)?;
 
-            TypeDeclaration::Ind(IndDeclaration {
+            PreTypeDeclaration::Ind(PreIndDeclaration {
                 name: constructor_name,
                 type_parameters,
                 recursive_type_var,
@@ -103,7 +125,7 @@ pub fn function_declaration(state: &mut State) -> Result<FunctionDeclaration> {
 
     fn inner_function_declaration(state: &mut State, function_name: FunctionName, type_parameters: Vec<Variable>) -> Result<FunctionDeclaration> {
         let type_ = function_type_annotation(state)?;
-        let function = function(state, type_)?;
+        let function = typed_function(state, type_)?;
         Ok(FunctionDeclaration { name: function_name, type_parameters, function })
     }
 
@@ -123,7 +145,7 @@ pub fn function_declaration(state: &mut State) -> Result<FunctionDeclaration> {
     }
 }
 
-pub fn function(state: &mut State, type_: FunctionType) -> Result<Function> {
+pub fn function(state: &mut State) -> Result<Function> {
     state.request_token(Request::OpenCurly)?;
 
     let parameters = parameter_possibly_empty_sequence(state)?;
@@ -132,12 +154,19 @@ pub fn function(state: &mut State, type_: FunctionType) -> Result<Function> {
 
     state.request_token(Request::CloseCurly)?;
 
-    if type_.input_types.len() != parameters.len() {
-        Err(Error::FunctionHasDifferentNumberOfParametersThanDeclaredInItsType { declared_in_type: type_.input_types.len(), parameters: parameters.len() })
+    Ok(Function { parameters, body })
+}
+
+pub fn typed_function(state: &mut State, type_: FunctionType) -> Result<TypedFunction> {
+    let function = function(state)?;
+
+    if type_.input_types.len() != function.parameters.len() {
+        Err(Error::FunctionHasDifferentNumberOfParametersThanDeclaredInItsType { declared_in_type: type_.input_types.len(), parameters: function.parameters.len() })
     } else {
-        Ok(Function { type_, parameters, body })
+        Ok(TypedFunction { type_, function })
     }
 }
+
 
 pub fn let_declaration(state: &mut State) -> Result<LetDeclaration> {
     state.request_keyword(Keyword::Let)?;

@@ -34,7 +34,7 @@ pub enum VariableOrConstructorName {
 
 pub fn constructor_name_or_variable(state: &mut State) -> Result<VariableOrConstructorName> {
     let id = identifier(state)?;
-    let c = id.first_char();
+    let c = id.first_char(state.interner());
     if c.is_ascii_uppercase() {
         // constructor
         Ok(VariableOrConstructorName::ConstructorName(id))
@@ -47,6 +47,7 @@ pub fn constructor_name_or_variable(state: &mut State) -> Result<VariableOrConst
 }
 
 pub enum StartTerm {
+    TypeAnnotation,
     VariableUse(Variable),
     FunctionApplication(Variable),
     ConstructorConstant(ConstructorName),
@@ -58,34 +59,42 @@ pub enum StartTerm {
     Lambda,
 }
 
+// TODO: This needs a refactor.
+//       For type annotation it doesn't consume the `#` symbol,
+//       but for fold/match/let/apply/fn it does consume the keyword (we're taking advantage of
+//       that these keywords are valid identifiers)
 pub fn start_term(state: &mut State) -> Result<StartTerm> {
-    let id = identifier(state)?;
-    let c = id.first_char();
-    if c.is_ascii_uppercase() {
-        // constructor
-        if state.is_next_token_open_paren()? {
-            Ok(StartTerm::ConstructorApplication(id))
-        } else {
-            // constructor constant
-            Ok(StartTerm::ConstructorConstant(id))
-        }
-    } else if c.is_ascii_lowercase() {
-        // TODO: Checking for fold/match here is really wrong. This should be the job for the lexer.
-        match id.str() {
-            "fold" => Ok(StartTerm::Fold),
-            "match" => Ok(StartTerm::Match),
-            "let" => Ok(StartTerm::Let),
-            "apply" => Ok(StartTerm::Apply),
-            "fn" => Ok(StartTerm::Lambda),
-            _ => {
-                if state.is_next_token_open_paren()? {
-                    Ok(StartTerm::FunctionApplication(id))
-                } else {
-                    Ok(StartTerm::VariableUse(id))
-                }
-            },
-        }
+    if state.is_next_token_start_type_annotation()? {
+        Ok(StartTerm::TypeAnnotation)
     } else {
-        Err(Error::ExpectedTypeConstructorOrTypeVarOrAnythingInPattern { received: id })
+        let id = identifier(state)?;
+        let c = id.first_char(state.interner());
+        if c.is_ascii_uppercase() {
+            // constructor
+            if state.is_next_token_open_paren()? {
+                Ok(StartTerm::ConstructorApplication(id))
+            } else {
+                // constructor constant
+                Ok(StartTerm::ConstructorConstant(id))
+            }
+        } else if c.is_ascii_lowercase() {
+            // TODO: Checking for fold/match here is really wrong. This should be the job for the lexer.
+            match id.str(state.interner()) {
+                "fold" => Ok(StartTerm::Fold),
+                "match" => Ok(StartTerm::Match),
+                "let" => Ok(StartTerm::Let),
+                "apply" => Ok(StartTerm::Apply),
+                "fn" => Ok(StartTerm::Lambda),
+                _ => {
+                    if state.is_next_token_open_paren()? || state.is_next_token_open_angle()? {
+                        Ok(StartTerm::FunctionApplication(id))
+                    } else {
+                        Ok(StartTerm::VariableUse(id))
+                    }
+                },
+            }
+        } else {
+            Err(Error::ExpectedTerm { received: id })
+        }
     }
 }

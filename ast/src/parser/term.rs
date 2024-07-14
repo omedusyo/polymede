@@ -3,9 +3,9 @@ use crate::parser::lex::{
     lexer::Request,
 };
 use crate::parser::{
-    base::{State, Result, Term, TypedTerm},
+    base::{State, Result, Term, TypedTerm, Type},
     identifier::{Variable, variable},
-    types::{function_type_annotation, type_annotation},
+    types::{type_annotation, type_nonempty_sequence},
     pattern::pattern_branches,
     program::function,
     special::{StartTerm, start_term, comma},
@@ -14,12 +14,25 @@ use crate::parser::{
 
 pub fn term(state: &mut State) -> Result<Term> {
     match start_term(state)? {
+        StartTerm::TypeAnnotation => {
+            let type_ = type_annotation(state)?;
+            let term = term(state)?;
+            Ok(Term::TypedTerm(Box::new(TypedTerm {type_, term})))
+        },
         StartTerm::VariableUse(variable) => Ok(Term::VariableUse(variable)),
         StartTerm::FunctionApplication(function_name) => {
+            let type_args: Vec<Type> = if state.is_next_token_open_angle()? {
+                state.request_token(Request::OpenAngle)?;
+                let type_args = type_nonempty_sequence(state)?;
+                state.request_token(Request::CloseAngle)?;
+                type_args
+            } else {
+                vec![]
+            };
             state.request_token(Request::OpenParen)?;
             let args = possibly_empty_term_sequence(state)?;
             state.request_token(Request::CloseParen)?;
-            Ok(Term::FunctionApplication(function_name, args))
+            Ok(Term::FunctionApplication(function_name, type_args, args))
         },
         StartTerm::ConstructorConstant(constructor_name) => {
             Ok(Term::ConstructorUse(constructor_name, vec![]))
@@ -38,7 +51,7 @@ pub fn term(state: &mut State) -> Result<Term> {
         StartTerm::Fold => {
             let arg = term(state)?;
             let branches = pattern_branches(state)?;
-            Ok(Term::Match(Box::new(arg), branches))
+            Ok(Term::Fold(Box::new(arg), branches))
         },
         StartTerm::Let => {
             state.request_token(Request::OpenCurly)?;
@@ -49,8 +62,7 @@ pub fn term(state: &mut State) -> Result<Term> {
             Ok(Term::Let(bindings, Box::new(body)))
         },
         StartTerm::Lambda => {
-            let function_type = function_type_annotation(state)?;
-            let function = function(state, function_type)?;
+            let function = function(state)?;
             Ok(Term::Lambda(Box::new(function)))
         },
         StartTerm::Apply => {
@@ -70,15 +82,15 @@ pub fn typed_term(state: &mut State) -> Result<TypedTerm> {
     Ok(TypedTerm { type_ , term })
 }
 
-// Parses    x = # type : expr
-fn var_binding(state: &mut State) -> Result<(Variable, TypedTerm)> {
+// Parses    x = expr
+fn var_binding(state: &mut State) -> Result<(Variable, Term)> {
     let var = variable(state)?;
     state.request_keyword(Keyword::Eq)?;
-    let term = typed_term(state)?;
+    let term = term(state)?;
     Ok((var, term))
 }
 
-fn nonempty_var_binding_sequence(state: &mut State) -> Result<Vec<(Variable, TypedTerm)>> {
+fn nonempty_var_binding_sequence(state: &mut State) -> Result<Vec<(Variable, Term)>> {
     state.consume_optional_comma()?;
     delimited_nonempty_sequence_to_vector(state, var_binding, comma)
 }
@@ -90,4 +102,3 @@ fn possibly_empty_term_sequence(state: &mut State) -> Result<Vec<Term>> {
 fn nonempty_term_sequence(state: &mut State) -> Result<Vec<Term>> {
     delimited_nonempty_sequence_to_vector(state, term, comma)
 }
-

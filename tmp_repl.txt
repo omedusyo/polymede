@@ -10,6 +10,8 @@ cargo test
 
 cargo run --bin ast -- -f examples/simple_bool.pmd
 
+cargo run --bin ast -- -f examples/simple_two.pmd
+
 cargo test -p ast
 
 
