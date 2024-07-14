@@ -288,6 +288,10 @@ impl FunctionDeclaration {
         self.name.clone()
     }
 
+    pub fn type_arity(&self) -> usize {
+        self.type_parameters.len()
+    }
+
     // Assumes arity matches.
     pub fn type_apply(&self, type_arguments: &[Type]) -> FunctionType {
         // TODO: This can be pretty space-expensive substitution. Consider having proper closures as type
@@ -311,6 +315,7 @@ pub struct Function {
     pub body: Term,
 }
 
+// TODO: Get rid of this or replace it by a version that doesn't have type parameters.
 #[derive(Debug)]
 pub struct LetDeclaration {
     pub name: Variable,

@@ -16,21 +16,28 @@ struct Environment<'a> {
     bindings_stack: Vec<HashMap<Variable, Type>>,
 }
 
-pub fn check_program(program: &Program) -> core::result::Result<(), ErrorWithLocation> {
+pub fn check_program(program: &Program) -> core::result::Result<(), Vec<ErrorWithLocation>> {
+    let mut errors = vec![];
+
     for decl in program.function_declarations.values() {
         match check_function_declaration(program, decl) {
             Ok(_) => {},
-            Err(e) => return Err(ErrorWithLocation::FunctionDeclaration(decl.name.clone(), e))
+            Err(e) => errors.push(ErrorWithLocation::FunctionDeclaration(decl.name.clone(), e)),
         }
     }
 
     for decl in program.let_declarations.values() {
         match check_let_declaration(program, decl) {
             Ok(_) => {},
-            Err(e) => return Err(ErrorWithLocation::LetDeclaration(decl.name.clone(), e))
+            Err(e) => errors.push(ErrorWithLocation::LetDeclaration(decl.name.clone(), e)),
         }
     }
-    Ok(())
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
 }
 
 fn check_let_declaration(program: &Program, decl: &LetDeclaration) -> Result<()> {
@@ -192,7 +199,7 @@ fn type_infer(env: &mut Environment, term: &Term) -> Result<Type> {
             let Some(type_decl) = env.get_type_declaration_of_constructor(constructor_name) else { return Err(Error::ConstructorDoesntExist { constructor_name: constructor_name.clone() })};
             if type_decl.arity() > 0 { return Err(Error::UnableToInferTypeOfConstructor) }
             let Some((constructor_decl, specialized_types)) = type_decl.type_apply_constructor(constructor_name, &vec![]) else { unreachable!() };
-            if constructor_decl.arity() != args.len() { return Err(Error::ConstructorIsAppliedToWrongNumberOfArguments { expected: constructor_decl.arity(), received: args.len() }) }
+            if constructor_decl.arity() != args.len() { return Err(Error::ConstructorIsAppliedToWrongNumberOfArguments { constructor_name: constructor_name.clone(), expected: constructor_decl.arity(), received: args.len() }) }
 
             for (arg, type_) in args.iter().zip(&specialized_types) { 
                 type_check(env, arg, &type_)?
@@ -205,8 +212,9 @@ fn type_infer(env: &mut Environment, term: &Term) -> Result<Type> {
         },
         FunctionApplication(function_name, type_args, args) => {
             let Some(fn_decl) = env.get_function_declaration(function_name) else { return Err(Error::FunctionDoesntExist { function_name: function_name.clone() }) };
+            if fn_decl.type_arity() != type_args.len() { return Err(Error::ApplyingWrongNumberOfTypeArgumentsToFunction { function_name: function_name.clone(), expected: fn_decl.type_arity(), received: type_args.len() }) }
             let fn_type = fn_decl.type_apply(type_args);
-            if fn_type.input_types.len() != args.len() { return Err(Error::ApplyingWrongNumberOfArgumentsToFunction { expected: fn_type.input_types.len(), received: args.len() }); }
+            if fn_type.input_types.len() != args.len() { return Err(Error::ApplyingWrongNumberOfArgumentsToFunction { function_name: function_name.clone(), expected: fn_type.input_types.len(), received: args.len() }); }
             for (arg, type_) in args.iter().zip(&fn_type.input_types) {
                 type_check(env, arg, type_)?
             }
@@ -262,7 +270,7 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
                     if eq_type(expected_type, type_) {
                         Ok(())
                     } else {
-                        Err(Error::VariableDoesntHaveExpectedType { expected_type: expected_type.clone(), received_type: type_.clone() })
+                        Err(Error::VariableDoesntHaveExpectedType { variable: var.clone(), expected_type: expected_type.clone(), received_type: type_.clone() })
                     }
                 },
                 None => Err(Error::VariableOutOfScope { variable: var.clone() }),
@@ -273,7 +281,7 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
             // SAFETY: We assume that `expected_type` is a valid type.
             let Some(type_decl) = env.get_type_declaration(type_constructor_name) else { unreachable!() };
             let Some((constructor_decl, specialized_types)) = type_decl.type_apply_constructor(constructor_name, types) else { return Err(Error::ConstructorDoesntBelongToExpectedTypeDeclaration { constructor_name: constructor_name.clone(), type_name: type_decl.name().clone() }) };
-            if constructor_decl.arity() != args.len() { return Err(Error::ConstructorIsAppliedToWrongNumberOfArguments { expected: constructor_decl.arity(), received: args.len() }) }
+            if constructor_decl.arity() != args.len() { return Err(Error::ConstructorIsAppliedToWrongNumberOfArguments { constructor_name: constructor_name.clone(), expected: constructor_decl.arity(), received: args.len() }) }
 
             for (arg, type_) in args.iter().zip(&specialized_types) { 
                 type_check(env, arg, &type_)?
@@ -300,22 +308,23 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
         },
         FunctionApplication(function_name, type_args, args) => {
             let Some(fn_decl) = env.get_function_declaration(function_name) else { return Err(Error::FunctionDoesntExist { function_name: function_name.clone() }) };
+            if fn_decl.type_arity() != type_args.len() { return Err(Error::ApplyingWrongNumberOfTypeArgumentsToFunction { function_name: function_name.clone(), expected: fn_decl.type_arity(), received: type_args.len() }) }
             let fn_type = fn_decl.type_apply(type_args);
-            if fn_type.input_types.len() != args.len() { return Err(Error::ApplyingWrongNumberOfArgumentsToFunction { expected: fn_type.input_types.len(), received: args.len() }); }
+            if fn_type.input_types.len() != args.len() { return Err(Error::ApplyingWrongNumberOfArgumentsToFunction { function_name: function_name.clone(), expected: fn_type.input_types.len(), received: args.len() }); }
             for (arg, type_) in args.iter().zip(&fn_type.input_types) {
                 type_check(env, arg, type_)?
             }
             if eq_type(&fn_type.output_type, expected_type) {
                 Ok(())
             } else {
-                Err(Error::FunctionOutputTypeDoesntMatchExpectedType { expected_type: expected_type.clone(), received_type: fn_type.output_type })
+                Err(Error::FunctionOutputTypeDoesntMatchExpectedType { function_name: function_name.clone(), expected_type: expected_type.clone(), received_type: fn_type.output_type })
             }
         },
         Match(arg, branches) => {
             let arg_type = type_infer(env, arg)?;
             let Type::TypeApplication(type_name, type_args) = arg_type else { return Err(Error::AttemptToMatchNonEnumerableType { received_type: arg_type }) };
             for branch in branches {
-                check_pattern_branch(env, branch, &type_name, &type_args, &expected_type)?;
+                check_pattern_branch(env, MatchOrFold::Match, branch, &type_name, &type_args, &expected_type)?;
             }
             Ok(())
         },
@@ -325,7 +334,7 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
             let Type::TypeApplication(type_name, type_args) = arg_type else { return Err(Error::AttemptToMatchNonEnumerableType { received_type: arg_type }) };
             if env.is_ind_type_declaration(&type_name) {
                 for branch in branches {
-                    check_pattern_branch(env, branch, &type_name, &type_args, &expected_type)?;
+                    check_pattern_branch(env, MatchOrFold::Fold, branch, &type_name, &type_args, &expected_type)?;
                 }
                 Ok(())
             } else {
@@ -351,7 +360,11 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
                 type_check(env, arg, type_)?
             }
 
-            Ok(())
+            if eq_type(&fn_type.output_type, expected_type) {
+                Ok(())
+            } else {
+                Err(Error::LambdaOutputTypeDoesntMatchExpectedType { expected_type: expected_type.clone(), received_type: fn_type.output_type })
+            }
         },
         Let(bindings, body) => {
             env.open_env();
@@ -366,10 +379,16 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
     }
 }
 
-fn check_pattern_branch(env: &mut Environment, branch: &PatternBranch, type_name: &Variable, type_args: &[Type], expected_type: &Type) -> Result<()>  {
+#[derive(Debug, Clone, Copy)]
+enum MatchOrFold {
+    Match,
+    Fold,
+}
+
+fn check_pattern_branch(env: &mut Environment, match_or_fold: MatchOrFold, branch: &PatternBranch, type_name: &Variable, type_args: &[Type], expected_type: &Type) -> Result<()>  {
     env.open_env();
     // The creation/cloning of the type here is a bit unfortunate.
-    check_and_extend_pattern(env, &branch.pattern, &Type::TypeApplication(type_name.clone(), type_args.to_vec()), expected_type)?;
+    check_and_extend_pattern(env, match_or_fold, &branch.pattern, &Type::TypeApplication(type_name.clone(), type_args.to_vec()), expected_type)?;
     type_check(env, &branch.body, expected_type)?;
     env.close_env();
     Ok(())
@@ -377,7 +396,7 @@ fn check_pattern_branch(env: &mut Environment, branch: &PatternBranch, type_name
 
 // Note this may extend current environment with new bindings
 // The expected_type is the type expected of the body of the pattern (this is important for folds)
-fn check_and_extend_pattern(env: &mut Environment, pattern: &Pattern, expected_pattern_type: &Type, expected_type: &Type) -> Result<()> {
+fn check_and_extend_pattern(env: &mut Environment, match_or_fold: MatchOrFold, pattern: &Pattern, expected_pattern_type: &Type, expected_type: &Type) -> Result<()> {
     match pattern {
         Pattern::Constructor(constructor_name, patterns) => {
             let Type::TypeApplication(type_name, type_args) = expected_pattern_type else { return Err(Error::AttemptToMatchNonEnumerableType { received_type: expected_pattern_type.clone() }) };
@@ -386,7 +405,10 @@ fn check_and_extend_pattern(env: &mut Environment, pattern: &Pattern, expected_p
             use TypeDeclaration::*;
             let Some((_, specialized_types)) = (match type_decl {
                 Enum(decl) => decl.type_apply_constructor(constructor_name, type_args),
-                Ind(decl) => decl.type_apply_constructor(constructor_name, type_args, expected_type),
+                Ind(decl) => decl.type_apply_constructor(constructor_name, type_args, match match_or_fold {
+                    MatchOrFold::Match => expected_pattern_type,
+                    MatchOrFold::Fold => expected_type,
+                }),
             }) else {
                 return Err(Error::ConstructorDoesntBelongToExpectedTypeDeclaration { constructor_name: constructor_name.clone(), type_name: type_decl.name().clone() }) 
             };
@@ -394,7 +416,7 @@ fn check_and_extend_pattern(env: &mut Environment, pattern: &Pattern, expected_p
             if specialized_types.len() != patterns.len() { return Err(Error::PatternHasWrongNumberOfArguments { expected: specialized_types.len(), received: patterns.len() }) }
             
             for (pattern, specialized_type) in patterns.iter().zip(&specialized_types) {
-                check_and_extend_pattern(env, pattern, specialized_type, expected_type)?
+                check_and_extend_pattern(env, match_or_fold, pattern, specialized_type, expected_type)?
             }
 
             Ok(())

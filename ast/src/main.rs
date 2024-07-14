@@ -15,7 +15,7 @@ struct Args {
     file: String,
 }
 
-fn check_program(program: &parser::base::Program) -> Result<(), validation::base::ErrorWithLocation> {
+fn check_program(program: &parser::base::Program) -> Result<(), Vec<validation::base::ErrorWithLocation>> {
     validation::type_formation::check_program(&program)?;
     validation::term_formation::check_program(&program)?;
     Ok(())
@@ -35,7 +35,12 @@ fn main() -> Result<(), io::Error> {
 
             match check_program(&program) {
                 Ok(_) => {},
-                Err(e) => println!("{}", e.show(&sh))
+                Err(errors) => {
+                    println!("\nTYPE ERROR\n");
+                    for e in errors {
+                        println!("{}\n", e.show(&sh))
+                    }
+                }
             }
         },
         Err(err) => {

@@ -4,6 +4,11 @@ type Bool = enum {
 | F
 }
 
+type Nat = ind { x .
+| Z
+| S(x)
+}
+
 type Empty = enum {
 }
 
@@ -11,13 +16,12 @@ type Unit = enum {
 | Unit
 }
 
-type Pair(a, b) = enum {
-| Pair(a, b)
+type Tuple1(a) = enum {
+| Tuple1(a)
 }
 
-type Nat = ind { x .
-| Z
-| S(x)
+type Pair(a, b) = enum {
+| Pair(a, b)
 }
 
 type List(a) = ind { x .
@@ -25,23 +29,45 @@ type List(a) = ind { x .
 | Cons(a, x)
 }
 
+let true = # Nat : S(Z)
+
+fn id_bool = # Bool -> Bool : { x . x }
+
+fn not = # Bool -> Bool : { x .
+  match x {
+  | T . F
+  | F . id_bool(id_bool(T))
+  }
+}
+
 fn add = # Nat, Nat -> Nat : { x, y .
   fold x {
   | Z . y
-  | S(result) . S(result)
+  | S(result) . S(id<Nat>(result))
   }
+}
+
+fn mul = # Nat, Nat -> Nat : { x, y .
+  fold x {
+  | Z . Z
+  | S(result) . add(y, result)
+  }
+}
+
+fn square = # Nat -> Nat : { x .
+  mul(x, x)
 }
 
 fn id = forall { a .
   # a -> a : { x . x }
 }
 
-fn twice = forall { a, b . # Fn(a -> b), a -> b : { f, a . apply f to (apply f to (a)) }}
+fn twice = forall { a . # Fn(a -> a), a -> a : { f, a . apply f to (apply f to (a)) }}
 
 fn map = forall { a, b . # Fn(a -> b), List(a) -> List(b) : { f, xs .
   fold xs {
   | Nil . Nil
-  | Cons(x, state) . Cons(f(x), state)
+  | Cons(x, state) . Cons(apply f to (x), state)
   }
 }}
 
@@ -49,7 +75,7 @@ fn filter = forall { a . # Fn(a -> Bool), List(a) -> List(a) : { f, xs .
   fold xs {
   | Nil . Nil
   | Cons(x, filtered_tail) .
-    match f(x) {
+    match apply f to (x) {
     | T . Cons(x, filtered_tail)
     | F . filtered_tail
     }
@@ -66,12 +92,12 @@ fn first = forall { a, b . # Pair(a, b) -> a : { pair .
   }
 }}
 
-fn second = forall { a, b . # Pair(a, b) -> a : { pair .
+fn second = forall { a, b . # Pair(a, b) -> b : { pair .
   match pair { Pair(_, y) . y }
 }}
 
 fn tuple = forall { a, b, x . # Fn(x -> a), Fn(x -> b) -> Fn(x -> Pair(a, b)) : { f, g .
-  fn { x . Pair(apply f to (x), apply g to (x)) }
+  fn { x . Pair(apply f to (x), apply # Fn(x -> b) : g to (x)) }
 }}
 
 fn curry = forall { a, b, c . # Fn(a, b -> c) -> Fn(a -> Fn(b -> c)) : { f .
@@ -82,13 +108,7 @@ fn curry = forall { a, b, c . # Fn(a, b -> c) -> Fn(a -> Fn(b -> c)) : { f .
   }
 }}
 
-let empty_list = forall { a . # List(a) : Nil }
-
-let y = # List(Nat) : f(Nil)
-
-let z = # List(Nat) : Nil
-
-let u = # List(Nat) : empty_list
+fn empty_list = forall { a . # -> List(a) : { . Nil } }
 
 fn range_reverse_iter = # Nat -> Pair(List(Nat), Nat) : { n .
   fold n {
@@ -98,12 +118,16 @@ fn range_reverse_iter = # Nat -> Pair(List(Nat), Nat) : { n .
 }
 
 fn range_reverse = # Nat -> List(Nat) : { n .
-  first(range_reverse_iter(n))
+  first<List(Nat), Nat>(range_reverse_iter(n))
 }
 
-let n1 = # Nat : S(Z)
-let n2 = # Nat : S(S(Z))
-let n3 = # Nat : S(S(S(Z)))
+fn range = # Nat -> List(Nat) : { n .
+  match n {
+  | Z . Nil
+  | S(m) . Cons(n, # List(Nat) : range(# Nat : m))
+  }
+}
 
-let xs = # List(Nat) : map<Nat, Nat>(fn { x . x }, range_reverse(n3))
-
+fn example0 = # -> List(Nat) : { .
+  map<Nat, Nat>(fn { x . square(x) }, range(S(S(S(Z)))))
+}

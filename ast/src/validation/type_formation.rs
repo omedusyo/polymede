@@ -5,25 +5,26 @@ use crate::parser::{
 use crate::validation:: base::{Result, Error, ErrorWithLocation};
 use std::collections::HashSet;
 
-pub fn check_program(program: &Program) -> core::result::Result<(), ErrorWithLocation> {
+pub fn check_program(program: &Program) -> core::result::Result<(), Vec<ErrorWithLocation>> {
+    let mut errors = vec![];
     for decl in program.type_declarations.values() {
         match check_type_declaration(program, decl) {
             Ok(_) => {},
-            Err(e) => return Err(ErrorWithLocation::TypeDeclaration(decl.name().clone(), e))
+            Err(e) => errors.push(ErrorWithLocation::TypeDeclaration(decl.name().clone(), e)),
         }
     }
 
     for decl in program.function_declarations.values() {
         match check_types_in_function_declaration(program, decl) {
             Ok(_) => {},
-            Err(e) => return Err(ErrorWithLocation::TypeDeclaration(decl.name().clone(), e))
+            Err(e) => errors.push(ErrorWithLocation::TypeDeclaration(decl.name().clone(), e)),
         }
     }
 
     for decl in program.let_declarations.values() {
         match check_types_in_let_declaration(program, decl) {
             Ok(_) => {},
-            Err(e) => return Err(ErrorWithLocation::TypeDeclaration(decl.name().clone(), e))
+            Err(e) => errors.push(ErrorWithLocation::TypeDeclaration(decl.name().clone(), e)),
         }
     }
 
