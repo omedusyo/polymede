@@ -1,0 +1,23 @@
+
+type Bool = enum {
+| T
+| F
+}
+
+type Nat = ind { x .
+| Z
+| S(x)
+}
+
+let true = # Nat : S(Z)
+
+fn id_bool = # Bool -> Bool : { x . x }
+
+fn not = # Bool -> Bool : { x .
+  match x {
+  | T . F
+  | F . id_bool(id_bool(T))
+  }
+}
+
+

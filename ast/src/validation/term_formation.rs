@@ -2,18 +2,61 @@ use crate::parser::{
     identifier::{Variable, FunctionName, ConstructorName},
     base::{Program, TypeDeclaration, Type, FunctionType, ConstructorDeclaration, FunctionDeclaration, LetDeclaration, Term, Pattern, PatternBranch },
 };
-use crate::validation:: base::{Result, Error};
+use crate::validation:: {
+    base::{Result, Error, ErrorWithLocation},
+    type_formation,
+    type_formation::TypeScope,
+};
 use std::collections::HashMap;
 
 struct Environment<'a> {
     program: &'a Program,
+    type_env: &'a TypeScope,
     // TODO: Consider having &Type
     bindings_stack: Vec<HashMap<Variable, Type>>,
 }
 
+pub fn check_program(program: &Program) -> core::result::Result<(), ErrorWithLocation> {
+    for decl in program.function_declarations.values() {
+        match check_function_declaration(program, decl) {
+            Ok(_) => {},
+            Err(e) => return Err(ErrorWithLocation::FunctionDeclaration(decl.name.clone(), e))
+        }
+    }
+
+    for decl in program.let_declarations.values() {
+        match check_let_declaration(program, decl) {
+            Ok(_) => {},
+            Err(e) => return Err(ErrorWithLocation::LetDeclaration(decl.name.clone(), e))
+        }
+    }
+    Ok(())
+}
+
+fn check_let_declaration(program: &Program, decl: &LetDeclaration) -> Result<()> {
+    let type_env = TypeScope::new(&decl.type_parameters);
+    let mut env = Environment::new(program, &type_env);
+    type_check(&mut env, &decl.body.term, &decl.body.type_)
+}
+
+fn check_function_declaration(program: &Program, decl: &FunctionDeclaration) -> Result<()> {
+    let type_env = TypeScope::new(&decl.type_parameters);
+    let mut env = Environment::new(program, &type_env);
+    let function_type = &decl.function.type_;
+    let function_parameters = &decl.function.function.parameters;
+
+    env.open_env();
+    for (var, type_) in function_parameters.iter().zip(&function_type.input_types) {
+        env.extend(var, type_);
+    }
+
+    type_check(&mut env, &decl.function.function.body, &function_type.output_type)?;
+    Ok(())
+}
+
 impl <'env>Environment<'env> {
-    fn new(program: &'env Program) -> Self {
-        Self { program, bindings_stack: vec![HashMap::new()] }
+    fn new(program: &'env Program, type_env: &'env TypeScope) -> Self {
+        Self { program, type_env, bindings_stack: vec![HashMap::new()] }
     }
 
     pub fn get_type(&self, var: &Variable) -> Option<&Type> {
@@ -24,6 +67,10 @@ impl <'env>Environment<'env> {
             }
         }
         None
+    }
+
+    pub fn check_type_formation(&self, type_: &Type) -> Result<()> {
+        type_formation::check_type(&self.program, &self.type_env, type_)
     }
 
     pub fn get_type_declaration(&self, type_name: &Variable) -> Option<&TypeDeclaration> {
@@ -128,9 +175,9 @@ fn type_infer(env: &mut Environment, term: &Term) -> Result<Type> {
     use Term::*;
     match term {
         TypedTerm(typed_term) => {
-            // TODO: You need to check that the type of the type annotation is well-formed.
             let type_ = &typed_term.type_;
             let term = &typed_term.term;
+            env.check_type_formation(type_)?;
             type_check(env, term, type_)?;
             Ok(type_.clone())
         },
@@ -200,13 +247,13 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
     use Term::*;
     match term {
         TypedTerm(typed_term) => {
-            // TODO: You need to check that the type of the type annotation is well-formed.
             let type_annotation = &typed_term.type_;
+            env.check_type_formation(type_annotation)?;
             if eq_type(type_annotation, expected_type) {
                 let term = &typed_term.term;
                 type_check(env, term, expected_type)
             } else {
-                Err(Error::TypeAnnotationDoesntMatchExpectedType { expected_type: expected_type.clone(), received: type_annotation.clone() })
+                Err(Error::TypeAnnotationDoesntMatchExpectedType { expected_type: expected_type.clone(), received_type: type_annotation.clone() })
             }
         },
         VariableUse(var) => {
@@ -261,12 +308,12 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
             if eq_type(&fn_type.output_type, expected_type) {
                 Ok(())
             } else {
-                Err(Error::FunctionOutputTypeDoesntMatchExpectedType { expected_type: expected_type.clone(), received: fn_type.output_type })
+                Err(Error::FunctionOutputTypeDoesntMatchExpectedType { expected_type: expected_type.clone(), received_type: fn_type.output_type })
             }
         },
         Match(arg, branches) => {
             let arg_type = type_infer(env, arg)?;
-            let Type::TypeApplication(type_name, type_args) = arg_type else { return Err(Error::AttemptToMatchNonEnumerableType { received: arg_type }) };
+            let Type::TypeApplication(type_name, type_args) = arg_type else { return Err(Error::AttemptToMatchNonEnumerableType { received_type: arg_type }) };
             for branch in branches {
                 check_pattern_branch(env, branch, &type_name, &type_args, &expected_type)?;
             }
@@ -275,14 +322,14 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
         Fold(arg, branches) => {
             let arg_type = type_infer(env, arg)?;
             let arg_type_copy = arg_type.clone(); // TODO: Can I get rid of this clone?
-            let Type::TypeApplication(type_name, type_args) = arg_type else { return Err(Error::AttemptToMatchNonEnumerableType { received: arg_type }) };
+            let Type::TypeApplication(type_name, type_args) = arg_type else { return Err(Error::AttemptToMatchNonEnumerableType { received_type: arg_type }) };
             if env.is_ind_type_declaration(&type_name) {
                 for branch in branches {
                     check_pattern_branch(env, branch, &type_name, &type_args, &expected_type)?;
                 }
                 Ok(())
             } else {
-                Err(Error::AttemptToFoldNonIndType { received: arg_type_copy })
+                Err(Error::AttemptToFoldNonIndType { received_type: arg_type_copy })
             }
         },
         LambdaApplication(fn_term, args) => {
@@ -333,7 +380,7 @@ fn check_pattern_branch(env: &mut Environment, branch: &PatternBranch, type_name
 fn check_and_extend_pattern(env: &mut Environment, pattern: &Pattern, expected_pattern_type: &Type, expected_type: &Type) -> Result<()> {
     match pattern {
         Pattern::Constructor(constructor_name, patterns) => {
-            let Type::TypeApplication(type_name, type_args) = expected_pattern_type else { return Err(Error::AttemptToMatchNonEnumerableType { received: expected_pattern_type.clone() }) };
+            let Type::TypeApplication(type_name, type_args) = expected_pattern_type else { return Err(Error::AttemptToMatchNonEnumerableType { received_type: expected_pattern_type.clone() }) };
             let Some(type_decl) = env.get_type_declaration(&type_name) else { return Err(Error::TypeConstructorDoesntExist { type_name: type_name.clone() }) };
 
             use TypeDeclaration::*;
@@ -360,9 +407,4 @@ fn check_and_extend_pattern(env: &mut Environment, pattern: &Pattern, expected_p
             Ok(())
         },
     }
-}
-
-
-pub fn check_term(program: &Program, term: &Term, expected_type: &Type) -> Result<()> {
-    type_check(&mut Environment::new(program), term, expected_type)
 }

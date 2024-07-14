@@ -92,7 +92,7 @@ impl <'show>Show<'show> {
         }
     }
 
-    fn show_type(&self, type_: &Type) -> String {
+    pub fn show_type(&self, type_: &Type) -> String {
         use Type::*;
         match type_ {
             VariableUse(variable) => variable.str(self.interner()).to_string(),
@@ -116,5 +116,9 @@ impl <'show>Show<'show> {
         let input_types = function_type.input_types.iter().map(|type_| self.show_type(type_)).collect::<Vec<_>>().join(", ");
         let output_type = self.show_type(&function_type.output_type);
         format!("{input_types} -> {output_type}")
+    }
+
+    pub fn show_identifier(&self, var: &Identifier) -> String {
+        var.str(self.interner).to_string()
     }
 }

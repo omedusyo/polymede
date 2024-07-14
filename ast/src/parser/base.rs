@@ -284,7 +284,7 @@ pub struct FunctionDeclaration {
 }
 
 impl FunctionDeclaration {
-    fn name(&self) -> FunctionName {
+    pub fn name(&self) -> FunctionName {
         self.name.clone()
     }
 
@@ -319,7 +319,7 @@ pub struct LetDeclaration {
 }
 
 impl LetDeclaration {
-    fn name(&self) -> Variable {
+    pub fn name(&self) -> Variable {
         self.name.clone()
     }
 }

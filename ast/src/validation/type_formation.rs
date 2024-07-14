@@ -2,20 +2,29 @@ use crate::parser::{
     identifier::Variable,
     base::{Program, TypeDeclaration, Type, FunctionType, ConstructorDeclaration, FunctionDeclaration, LetDeclaration, Term, Pattern, PatternBranch },
 };
-use crate::validation:: base::{Result, Error};
+use crate::validation:: base::{Result, Error, ErrorWithLocation};
 use std::collections::HashSet;
 
-pub fn check_type_formation(program: &Program) -> Result<()> {
+pub fn check_program(program: &Program) -> core::result::Result<(), ErrorWithLocation> {
     for decl in program.type_declarations.values() {
-        check_type_declaration(program, decl)?
+        match check_type_declaration(program, decl) {
+            Ok(_) => {},
+            Err(e) => return Err(ErrorWithLocation::TypeDeclaration(decl.name().clone(), e))
+        }
     }
 
     for decl in program.function_declarations.values() {
-        check_types_in_function_declaration(program, decl)?
+        match check_types_in_function_declaration(program, decl) {
+            Ok(_) => {},
+            Err(e) => return Err(ErrorWithLocation::TypeDeclaration(decl.name().clone(), e))
+        }
     }
 
     for decl in program.let_declarations.values() {
-        check_types_in_let_declaration(program, decl)?
+        match check_types_in_let_declaration(program, decl) {
+            Ok(_) => {},
+            Err(e) => return Err(ErrorWithLocation::TypeDeclaration(decl.name().clone(), e))
+        }
     }
 
     Ok(())
@@ -63,7 +72,7 @@ fn check_types_in_let_declaration(program: &Program, decl: &LetDeclaration) -> R
     check_type(program, &type_env, &decl.body.type_)
 }
 
-struct TypeScope {
+pub struct TypeScope {
     variables: HashSet<Variable>,
 }
 
@@ -85,7 +94,7 @@ impl TypeScope {
     }
 }
 
-fn check_type(program: &Program, type_env: &TypeScope, type_: &Type) -> Result<()> {
+pub fn check_type(program: &Program, type_env: &TypeScope, type_: &Type) -> Result<()> {
     use Type::*;
     match type_{
         VariableUse(type_var) => {
