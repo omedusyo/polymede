@@ -60,6 +60,11 @@ pub enum DeclarationKind {
     Function,
 }
 
+enum WhitespaceState {
+    ConsumeWhitespace,
+    ConsumeAllUntilNewline,
+}
+
 impl <'state> State<'state> {
     // 'a lives atleast as long as 'state ('a contains 'state)
     pub fn new<'a: 'state>(str: &'a str) -> Self {
@@ -100,28 +105,45 @@ impl <'state> State<'state> {
     }
 
     pub fn consume_whitespace(&mut self) {
-        for c in self.tokens.chars() {
-            if c == '\n' {
-                self.new_line();
-                self.consume_by(1);
-            } else if c == ' ' || c == '\t' {
-                self.move_column_by(1);
-                self.consume_by(1);
-            } else {
-                return
+        fn consume(state: &mut State, ws_state: &mut WhitespaceState) {
+            for c in state.tokens.chars() {
+                use WhitespaceState::*;
+                match ws_state {
+                    ConsumeWhitespace => match c {
+                        '\n' => {
+                            state.new_line();
+                            state.consume_by(1);
+                        },
+                        ' ' | '\t' => {
+                            state.move_column_by(1);
+                            state.consume_by(1);
+                        },
+                        '/' => {
+                            state.move_column_by(1);
+                            state.consume_by(1);
+                            *ws_state = ConsumeAllUntilNewline;
+                        },
+                        _ => {
+                            return
+                        }
+                    },
+                    ConsumeAllUntilNewline => match c {
+                        '\n' => {
+                            state.move_column_by(1);
+                            state.consume_by(1);
+                            *ws_state = ConsumeWhitespace;
+                        }
+                        _ => {
+                            state.move_column_by(1);
+                            state.consume_by(1);
+                        }
+                    },
+                }
             }
+            
         }
-    }
 
-    pub fn consume_non_newline_whitespace(&mut self) {
-        for c in self.tokens.chars() {
-            if c == ' ' || c == '\t' {
-                self.move_column_by(1);
-                self.consume_by(1);
-            } else {
-                return
-            }
-        }
+        consume(self, &mut WhitespaceState::ConsumeWhitespace)
     }
 
     // Note that this returns the position BEFORE the advancement.

@@ -1,9 +1,14 @@
 
+/ This is a comment
 type Bool = enum {
 | T
 | F
 }
 
+
+// this is also a comment.
+// think that `x := Nat`, so that
+// Nat = Z | S(Nat)
 type Nat = ind { x .
 | Z
 | S(x)
