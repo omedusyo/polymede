@@ -14,12 +14,12 @@ pub enum Error {
 
     VariableOutOfScope { variable: Variable },
     VariableDoesntHaveExpectedType { expected_type: Type, received_type: Type },
-
     TypeAnnotationDoesntMatchExpectedType { expected_type: Type, received: Type },
     TermIsConstructorButExpectedTypeIsNot { expected_type: Type },
     TermIsLambdaButExpectedTypeIsNotArrowType { expected_type: Type },
     ConstructorDoesntBelongToExpectedTypeDeclaration { constructor_name: ConstructorName, type_name: Variable },
-    ConstructorIsApplliedToWrongNumberOfArguments { expected: usize, received: usize },
+    ConstructorDoesntExist { constructor_name: ConstructorName },
+    ConstructorIsAppliedToWrongNumberOfArguments { expected: usize, received: usize },
     LambdaHasWrongNumberOfArguments { expected: usize, received: usize },
     AttemptToMatchNonEnumerableType { received: Type },
     PatternHasWrongNumberOfArguments { expected: usize, received: usize },
@@ -29,5 +29,11 @@ pub enum Error {
     FunctionDoesntExist { function_name: FunctionName },
     ApplyingWrongNumberOfArgumentsToFunction { expected: usize, received: usize },
     FunctionOutputTypeDoesntMatchExpectedType { expected_type: Type, received: Type },
+    TermDoesntHaveExpectedArrowType { received: Type },
+
+    UnableToInferTypeOfMatch,
+    UnableToInferTypeOfFold,
+    UnableToInferTypeOfLambda,
+    UnableToInferTypeOfConstructor,
 }
 

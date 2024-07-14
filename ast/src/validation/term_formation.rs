@@ -1,5 +1,5 @@
 use crate::parser::{
-    identifier::{Variable, FunctionName},
+    identifier::{Variable, FunctionName, ConstructorName},
     base::{Program, TypeDeclaration, Type, FunctionType, ConstructorDeclaration, FunctionDeclaration, LetDeclaration, Term, Pattern, PatternBranch },
 };
 use crate::validation:: base::{Result, Error};
@@ -28,6 +28,10 @@ impl <'env>Environment<'env> {
 
     pub fn get_type_declaration(&self, type_name: &Variable) -> Option<&TypeDeclaration> {
         self.program.get_type_declaration(type_name)
+    }
+
+    pub fn get_type_declaration_of_constructor(&self, constructor_name: &ConstructorName) -> Option<&TypeDeclaration> {
+        self.program.get_type_declaration_of_constructor(constructor_name)
     }
 
     pub fn is_ind_type_declaration(&self, type_name: &Variable) -> bool {
@@ -76,6 +80,16 @@ fn type_infer_arrow_inputs(env: &mut Environment, term: &Term, expected_out_type
     use Term::*;
     match term {
         TypedTerm(typed_term) => {
+            // TODO: You need to check that the type of the type annotation is well-formed.
+            //let type_ = &typed_term.type_;
+            //let term = &typed_term.term;
+            //
+            //let Type::Arrow(fn_type) = type_ else { return Err(Error::TermDoesntHaveExpectedArrowType { received: type_.clone() }) };
+            //type_check(env, term, type_)?;
+            //
+            //eq_type(fn_type.output_type)
+            //
+            //Ok(fn_type.input_types.clone())
             todo!()
         },
         VariableUse(var) => {
@@ -114,6 +128,7 @@ fn type_infer(env: &mut Environment, term: &Term) -> Result<Type> {
     use Term::*;
     match term {
         TypedTerm(typed_term) => {
+            // TODO: You need to check that the type of the type annotation is well-formed.
             let type_ = &typed_term.type_;
             let term = &typed_term.term;
             type_check(env, term, type_)?;
@@ -126,28 +141,57 @@ fn type_infer(env: &mut Environment, term: &Term) -> Result<Type> {
             }
         },
         ConstructorUse(constructor_name, args) => {
-            // TODO:
-            //   if the constructor has no type parameters, then we can infer the type.
-            todo!()
+            // If constructor has 0 type-parameters, then we can infer its type, otherwise ask for type-annotation.
+            let Some(type_decl) = env.get_type_declaration_of_constructor(constructor_name) else { return Err(Error::ConstructorDoesntExist { constructor_name: constructor_name.clone() })};
+            if type_decl.arity() > 0 { return Err(Error::UnableToInferTypeOfConstructor) }
+            let Some((constructor_decl, specialized_types)) = type_decl.type_apply_constructor(constructor_name, &vec![]) else { unreachable!() };
+            if constructor_decl.arity() != args.len() { return Err(Error::ConstructorIsAppliedToWrongNumberOfArguments { expected: constructor_decl.arity(), received: args.len() }) }
+
+            for (arg, type_) in args.iter().zip(&specialized_types) { 
+                type_check(env, arg, &type_)?
+            }
+
+            Ok(Type::TypeApplication(constructor_name.clone(), vec![]))
         },
-        Lambda(function) => {
-            todo!()
+        Lambda(_function) => {
+            Err(Error::UnableToInferTypeOfLambda)
         },
-        FunctionApplication(fn_name, type_args, args) => {
-            // type infer args, then feed them into fn_name
-            todo!()
+        FunctionApplication(function_name, type_args, args) => {
+            let Some(fn_decl) = env.get_function_declaration(function_name) else { return Err(Error::FunctionDoesntExist { function_name: function_name.clone() }) };
+            let fn_type = fn_decl.type_apply(type_args);
+            if fn_type.input_types.len() != args.len() { return Err(Error::ApplyingWrongNumberOfArgumentsToFunction { expected: fn_type.input_types.len(), received: args.len() }); }
+            for (arg, type_) in args.iter().zip(&fn_type.input_types) {
+                type_check(env, arg, type_)?
+            }
+            Ok(fn_type.output_type)
         },
-        Match(arg, branches) => {
-            todo!()
+        Match(_arg, _branches) => {
+            // TODO: We could infer arg, then infer branches and check that all of the branches
+            // match to the same type.
+            Err(Error::UnableToInferTypeOfMatch)
         },
-        Fold(arg, branches) => {
-            todo!()
+        Fold(_arg, _branches) => {
+            Err(Error::UnableToInferTypeOfFold)
         },
         LambdaApplication(fn_term, args) => {
-            todo!()
+            let fn_type = type_infer(env, fn_term)?;
+            let Type::Arrow(fn_type) = fn_type else { return Err(Error::TermDoesntHaveExpectedArrowType { received: fn_type }) };
+            if fn_type.input_types.len() != args.len() { return Err(Error::ApplyingWrongNumberOfArgumentsToLambda { expected: fn_type.input_types.len(), received: args.len() }); }
+
+            for (arg, type_) in args.iter().zip(&fn_type.input_types) {
+                type_check(env, arg, type_)?;
+            }
+            Ok(fn_type.output_type)
         },
         Let(bindings, body) => {
-            todo!()
+            env.open_env();
+            for (var, term) in bindings {
+                let type_ = type_infer(env, term)?;
+                env.extend(var, &type_);
+            }
+            let type_ = type_infer(env, body)?;
+            env.close_env();
+            Ok(type_)
         },
     }
 }
@@ -178,27 +222,17 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
             }
         },
         ConstructorUse(constructor_name, args) => {
-            match expected_type {
-                Type::TypeApplication(type_constructor_name, types) => {
-                    // SAFETY: We assume that `expected_type` is a valid type.
-                    let Some(type_decl) = env.get_type_declaration(type_constructor_name) else { unreachable!() };
-                    match type_decl.type_apply_constructor(constructor_name, types) {
-                        Some((constructor_decl, specialized_types)) => {
-                            if constructor_decl.arity() != args.len() {
-                                return Err(Error::ConstructorIsApplliedToWrongNumberOfArguments { expected: constructor_decl.arity(), received: args.len() })
-                            }
+            let Type::TypeApplication(type_constructor_name, types) = expected_type else { return Err(Error::TermIsConstructorButExpectedTypeIsNot { expected_type: expected_type.clone() }) };
+            // SAFETY: We assume that `expected_type` is a valid type.
+            let Some(type_decl) = env.get_type_declaration(type_constructor_name) else { unreachable!() };
+            let Some((constructor_decl, specialized_types)) = type_decl.type_apply_constructor(constructor_name, types) else { return Err(Error::ConstructorDoesntBelongToExpectedTypeDeclaration { constructor_name: constructor_name.clone(), type_name: type_decl.name().clone() }) };
+            if constructor_decl.arity() != args.len() { return Err(Error::ConstructorIsAppliedToWrongNumberOfArguments { expected: constructor_decl.arity(), received: args.len() }) }
 
-                            for (arg, type_) in args.iter().zip(&specialized_types) { 
-                                type_check(env, arg, &type_)?
-                            }
-
-                            Ok(())
-                        },
-                        None => Err(Error::ConstructorDoesntBelongToExpectedTypeDeclaration { constructor_name: constructor_name.clone(), type_name: type_decl.name().clone() })
-                    }
-                },
-                _ => Err(Error::TermIsConstructorButExpectedTypeIsNot { expected_type: expected_type.clone() })
+            for (arg, type_) in args.iter().zip(&specialized_types) { 
+                type_check(env, arg, &type_)?
             }
+
+            Ok(())
         },
         Lambda(function) => {
             match expected_type {
@@ -257,12 +291,16 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
             // 2. infer args then check fn_term
             // We take the 1. approach.
 
-            let input_types = type_infer_arrow_inputs(env, fn_term, expected_type)?;
-            if input_types.len() != args.len() {
-                return Err(Error::ApplyingWrongNumberOfArgumentsToLambda { expected: input_types.len(), received: args.len() });
+            // TODO: We could actually try to infer the type of `fn_term` with the expectation of
+            // it being an Arrow type whose otuput type is `expecated_type`.
+            // But this would require writing another specialized type inference function.
+            let fn_type = type_infer(env, fn_term)?;
+            let Type::Arrow(fn_type) = fn_type else { return Err(Error::TermDoesntHaveExpectedArrowType { received: fn_type.clone() }) };
+            if fn_type.input_types.len() != args.len() {
+                return Err(Error::ApplyingWrongNumberOfArgumentsToLambda { expected: fn_type.input_types.len(), received: args.len() });
             }
 
-            for (arg, type_) in args.iter().zip(&input_types) {
+            for (arg, type_) in args.iter().zip(&fn_type.input_types) {
                 type_check(env, arg, type_)?
             }
 

@@ -12,8 +12,6 @@ cargo run --bin ast -- -f examples/simple_bool.pmd
 
 cargo run --bin ast -- -f examples/simple_two.pmd
 
-cargo run --bin ast -- -f examples/test_angle.pmd
-
 cargo test -p ast
 
 
