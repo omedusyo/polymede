@@ -14,7 +14,6 @@ cargo run --bin ast -- -f examples/simple_two.pmd
 
 cargo test -p ast
 
-
 # ===Expressions===
 
 rm $TMP_WASM/$FILE.wasm

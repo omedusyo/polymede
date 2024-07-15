@@ -65,7 +65,7 @@ impl <'env>Environment<'env> {
     }
 
     pub fn get_type(&self, var: &Variable) -> Option<&Type> {
-        for bindings in &self.bindings_stack {
+        for bindings in self.bindings_stack.iter().rev() {
             match bindings.get(var) {
                 Some(type_) => return Some(type_),
                 None => {},

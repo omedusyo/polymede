@@ -6,7 +6,7 @@ use std::collections::HashMap;
 #[derive(Debug)]
 pub struct Program {
     interner: Interner,
-    pub type_declarations: HashMap<ConstructorName, TypeDeclaration>,
+    pub type_declarations: HashMap<Variable, TypeDeclaration>,
     pub function_declarations: HashMap<FunctionName, FunctionDeclaration>,
     pub let_declarations: HashMap<Variable, LetDeclaration>,
     pub constructor_to_type_mapping: HashMap<ConstructorName, Variable>,
@@ -209,6 +209,14 @@ impl TypeDeclaration {
         match self {
             Enum(decl) => decl.type_apply_constructor(constructor_name, type_args),
             Ind(decl) => decl.type_apply_constructor(constructor_name, type_args, &Type::TypeApplication(self.name().clone(), type_args.to_vec())),
+        }
+    }
+
+    pub fn constructors(&self) -> &HashMap<ConstructorName, ConstructorDeclaration> {
+        use TypeDeclaration::*;
+        match self {
+            Enum(decl) => &decl.constructors,
+            Ind(decl) => &decl.constructors,
         }
     }
 }

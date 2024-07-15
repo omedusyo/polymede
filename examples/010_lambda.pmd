@@ -27,6 +27,7 @@ fn showing_application = forall { a, b . # Fn(a -> b), a -> b { f, a .
   apply f to (a)
 }}
 
+// Consider instead of `apply f to (a1, a2)` to have atleast `[f (a1, a2)]`  or even... `$f(a1, a2)`
 
 // So basically `fn` is an operator, that takes in a judgment 
 //     # Int -> Int { x . x * x }

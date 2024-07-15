@@ -4,9 +4,9 @@ use std::fs;
 
 mod graph_memory_machine;
 mod interpreter;
+mod polymede_compiler;
 
 use wasm;
-
 
 type Result<A> = std::result::Result<A, io::Error>;
 
