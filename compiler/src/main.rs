@@ -53,7 +53,7 @@ fn main() -> Result<()> {
 
             match check_program(&program) {
                 Ok(()) => {
-                    let gmm_program = polymede_compiler::compile(0, &program);
+                    let gmm_program = polymede_compiler::compile(250, &program);
                     let s = show::show_program(&gmm_program).str();
                     println!("");
                     println!("");

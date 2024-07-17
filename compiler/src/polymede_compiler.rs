@@ -10,17 +10,62 @@ type ConstructorIndex = i32;
 
 struct State {
     number_of_primitive_functions: usize,
-
     function_count: FunctionIndex,
     function_mapping: HashMap<FunctionName, FunctionIndex>,
     functions: Vec<gmm::Function>,
     constructor_mapping: HashMap<ConstructorName, ConstructorIndex>,
-    env: Vec<Scope>,
+
+    env: Env,
 }
 
-struct Scope {
-    count: VariableIndex,
-    mapping: HashMap<Variable, VariableIndex>,
+struct Env {
+    next_var: VariableIndex,
+    scopes: Vec<HashMap<Variable, VariableIndex>>,
+}
+
+impl Env {
+    fn new() -> Self {
+        Self { next_var: 0, scopes: vec![] }
+    }
+
+    fn open_env(&mut self) { 
+        self.scopes.push(HashMap::new())
+    }
+
+    fn close_env(&mut self) {
+        match self.scopes.pop() {
+            Some(scope) => {
+                self.next_var -= scope.len();
+            },
+            None => {}
+        }
+    }
+
+    fn extend_var(&mut self, var: Variable) {
+        match self.scopes.last_mut() {
+            Some(scope) => {
+                scope.insert(var, self.next_var);
+                self.next_var += 1;
+            },
+            None => unreachable!(),
+        }
+    }
+
+    fn extend_vars(&mut self, vars: Vec<Variable>) {
+        for var in vars {
+            self.extend_var(var)
+        }
+    }
+
+    fn get(&self, var: &Variable) -> Option<VariableIndex> {
+        for scope in self.scopes.iter().rev() {
+            match scope.get(var) {
+                Some(var_index) => return Some(*var_index),
+                None => {},
+            }
+        }
+        None
+    }
 }
 
 impl State {
@@ -32,7 +77,7 @@ impl State {
             function_mapping: HashMap::new(),
             functions: vec![],
             constructor_mapping: HashMap::new(),
-            env: vec![Scope::new()],
+            env: Env::new(),
         }
     }
 
@@ -41,7 +86,10 @@ impl State {
     }
 
     fn get_function_index(&self, function_name: &FunctionName) -> Option<FunctionIndex> {
-        self.function_mapping.get(function_name).copied()
+        match self.function_mapping.get(function_name) {
+            Some(i) => Some(i + self.number_of_primitive_functions),
+            None => None
+        }
     }
 
     fn add_function_name(&mut self, function_name: FunctionName) {
@@ -50,60 +98,23 @@ impl State {
     }
 
     fn open_env(&mut self) {
-        self.env.push(Scope::new())
+        self.env.open_env()
     }
 
     fn close_env(&mut self) {
-        let _ = self.env.pop();
+        self.env.close_env()
     }
 
     fn extend_var(&mut self, var: Variable) {
-        match self.env.last_mut() {
-            Some(scope) => {
-                scope.extend_var(var)
-            },
-            None => unreachable!(),
-        }
+        self.env.extend_var(var)
     }
 
     fn extend_vars(&mut self, vars: Vec<Variable>) {
-        match self.env.last_mut() {
-            Some(scope) => {
-                scope.extend_vars(vars)
-            },
-            None => unreachable!(),
-        }
+        self.env.extend_vars(vars)
     }
     
     fn get_var(&self, var: &Variable) -> Option<VariableIndex> {
-        for scope in self.env.iter().rev() {
-            match scope.get(var) {
-                Some(var_index) => return Some(var_index),
-                None => {},
-            }
-        }
-        None
-    }
-}
-
-impl Scope {
-    fn new() -> Self {
-        Self { count: 0, mapping: HashMap::new() }
-    }
-
-    fn extend_var(&mut self, var: Variable) {
-        self.mapping.insert(var, self.count);
-        self.count += 1;
-    }
-
-    fn extend_vars(&mut self, vars: Vec<Variable>) {
-        for var in vars {
-            self.extend_var(var)
-        }
-    }
-
-    fn get(&self, var: &Variable) -> Option<VariableIndex> {
-        self.mapping.get(var).copied()
+        self.env.get(var)
     }
 }
 
@@ -144,11 +155,14 @@ pub fn compile(number_of_primitive_functions: usize, program: &polymede::Program
 }
 
 fn compile_function_declaration(state: &mut State, function: &polymede::Function) -> gmm::Function {
+    state.open_env();
     state.extend_vars(function.parameters.clone());
-    gmm::Function {
+    let gmm_function = gmm::Function {
         number_of_parameters: function.parameters.len(),
         body: compile_term(state, &function.body),
-    }
+    };
+    state.close_env();
+    gmm_function
 }
 
 fn compile_term(state: &mut State, term: &polymede::Term) -> gmm::Term {

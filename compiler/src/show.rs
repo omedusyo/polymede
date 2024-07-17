@@ -157,17 +157,18 @@ pub fn show_term(term: &Term, next_parameter: usize) -> PrettyString {
             string(format!("${}", var))
         },
         Let(args, body) => {
-            let mut strs = vec![];
+            let mut strs = vec![str("{")];
             let mut count = next_parameter;
             for arg in args {
                 strs.push(seq(vec![
                         string(format!("let {} = ", count)),
                         ignore_indentation(show_term(arg, count + 1)),
-                        str(";"),
+                        str("; "),
                 ]));
                 count += 1;
             }
             strs.push(show_term(body, count));
+            strs.push(str("}"));
             lines(strs)
         },
         Match(arg, branches) => {

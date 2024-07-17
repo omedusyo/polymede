@@ -1,0 +1,55 @@
+
+type Bool = enum {
+| T
+| F
+}
+
+type Pair(a, b) = enum {
+| Pair(a, b)
+}
+
+fn id_bool = # Bool -> Bool : { x . x }
+
+fn const_true = # -> Bool : { . T }
+fn const_false = # -> Bool : { . F }
+
+fn const_true_pair = # -> Pair(Bool, Bool) : { . Pair(T, T) }
+
+fn const_pair = # Bool -> Pair(Bool, Bool) : { x . Pair(x, x) }
+
+fn const_pair_polymorphic = forall { a . # a -> Pair(a, a) : { x . Pair(x, x) }}
+fn const_pair1 = # Bool -> Pair(Bool, Bool) : { x . Pair(x, x) }
+fn const_pair2 = # Bool -> Pair(Bool, Bool) : { x . Pair(x, x) }
+
+fn first = forall { a, b . # a, b -> a : { x, y . x } }
+fn second = forall { a, b . # a, b -> b : { x, y . y } }
+fn third = forall { a, b, c . # a, b, c -> c : { x, y, z . z } }
+
+fn call_fn_0 = # Bool -> Bool : { x . id_bool(const_false()) }
+
+fn call_fn_1 = # Bool -> Bool : { x . second<Bool, Bool>(x, id_bool(x)) }
+
+fn let_binding_0 = # Bool, Bool, Bool -> Pair(Bool, Bool) : { x, y, z .
+  let {
+  , y = # Pair(Bool, Bool) : Pair(T, F)
+  . y
+  }
+}
+
+fn let_binding_1 = # Bool, Bool, Bool -> Pair(Bool, Bool) : { x, y, z .
+  let {
+  , y0 = # Pair(Bool, Bool) : Pair(T, F)
+  , w = T
+  , z = let {
+    , u = T
+    . u
+    }
+  , u = F
+  , v = let {
+    , x = z
+    , t = x
+    . first<Bool, Bool>(x, y)
+    }
+  . y0
+  }
+}
