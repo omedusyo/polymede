@@ -107,7 +107,8 @@ impl Scope {
     }
 }
 
-fn compile(mut state: State, program: &polymede::Program) -> gmm::Program {
+pub fn compile(number_of_primitive_functions: usize, program: &polymede::Program) -> gmm::Program {
+    let mut state = State::new(number_of_primitive_functions);
     // ===constructors===
     for decl in program.type_declarations.values() {
         let mut count: ConstructorIndex = 0;
@@ -166,10 +167,10 @@ fn compile_term(state: &mut State, term: &polymede::Term) -> gmm::Term {
             let Some(constructor_index) = state.get_constructor_index(constructor_name) else { unreachable!() };
             gmm::Term::Tuple(constructor_index, args.iter().map(|arg| compile_term(state, arg)).collect())
         },
-        Match(term, pattern_branch) => {
+        Match(arg, pattern_branch) => {
             todo!()
         },
-        Fold(term, pattern_branch) => {
+        Fold(arg, pattern_branch) => {
             todo!()
         },
         Lambda(function) => {

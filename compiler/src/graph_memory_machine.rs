@@ -1,4 +1,3 @@
-
 pub type Variant = i32;
 
 pub type FunctionName = usize;
@@ -9,6 +8,7 @@ pub type ComponentIndex = u8; // max 256 components
 pub enum Term {
     Const(Variant),
     ByteArray(Vec<u8>),
+    // TODO: Rename to Cons (Constructor)
     Tuple(Variant, Vec<Term>),
     ProjectComponent(Box<Term>, ComponentIndex),
     Call(FunctionName, Vec<Term>),

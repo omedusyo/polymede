@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 wasm = { path = "../wasm" }
 ast = { path = "../ast" }
+clap = "4.5.9"
