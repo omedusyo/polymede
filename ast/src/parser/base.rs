@@ -46,9 +46,11 @@ pub fn parse_program(s: &str) -> Result<Program> {
 
     for pre_decl in pre_program.type_declarations {
         let decl = TypeDeclaration::new(pre_decl,  &mut program.constructor_to_type_mapping);
+        program.type_declarations_ordering.push(decl.name().clone());
         program.type_declarations.insert(decl.name().clone(), decl);
     }
     for decl in pre_program.function_declarations {
+        program.function_declarations_ordering.push(decl.name());
         program.function_declarations.insert(decl.name(), decl);
     }
     for decl in pre_program.let_declarations {

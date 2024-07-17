@@ -7,7 +7,9 @@ use std::collections::HashMap;
 pub struct Program {
     interner: Interner,
     pub type_declarations: HashMap<Variable, TypeDeclaration>,
+    pub type_declarations_ordering: Vec<Variable>,
     pub function_declarations: HashMap<FunctionName, FunctionDeclaration>,
+    pub function_declarations_ordering: Vec<FunctionName>,
     pub let_declarations: HashMap<Variable, LetDeclaration>,
     pub constructor_to_type_mapping: HashMap<ConstructorName, Variable>,
 }
@@ -17,7 +19,9 @@ impl Program {
         Self { 
             interner: interner(),
             type_declarations: HashMap::new(),
+            type_declarations_ordering: vec![],
             function_declarations: HashMap::new(),
+            function_declarations_ordering: vec![],
             let_declarations: HashMap::new(),
             constructor_to_type_mapping: HashMap::new(),
         }
@@ -43,6 +47,22 @@ impl Program {
         let type_name = self.constructor_to_type_mapping.get(constructor_name)?;
         self.get_type_declaration_of_constructor(type_name)
     }
+
+    pub fn type_declarations_in_source_ordering(&self) -> Vec<&TypeDeclaration> {
+        let mut result = vec![];
+        for type_name in &self.type_declarations_ordering {
+            result.push(self.get_type_declaration(type_name).unwrap())
+        }
+        result
+    }
+    
+    pub fn function_declarations_in_source_ordering(&self) -> Vec<&FunctionDeclaration> {
+        let mut result = vec![];
+        for function_name in &self.function_declarations_ordering {
+            result.push(self.get_function_declaration(function_name).unwrap())
+        }
+        result
+    }
 }
 
 
@@ -58,6 +78,7 @@ pub struct EnumDeclaration {
     pub name: ConstructorName,
     pub type_parameters: Vec<Variable>,
     pub constructors: HashMap<ConstructorName, ConstructorDeclaration>,
+    pub constructors_ordering: Vec<ConstructorName>,
 }
 
 #[derive(Debug)]
@@ -66,6 +87,7 @@ pub struct IndDeclaration {
     pub type_parameters: Vec<Variable>,
     pub recursive_type_var: Variable,
     pub constructors: HashMap<ConstructorName, ConstructorDeclaration>,
+    pub constructors_ordering: Vec<ConstructorName>,
 }
 
 #[derive(Debug)]
@@ -154,20 +176,25 @@ impl TypeDeclaration {
         match pre_decl {
             PreTypeDeclaration::Enum(pre_decl) => {
                 let mut constructors = HashMap::new();
+                let mut constructors_ordering = vec![];
                 for constructor_decl in pre_decl.constructors {
                     constructor_to_type_mapping.insert(constructor_decl.name.clone(), pre_decl.name.clone());
+                    constructors_ordering.push(constructor_decl.name.clone()); 
                     constructors.insert(constructor_decl.name.clone(), constructor_decl);
                 }
                 Self::Enum(EnumDeclaration {
                     name: pre_decl.name,
                     type_parameters: pre_decl.type_parameters,
                     constructors,
+                    constructors_ordering,
                 })
             },
             PreTypeDeclaration::Ind(pre_decl) => {
                 let mut constructors = HashMap::new();
+                let mut constructors_ordering = vec![];
                 for constructor_decl in pre_decl.constructors {
                     constructor_to_type_mapping.insert(constructor_decl.name.clone(), pre_decl.name.clone());
+                    constructors_ordering.push(constructor_decl.name.clone()); 
                     constructors.insert(constructor_decl.name.clone(), constructor_decl);
                 }
                 Self::Ind(IndDeclaration {
@@ -175,6 +202,7 @@ impl TypeDeclaration {
                     recursive_type_var: pre_decl.recursive_type_var,
                     type_parameters: pre_decl.type_parameters,
                     constructors,
+                    constructors_ordering,
                 })
             }
         }
@@ -219,6 +247,14 @@ impl TypeDeclaration {
             Ind(decl) => &decl.constructors,
         }
     }
+
+    pub fn constructors_in_source_ordering(&self) -> Vec<&ConstructorDeclaration> {
+        use TypeDeclaration::*;
+        match self {
+            Enum(decl) => decl.constructors_in_source_ordering(),
+            Ind(decl) => decl.constructors_in_source_ordering(),
+        }
+    }
 }
 
 impl EnumDeclaration {
@@ -229,6 +265,19 @@ impl EnumDeclaration {
             .map(|type_body| type_apply(&self.type_parameters, type_body, type_args))
             .collect();
         Some((constructor_decl, specialized_constructor_type_arguments))
+    }
+
+    pub fn get_constructor(&self, constructor_name: &ConstructorName) -> Option<&ConstructorDeclaration> {
+        self.constructors.get(constructor_name)
+    }
+
+    pub fn constructors_in_source_ordering(&self) -> Vec<&ConstructorDeclaration> {
+        let mut result = vec![];
+        for constructor_name in &self.constructors_ordering {
+            let cons = self.get_constructor(constructor_name).unwrap();
+            result.push(cons);
+        }
+        result
     }
 }
 
@@ -249,6 +298,19 @@ impl IndDeclaration {
             .map(|type_body| type_apply(&type_parameters, type_body, &type_args))
             .collect();
         Some((constructor_decl, specialized_constructor_type_arguments))
+    }
+
+    pub fn get_constructor(&self, constructor_name: &ConstructorName) -> Option<&ConstructorDeclaration> {
+        self.constructors.get(constructor_name)
+    }
+
+    pub fn constructors_in_source_ordering(&self) -> Vec<&ConstructorDeclaration> {
+        let mut result = vec![];
+        for constructor_name in &self.constructors_ordering {
+            let cons = self.get_constructor(constructor_name).unwrap();
+            result.push(cons);
+        }
+        result
     }
 }
 

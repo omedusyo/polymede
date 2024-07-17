@@ -110,23 +110,23 @@ impl Scope {
 pub fn compile(number_of_primitive_functions: usize, program: &polymede::Program) -> gmm::Program {
     let mut state = State::new(number_of_primitive_functions);
     // ===constructors===
-    for decl in program.type_declarations.values() {
+    for decl in program.type_declarations_in_source_ordering() {
         let mut count: ConstructorIndex = 0;
 
-        for constructor in decl.constructors().values() {
+        for constructor in decl.constructors_in_source_ordering() {
             state.constructor_mapping.insert(constructor.name.clone(), count);
             count += 1;
         }
     }
 
     // ===functions===
-    for decl in program.function_declarations.values() { 
+    for decl in program.function_declarations_in_source_ordering() { 
         state.add_function_name(decl.name())
     }
 
     // TODO: This vector shuffling is way too complicated.
     let mut functions: Vec<(FunctionIndex, gmm::Function)> = vec![];
-    for decl in program.function_declarations.values() { 
+    for decl in program.function_declarations_in_source_ordering() { 
         let Some(fn_index) = state.get_function_index(&decl.name()) else { unreachable!() };
         functions.push((fn_index, compile_function_declaration(&mut state, &decl.function.function)));
     }
