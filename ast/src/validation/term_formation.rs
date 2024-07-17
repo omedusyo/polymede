@@ -150,11 +150,12 @@ fn type_infer(env: &mut Environment, term: &Term) -> Result<Type> {
             let Some((constructor_decl, specialized_types)) = type_decl.type_apply_constructor(constructor_name, &vec![]) else { unreachable!() };
             if constructor_decl.arity() != args.len() { return Err(Error::ConstructorIsAppliedToWrongNumberOfArguments { constructor_name: constructor_name.clone(), expected: constructor_decl.arity(), received: args.len() }) }
 
+            let type_name = type_decl.name().clone();
             for (arg, type_) in args.iter().zip(&specialized_types) { 
                 type_check(env, arg, &type_)?
             }
 
-            Ok(Type::TypeApplication(constructor_name.clone(), vec![]))
+            Ok(Type::TypeApplication(type_name, vec![]))
         },
         Lambda(_function) => {
             Err(Error::UnableToInferTypeOfLambda)

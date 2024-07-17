@@ -45,7 +45,7 @@ impl Program {
 
     pub fn get_type_declaration_of_constructor(&self, constructor_name: &ConstructorName) -> Option<&TypeDeclaration> {
         let type_name = self.constructor_to_type_mapping.get(constructor_name)?;
-        self.get_type_declaration_of_constructor(type_name)
+        self.get_type_declaration(type_name)
     }
 
     pub fn type_declarations_in_source_ordering(&self) -> Vec<&TypeDeclaration> {
