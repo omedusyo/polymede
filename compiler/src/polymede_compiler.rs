@@ -5,8 +5,12 @@ use crate::graph_memory_machine as gmm;
 use std::collections::HashMap;
 
 type FunctionIndex = usize;
-type VariableIndex = usize;
 type ConstructorIndex = i32;
+
+struct VariableIndex {
+    index: usize,
+    projections: Vec<u8>,
+}
 
 struct State {
     number_of_primitive_functions: usize,
@@ -19,33 +23,65 @@ struct State {
 }
 
 struct Env {
-    next_var: VariableIndex,
-    scopes: Vec<HashMap<Variable, VariableIndex>>,
+    scopes: Vec<Scope>,
 }
+
+struct Scope {
+    next_var: usize,
+    map: HashMap<Variable, VariableIndex>,
+}
+
+impl VariableIndex {
+    fn compile(&self) -> gmm::Term {
+        // [i0, i1, i2] ~> ProjectComponent(ProjectComponent(ProjectComponent(VarUse(index), i2), i1), i0)
+        let mut term = gmm::Term::VarUse(self.index);
+        for i in self.projections.iter().rev() {
+            term = gmm::Term::ProjectComponent(Box::new(term), *i)
+        }
+        term
+    }
+}
+
 
 impl Env {
     fn new() -> Self {
-        Self { next_var: 0, scopes: vec![] }
+        Self { scopes: vec![] }
     }
 
     fn open_env(&mut self) { 
-        self.scopes.push(HashMap::new())
+        match self.scopes.last() {
+            Some(top_scope) => {
+                self.scopes.push(Scope { next_var: top_scope.next_var, map: HashMap::new() })
+            },
+            None => {
+                self.scopes.push(Scope { next_var: 0, map: HashMap::new() })
+            }
+        }
     }
 
     fn close_env(&mut self) {
-        match self.scopes.pop() {
-            Some(scope) => {
-                self.next_var -= scope.len();
-            },
-            None => {}
-        }
+        let _ = self.scopes.pop();
     }
 
     fn extend_var(&mut self, var: Variable) {
         match self.scopes.last_mut() {
             Some(scope) => {
-                scope.insert(var, self.next_var);
-                self.next_var += 1;
+                scope.map.insert(var, VariableIndex { index: scope.next_var, projections: vec![] });
+                scope.next_var += 1;
+            },
+            None => unreachable!(),
+        }
+    }
+
+    fn extend_pattern(&mut self, pattern: &polymede::Pattern) {
+        match self.scopes.last_mut() {
+            Some(scope) => {
+                let mut indices = vec![];
+                pattern_to_indices_simple(pattern, &mut indices, scope.next_var);
+                for (var, index) in indices {
+                    scope.map.insert(var, index);
+                }
+                scope.next_var += 1;
             },
             None => unreachable!(),
         }
@@ -57,10 +93,10 @@ impl Env {
         }
     }
 
-    fn get(&self, var: &Variable) -> Option<VariableIndex> {
+    fn get(&self, var: &Variable) -> Option<&VariableIndex> {
         for scope in self.scopes.iter().rev() {
-            match scope.get(var) {
-                Some(var_index) => return Some(*var_index),
+            match scope.map.get(var) {
+                Some(var_index) => return Some(var_index),
                 None => {},
             }
         }
@@ -109,11 +145,15 @@ impl State {
         self.env.extend_var(var)
     }
 
+    fn extend_pattern(&mut self, pattern: &polymede::Pattern) {
+        self.env.extend_pattern(pattern)
+    }
+
     fn extend_vars(&mut self, vars: Vec<Variable>) {
         self.env.extend_vars(vars)
     }
     
-    fn get_var(&self, var: &Variable) -> Option<VariableIndex> {
+    fn get_var(&self, var: &Variable) -> Option<&VariableIndex> {
         self.env.get(var)
     }
 }
@@ -171,7 +211,7 @@ fn compile_term(state: &mut State, term: &polymede::Term) -> gmm::Term {
         TypedTerm(typed_term) => compile_term(state, &typed_term.term),
         VariableUse(var) => {
             let Some(var_index) = state.get_var(var) else { unreachable!() };
-            gmm::Term::VarUse(var_index)
+            var_index.compile()
         },
         FunctionApplication(function_name, _, args) => {
             let Some(fn_index) = state.get_function_index(function_name) else { unreachable!() };
@@ -181,8 +221,27 @@ fn compile_term(state: &mut State, term: &polymede::Term) -> gmm::Term {
             let Some(constructor_index) = state.get_constructor_index(constructor_name) else { unreachable!() };
             gmm::Term::Tuple(constructor_index, args.iter().map(|arg| compile_term(state, arg)).collect())
         },
-        Match(arg, pattern_branch) => {
-            todo!()
+        Match(arg, branches) => {
+            // TODO: This will have to be replaced by proper
+            //       compilation of nested patterns.
+            let gmm_arg = compile_term(state, arg);
+            let mut gmm_branches = vec![];
+            for branch in branches {
+                state.open_env();
+                state.extend_pattern(&branch.pattern);
+                use polymede::Pattern::*;
+                let gmm_pattern = match &branch.pattern {
+                    Constructor(constructor_name, _) => {
+                        let Some(constructor_index) = state.get_constructor_index(constructor_name) else { unreachable!() };
+                        gmm::Pattern::Variant(constructor_index)
+                    },
+                    Variable(_) => gmm::Pattern::Always,
+                    Anything(_) => gmm::Pattern::Always,
+                };
+                gmm_branches.push((gmm_pattern, compile_term(state, &branch.body)));
+                state.close_env();
+            }
+            gmm::Term::Match(Box::new(gmm_arg), gmm_branches)
         },
         Fold(arg, pattern_branch) => {
             todo!()
@@ -206,5 +265,45 @@ fn compile_term(state: &mut State, term: &polymede::Term) -> gmm::Term {
             state.close_env();
             gmm::Term::Let(gmm_args, Box::new(gmm_body))
         },
+    }
+}
+
+fn pattern_to_indices(pattern: &polymede::Pattern, indices: &mut Vec<(Variable, VariableIndex)>, depth: Vec<u8>, var_index: usize) {
+    use polymede::Pattern::*;
+    match pattern {
+        Constructor(_, patterns) => {
+            for (i, pattern) in patterns.iter().enumerate() {
+                let mut depth = depth.clone();
+                depth.push(i as u8);
+                pattern_to_indices(pattern, indices, depth, var_index)
+            }
+        },
+        Variable(var) => {
+            indices.push((var.clone(), VariableIndex { index: var_index, projections: depth }))
+        },
+        Anything(_) => {}
+    }
+}
+
+// TODO: This function is used instead of `pattern_to_indices` so that we crash on nested patterns.
+//       Nested patterns are not yet supported.
+fn pattern_to_indices_simple(pattern: &polymede::Pattern, indices: &mut Vec<(Variable, VariableIndex)>, var_index: usize) {
+    use polymede::Pattern::*;
+    match pattern {
+        Constructor(_, patterns) => {
+            for (i, pattern) in patterns.iter().enumerate() {
+                match pattern {
+                    Constructor(_, _) => todo!("We don't yet support nested patterns during compilation."),
+                    Variable(var) => {
+                        indices.push((var.clone(), VariableIndex { index: var_index, projections: vec![i as u8] }))
+                    }
+                    Anything(_) => {}
+                }
+            }
+        },
+        Variable(var) => {
+            indices.push((var.clone(), VariableIndex { index: var_index, projections: vec![] }))
+        },
+        Anything(_) => {}
     }
 }

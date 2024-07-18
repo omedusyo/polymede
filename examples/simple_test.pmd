@@ -53,3 +53,29 @@ fn let_binding_1 = # Bool, Bool, Bool -> Pair(Bool, Bool) : { x, y, z .
   . y0
   }
 }
+
+fn not = # Bool -> Bool : { x .
+  match x {
+  | T . F
+  | F . T
+  }
+}
+
+fn id_bool_another = # Bool -> Bool : { x .
+  match x {
+  | T . x
+  | y . y
+  }
+}
+
+fn p_first = # Pair(Bool, Bool) -> Bool : { p .
+  match p {
+  | Pair(x, y) . x
+  }
+}
+
+fn p_second = # Pair(Bool, Bool) -> Bool : { p .
+  match p {
+  | Pair(x, y) . y
+  }
+}

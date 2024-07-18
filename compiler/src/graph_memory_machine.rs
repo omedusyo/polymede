@@ -16,6 +16,8 @@ pub enum Term {
     CallClosure(Box<Term>, Vec<Term>),
     VarUse(VarName),
     Let(Vec<Term>, Box<Term>), // let x0 = e0, x1 = e1, ... in body
+    // Intention behind match is that the argument will be bound to a new variable
+    // that will be accessible in the bodies.
     Match(Box<Term>, Vec<(Pattern, Term)>),
     Seq(Vec<Term>),
 }
