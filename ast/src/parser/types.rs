@@ -1,9 +1,10 @@
+use crate::base::{FunctionType, Type};
 use crate::parser::lex::{
     token::Keyword,
     lexer::Request,
 };
 use crate::parser::{
-    base::{State, Result, FunctionType, Type},
+    base::{State, Result},
     special::{VariableOrConstructorName, comma, constructor_name_or_variable},
     combinator::{delimited_nonempty_sequence_to_vector, delimited_possibly_empty_sequence_to_vector},
 };

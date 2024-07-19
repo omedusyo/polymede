@@ -42,7 +42,21 @@ fn test_let = # Nat -> Nat : { x .
   let {
   , y = mul(x, x)
   , z = # Fn(Nat -> Nat) : fn { x . x }
+  , w = mul(y, x) // note that here we refer to `y` which was defined previously
   . y
+  }
+}
+
+fn test_let1 = # Nat -> Nat : { x .
+  let {
+  , y = mul(x, x)
+  . let {
+    , z = # Fn(Nat -> Nat) : fn { x . x }
+    . let {
+      , w = mul(y, x)
+      . y
+      }
+    }
   }
 }
 

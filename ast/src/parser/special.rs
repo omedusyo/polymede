@@ -1,10 +1,11 @@
+use crate::identifier::{Variable, ConstructorName};
 use crate::parser::lex::{
     token::SeparatorSymbol,
     lexer::{Position, Request, LocatedToken},
 };
 use crate::parser::{
     base::{State, Result, Error},
-    identifier::{Variable, ConstructorName, identifier},
+    identifier::identifier,
 };
 
 pub fn comma(state: &mut State) -> Result<Position> {
@@ -14,11 +15,6 @@ pub fn comma(state: &mut State) -> Result<Position> {
 
 pub fn or_separator(state: &mut State) -> Result<Position> {
     let LocatedToken { position, .. } = state.request_token(Request::Separator(SeparatorSymbol::Or))?;
-    Ok(position)
-}
-
-pub fn and_separator(state: &mut State) -> Result<Position> {
-    let LocatedToken { position, .. } = state.request_token(Request::Separator(SeparatorSymbol::And))?;
     Ok(position)
 }
 

@@ -1,0 +1,33 @@
+
+type Bool = enum {
+| T
+| F
+}
+
+type Pair(a, b) = enum {
+| Pair(a, b)
+}
+
+fn f = # Bool, Bool -> Fn(Bool, Bool -> Pair(Bool, Pair(Bool, Fn(Bool -> Bool)))) : { x, y . 
+  let {
+  , free = T
+  . fn { z, w .
+      let {
+      , g = # Fn(Bool -> Bool) : fn { u . free }
+      , h = # Fn(Bool -> Bool) : fn { u .
+          match u {
+          | T . apply g to (F)
+          | F . T
+          }
+        }
+      , first = # Fn(Pair(Bool, Bool) -> Bool) : fn { pair .
+          match pair {
+          | Pair(a, b) . a
+          }
+        }
+      . Pair(apply first to(Pair(x, x)), Pair(y, g))
+      }
+    } 
+  }
+}
+

@@ -1,7 +1,5 @@
-use crate::parser::{
-    base::{Program, Type, FunctionType, TypeDeclaration, FunctionDeclaration, LetDeclaration, EnumDeclaration, IndDeclaration, ConstructorDeclaration},
-    identifier::{Identifier, Interner},
-};
+use crate::base::{Program, Type, FunctionType, TypeDeclaration, FunctionDeclaration, LetDeclaration, EnumDeclaration, IndDeclaration, ConstructorDeclaration};
+use crate::identifier::{Identifier, Interner};
 
 pub struct Show<'a> {
     interner: &'a Interner,
@@ -17,8 +15,8 @@ impl <'show>Show<'show> {
     }
 
     pub fn show_program_declarations(&self, program: &Program) -> String {
-        let type_declarations = program.type_declarations.values().map(|decl| self.show_type_declaration(decl)).collect::<Vec<_>>().join("\n\n");
-        let function_declarations = program.function_declarations.values().map(|decl| self.show_function_declaration(decl)).collect::<Vec<_>>().join("\n");
+        let type_declarations =  program.type_declarations_in_source_ordering().iter().map(|decl| self.show_type_declaration(decl)).collect::<Vec<_>>().join("\n\n");
+        let function_declarations = program.function_declarations_in_source_ordering().iter().map(|decl| self.show_function_declaration(decl)).collect::<Vec<_>>().join("\n");
         let let_declarations = program.let_declarations.values().map(|decl| self.show_let_declaration(decl)).collect::<Vec<_>>().join("\n");
         format!("{type_declarations}\n\n{function_declarations}\n{let_declarations}")
     }
@@ -33,7 +31,7 @@ impl <'show>Show<'show> {
 
     fn show_enum_declaration(&self, declaration: &EnumDeclaration) -> String {
         let name_str = declaration.name.str(self.interner());
-        let constructor_strs = declaration.constructors.values().map(|cons| self.show_constructor_declaration(cons)).collect::<Vec<_>>().join("\n");
+        let constructor_strs = declaration.constructors_in_source_ordering().iter().map(|decl| self.show_constructor_declaration(decl)).collect::<Vec<_>>().join("\n");
         let after_equals_str = format!("enum {{\n{constructor_strs}\n}}");
         if declaration.type_parameters.is_empty() {
             format!("type {name_str} = {after_equals_str}")
@@ -46,7 +44,7 @@ impl <'show>Show<'show> {
     fn show_ind_declaration(&self, declaration: &IndDeclaration) -> String {
         let name_str = declaration.name.str(self.interner());
         let rec_var_str = declaration.recursive_type_var.str(self.interner());
-        let constructor_strs = declaration.constructors.values().map(|cons| self.show_constructor_declaration(cons)).collect::<Vec<_>>().join("\n");
+        let constructor_strs = declaration.constructors_in_source_ordering().iter().map(|decl| self.show_constructor_declaration(decl)).collect::<Vec<_>>().join("\n");
         let after_equals_str = format!("ind {{ {rec_var_str} .\n{constructor_strs}\n}}");
         if declaration.type_parameters.is_empty() {
             format!("type {name_str} = {after_equals_str}")

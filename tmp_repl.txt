@@ -14,7 +14,6 @@ cargo run --bin ast -- -f examples/simple_two.pmd
 
 cargo test -p ast
 
-
 # ===Expressions===
 
 rm $TMP_WASM/$FILE.wasm
@@ -76,6 +75,11 @@ cat $TMP_WAT/another_test_decompile.wat
 
 cargo test -p compiler
 
+cargo run --bin compiler
+
+cargo run --bin compiler -- -f examples/simple_test.pmd
+
+cargo run --bin compiler -- -f examples/closure_test.pmd
 
 TMP_WASM=tmp_wasm
 MODULE=out00

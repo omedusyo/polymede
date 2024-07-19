@@ -1,4 +1,3 @@
-
 pub type Variant = i32;
 
 pub type FunctionName = usize;
@@ -9,13 +8,19 @@ pub type ComponentIndex = u8; // max 256 components
 pub enum Term {
     Const(Variant),
     ByteArray(Vec<u8>),
+    // TODO: Rename to Cons (Constructor)
     Tuple(Variant, Vec<Term>),
     ProjectComponent(Box<Term>, ComponentIndex),
     Call(FunctionName, Vec<Term>),
+    // This is used to created closures.
+    // Note that even though the arguments are in general variables, some of these arguments
+    // can be projections of variables.
     PartialApply(FunctionName, Vec<Term>),
     CallClosure(Box<Term>, Vec<Term>),
     VarUse(VarName),
     Let(Vec<Term>, Box<Term>), // let x0 = e0, x1 = e1, ... in body
+    // Intention behind match is that the argument will be bound to a new variable
+    // that will be accessible in the bodies.
     Match(Box<Term>, Vec<(Pattern, Term)>),
     Seq(Vec<Term>),
 }
