@@ -12,6 +12,9 @@ pub enum Term {
     Tuple(Variant, Vec<Term>),
     ProjectComponent(Box<Term>, ComponentIndex),
     Call(FunctionName, Vec<Term>),
+    // This is used to created closures.
+    // Note that even though the arguments are in general variables, some of these arguments
+    // can be projections of variables.
     PartialApply(FunctionName, Vec<Term>),
     CallClosure(Box<Term>, Vec<Term>),
     VarUse(VarName),

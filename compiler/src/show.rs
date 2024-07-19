@@ -147,8 +147,9 @@ pub fn show_term(term: &Term, next_parameter: usize) -> PrettyString {
         },
         CallClosure(term, args) => {
             seq(vec![
-                str("call-closure {}("),
+                str("call-closure "),
                 ignore_indentation(show_term(term, next_parameter)),
+                str("("),
                 ignore_indentation(comma_seq(args.iter().map(|arg| show_term(arg, next_parameter)).collect())),
                 str(")"),
             ])

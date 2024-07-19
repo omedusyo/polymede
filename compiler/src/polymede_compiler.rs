@@ -17,6 +17,7 @@ struct State {
     function_count: FunctionIndex,
     function_mapping: HashMap<FunctionName, FunctionIndex>,
     functions: Vec<gmm::Function>,
+    anonymous_functions: Vec<gmm::Function>,
     constructor_mapping: HashMap<ConstructorName, ConstructorIndex>,
 
     env: Env,
@@ -112,9 +113,20 @@ impl State {
             function_count: 0,
             function_mapping: HashMap::new(),
             functions: vec![],
+            anonymous_functions: vec![],
             constructor_mapping: HashMap::new(),
             env: Env::new(),
         }
+    }
+
+    fn reset_env(&mut self) -> Env {
+        use std::mem;
+        let old_env = mem::replace(&mut self.env, Env::new());
+        old_env
+    }
+
+    fn restore_env(&mut self, env: Env) {
+        self.env = env;
     }
 
     fn get_constructor_index(&self, constructor_name: &ConstructorName) -> Option<ConstructorIndex> {
@@ -131,6 +143,13 @@ impl State {
     fn add_function_name(&mut self, function_name: FunctionName) {
         self.function_mapping.insert(function_name, self.function_count);
         self.function_count += 1;
+    }
+
+    fn add_anonymous_function(&mut self, gmm_function: gmm::Function) -> usize {
+        let anonymous_fn_index = self.anonymous_functions.len();
+        self.anonymous_functions.push(gmm_function);
+
+        self.number_of_primitive_functions + self.function_count + anonymous_fn_index
     }
 
     fn open_env(&mut self) {
@@ -187,9 +206,11 @@ pub fn compile(number_of_primitive_functions: usize, program: &polymede::Program
         state.functions.push(function)
     }
 
+    let mut final_functions = state.functions;
+    final_functions.append(&mut state.anonymous_functions);
     gmm::Program {
         number_of_primitive_functions: state.number_of_primitive_functions,
-        functions: state.functions,
+        functions: final_functions,
         main: gmm::constant(0), // TODO
     }
 }
@@ -205,14 +226,16 @@ fn compile_function_declaration(state: &mut State, function: &polymede::Function
     gmm_function
 }
 
+fn compile_var(state: &State, var: &Variable) -> gmm::Term {
+    let Some(var_index) = state.get_var(var) else { unreachable!() };
+    var_index.compile()
+}
+
 fn compile_term(state: &mut State, term: &polymede::Term) -> gmm::Term {
     use polymede::Term::*;
     match term {
         TypedTerm(typed_term) => compile_term(state, &typed_term.term),
-        VariableUse(var) => {
-            let Some(var_index) = state.get_var(var) else { unreachable!() };
-            var_index.compile()
-        },
+        VariableUse(var) => compile_var(state, var),
         FunctionApplication(function_name, _, args) => {
             let Some(fn_index) = state.get_function_index(function_name) else { unreachable!() };
             gmm::Term::Call(fn_index, args.iter().map(|arg| compile_term(state, arg)).collect())
@@ -244,13 +267,34 @@ fn compile_term(state: &mut State, term: &polymede::Term) -> gmm::Term {
             gmm::Term::Match(Box::new(gmm_arg), gmm_branches)
         },
         Fold(arg, pattern_branch) => {
+            // TODO: Replace fold with a call to anonymous function whose body is match that uses
+            // recursion. 
             todo!()
         },
         Lambda(function) => {
-            todo!()
+            // 1. Compile anonymous lambda into a new global function with extended parameters.
+            // 2. Afterwards partially apply said global function with values of free variables.
+            let free_vars: Vec<Variable> = function.free_variables();
+            let gmm_function = {
+                let mut function_with_extended_parameters = *function.clone();
+                let mut new_parameters = free_vars.clone();
+                new_parameters.append(&mut function_with_extended_parameters.parameters);
+                function_with_extended_parameters.parameters = new_parameters;
+
+                let old_env = state.reset_env();
+                let gmm_function = compile_function_declaration(state, &function_with_extended_parameters);
+                state.restore_env(old_env);
+                gmm_function
+            };
+            let function_index = state.add_anonymous_function(gmm_function);
+
+            let free_args = free_vars.iter().map(|var| compile_var(state, var)).collect();
+            gmm::Term::PartialApply(function_index, free_args)
         },
         LambdaApplication(fn_term, args) => {
-            todo!()
+            let gmm_fn_term = compile_term(state, fn_term);
+            let gmm_args = args.iter().map(|arg| compile_term(state, arg)).collect();
+            gmm::Term::CallClosure(Box::new(gmm_fn_term), gmm_args)
         },
         Let(bindings, body) => {
             state.open_env();

@@ -79,6 +79,8 @@ cargo run --bin compiler
 
 cargo run --bin compiler -- -f examples/simple_test.pmd
 
+cargo run --bin compiler -- -f examples/closure_test.pmd
+
 # ===WASM Runtime Support===
 
 cargo build

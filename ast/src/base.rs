@@ -1,6 +1,7 @@
 use crate::identifier::{Interner, interner, Variable, ConstructorName, FunctionName, Identifier};
 use crate::parser::base::PreTypeDeclaration;
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 // ===Program===
 #[derive(Debug)]
@@ -109,7 +110,7 @@ pub struct TypedFunction {
     pub function: Function,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Function {
     pub parameters: Vec<Variable>,
     pub body: Term,
@@ -139,13 +140,13 @@ pub struct FunctionType {
 
 
 // ===Terms===
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TypedTerm {
     pub type_: Type,
     pub term: Term
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Term {
     TypedTerm(Box<TypedTerm>),
     VariableUse(Variable),
@@ -158,13 +159,13 @@ pub enum Term {
     Let(Vec<(Variable, Term)>, Box<Term>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PatternBranch {
     pub pattern: Pattern,
     pub body: Term,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Pattern {
     Constructor(ConstructorName, Vec<Pattern>),
     Variable(Variable),
@@ -346,6 +347,146 @@ impl ConstructorDeclaration {
     }
 }
 
+impl Function {
+    pub fn free_variables(&self) -> Vec<Variable> {
+        let mut env: Env = Env::new();
+        free_variables_in_function(&mut env, self);
+        env.free_vars
+    }
+}
+
+// ===Free Variables===
+struct Env {
+    scope_stack: Vec<HashSet<Variable>>,
+    free_vars: Vec<Variable>,
+    free_vars_set: HashSet<Variable>,
+}
+
+impl Env {
+    fn new() -> Self {
+        Self { scope_stack: vec![], free_vars: vec![], free_vars_set: HashSet::new() }
+    }
+
+    fn open(&mut self) {
+        self.scope_stack.push(HashSet::new())
+    }
+
+    fn close(&mut self) {
+        let _ = self.scope_stack.pop();
+    }
+
+    fn extend_var(&mut self, var: &Variable) {
+        match self.scope_stack.last_mut() {
+            Some(scope) => {
+                let _ = scope.insert(var.clone());
+            },
+            None => unreachable!(),
+        }
+    }
+
+    fn extend_vars(&mut self, vars: &[Variable]) {
+        for var in vars {
+            self.extend_var(var)
+        }
+    }
+
+    fn extend_pattern(&mut self, pattern: &Pattern) { 
+        use Pattern::*;
+        match pattern {
+            Constructor(_, patterns) => {
+                for pattern in patterns {
+                    self.extend_pattern(pattern)
+                }
+            },
+            Variable(var) => {
+                self.extend_var(var)
+            },
+            Anything(_) => {},
+        }
+    }
+
+    fn is_bound(&self, var: &Variable) -> bool {
+        for scope in self.scope_stack.iter().rev() {
+            if scope.contains(var) {
+                return true
+            }
+        }
+        false
+    }
+
+    fn attempt_to_register_free(&mut self, var: &Variable) {
+        if !(self.free_vars_set.contains(var) || self.is_bound(var)) {
+            self.free_vars.push(var.clone());
+            self.free_vars_set.insert(var.clone());
+        } 
+    }
+}
+
+fn free_variables_in_function(env: &mut Env, function: &Function) {
+    env.open();
+    env.extend_vars(&function.parameters);
+    free_variables(env, &function.body);
+    env.close();
+}
+
+fn free_variables(env: &mut Env, term: &Term) {
+    use Term::*;
+
+    match term {
+        TypedTerm(typed_term) => free_variables(env, &typed_term.term),
+        VariableUse(var) => {
+            env.attempt_to_register_free(var)
+        },
+        FunctionApplication(_, _, args) => {
+            for arg in args {
+                free_variables(env, arg)
+            }
+        },
+        ConstructorUse(_, args) => {
+            for arg in args {
+                free_variables(env, arg)
+            }
+        },
+        Match(arg, branches) => {
+            free_variables(env, arg);
+            for branch in branches {
+                env.open();
+                env.extend_pattern(&branch.pattern);
+                free_variables(env, &branch.body);
+                env.close();
+            }
+        },
+        Fold(arg, branches) => {
+            free_variables(env, arg);
+            for branch in branches {
+                env.open();
+                env.extend_pattern(&branch.pattern);
+                free_variables(env, &branch.body);
+                env.close();
+            }
+        },
+        Lambda(function) => {
+            free_variables_in_function(env, function)
+        },
+        LambdaApplication(fn_term, args) => {
+            free_variables(env, fn_term);
+            for arg in args {
+                free_variables(env, arg)
+            }
+        },
+        Let(bindings, body) => {
+            env.open();
+            for (var, term) in bindings {
+                env.extend_var(var);
+                free_variables(env, term);
+            }
+            free_variables(env, body);
+            env.close();
+        },
+    }
+}
+
+// ===Type Application===
 pub fn type_apply(type_parameters: &[Variable], type_body: &Type, type_arguments: &[Type]) -> Type {
     // TODO: What are the assumptions? Am I responsible for checking the arities are correct here?
     //
