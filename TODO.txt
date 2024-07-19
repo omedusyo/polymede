@@ -1,3 +1,4 @@
+====Add String/i32 types====
 ====Human Readable Error messages====
 
 ====Proper scoping for the recursive type-variable in inductive type declarations====

@@ -95,6 +95,8 @@ pub fn show_program(program: &Program) -> PrettyString {
     for (i, function) in program.functions.iter().enumerate() {
         ss.push(show_function(function, i + program.number_of_primitive_functions))
     }
+
+    ss.push(show_term(&program.main, 0));
     lines(ss)
 }
 
