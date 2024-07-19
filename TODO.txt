@@ -1,0 +1,47 @@
+====Compilation of nested patterns====
+See e.g. Simon Peyton Jone's book, The Implementation of Functional Programming Languages for how to do this well.
+
+====Compilation of fold statements====
+How to desugar fold into a match statement + recursion?
+You will need a functor/map concept.
+
+Consider
+type Bool = enum {
+| T
+| F
+}
+
+type Index2 = enum {
+| I0
+| I1
+}
+
+type Pair(a, b) = enum {
+| Pair(a, b)
+}
+
+type NonemptyList(a) = ind { x .
+| Singleton(a)
+| Cons(a, x)
+}
+
+// Here you need functor \x . Pair(x, x)
+type BinStrictTree(a) = ind { x .
+| BSLeaf(a)
+| BSBranch(Pair(x, x))
+}
+
+// Here you need functor \x . Fn(Index2 -> X)
+type BinLazyTree(a) = ind { x .
+| BLLeaf(a)
+| BLranch(Fn(Index2 -> x))
+}
+
+// Here you need functor \x . NonemptyList(x)
+type WideTree(a) = ind { x .
+| WLeaf(a)
+| WBranch(NonemptyList(x))
+}
+
+Should all type declarations have functoriality implemented?
+Should I add syntax for functors? Seems like I would also need to express holes of multivariable functors.
