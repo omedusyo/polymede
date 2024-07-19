@@ -1,4 +1,4 @@
-use crate::base::{Program, TypeDeclaration, Type, FunctionDeclaration, LetDeclaration, Term, Pattern, PatternBranch};
+use crate::base::{Program, TypeDeclaration, Type, FunctionDeclaration, RunDeclaration, Term, Pattern, PatternBranch};
 use crate::identifier::{Variable, FunctionName, ConstructorName};
 use crate::validation:: {
     base::{Result, Error, ErrorWithLocation},
@@ -24,10 +24,10 @@ pub fn check_program(program: &Program) -> core::result::Result<(), Vec<ErrorWit
         }
     }
 
-    for decl in program.let_declarations.values() {
-        match check_let_declaration(program, decl) {
+    for decl in &program.run_declaration {
+        match check_run_declaration(program, decl) {
             Ok(_) => {},
-            Err(e) => errors.push(ErrorWithLocation::LetDeclaration(decl.name.clone(), e)),
+            Err(e) => errors.push(ErrorWithLocation::RunDeclaration(e)),
         }
     }
 
@@ -38,8 +38,8 @@ pub fn check_program(program: &Program) -> core::result::Result<(), Vec<ErrorWit
     }
 }
 
-fn check_let_declaration(program: &Program, decl: &LetDeclaration) -> Result<()> {
-    let type_env = TypeScope::new(&decl.type_parameters);
+fn check_run_declaration(program: &Program, decl: &RunDeclaration) -> Result<()> {
+    let type_env = TypeScope::new(&vec![]);
     let mut env = Environment::new(program, &type_env);
     type_check(&mut env, &decl.body.term, &decl.body.type_)
 }

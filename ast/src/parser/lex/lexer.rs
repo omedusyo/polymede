@@ -54,7 +54,7 @@ pub enum Request {
 #[derive(Debug)]
 pub enum DeclarationKind {
     Type,
-    Let,
+    Run,
     Function,
 }
 
@@ -333,7 +333,7 @@ impl <'state> State<'state> {
         let c = self.read_char_or_fail_when_end()?;
         match c {
             't' => Ok(DeclarationKind::Type),
-            'l' => Ok(DeclarationKind::Let),
+            'r' => Ok(DeclarationKind::Run),
             'f' => Ok(DeclarationKind::Function),
             _ => Err(Error::ExpectedTypeDeclarationKeyword),
         }

@@ -1,4 +1,4 @@
-use crate::base::{Program, Type, FunctionType, TypeDeclaration, FunctionDeclaration, LetDeclaration, EnumDeclaration, IndDeclaration, ConstructorDeclaration};
+use crate::base::{Program, Type, FunctionType, TypeDeclaration, FunctionDeclaration, RunDeclaration, EnumDeclaration, IndDeclaration, ConstructorDeclaration};
 use crate::identifier::{Identifier, Interner};
 
 pub struct Show<'a> {
@@ -17,8 +17,8 @@ impl <'show>Show<'show> {
     pub fn show_program_declarations(&self, program: &Program) -> String {
         let type_declarations =  program.type_declarations_in_source_ordering().iter().map(|decl| self.show_type_declaration(decl)).collect::<Vec<_>>().join("\n\n");
         let function_declarations = program.function_declarations_in_source_ordering().iter().map(|decl| self.show_function_declaration(decl)).collect::<Vec<_>>().join("\n");
-        let let_declarations = program.let_declarations.values().map(|decl| self.show_let_declaration(decl)).collect::<Vec<_>>().join("\n");
-        format!("{type_declarations}\n\n{function_declarations}\n{let_declarations}")
+        let run_declaration = program.run_declaration.iter().map(|decl| self.show_run_declaration(decl)).collect::<Vec<_>>().join("\n");
+        format!("{type_declarations}\n\n{function_declarations}\n{run_declaration}")
     }
 
     fn show_type_declaration(&self, type_declaration: &TypeDeclaration) -> String {
@@ -79,15 +79,9 @@ impl <'show>Show<'show> {
         }
     }
 
-    fn show_let_declaration(&self, declaration: &LetDeclaration) -> String {
-        let name_str = declaration.name.str(self.interner());
+    fn show_run_declaration(&self, declaration: &RunDeclaration) -> String {
         let type_ = self.show_type(&declaration.body.type_);
-        if declaration.type_parameters.is_empty() {
-            format!("let {name_str} : {type_} ")
-        } else {
-            let type_var_strs = self.show_sequence_of_identifiers(&declaration.type_parameters);
-            format!("let {name_str} : forall {{ {type_var_strs} . {type_} }}")
-        }
+        format!("run {type_} ")
     }
 
     pub fn show_type(&self, type_: &Type) -> String {

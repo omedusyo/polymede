@@ -179,7 +179,7 @@ impl State {
 
 pub fn compile(number_of_primitive_functions: usize, program: &polymede::Program) -> gmm::Program {
     let mut state = State::new(number_of_primitive_functions);
-    // ===constructors===
+    // ===Constructors===
     for decl in program.type_declarations_in_source_ordering() {
         let mut count: ConstructorIndex = 0;
 
@@ -189,10 +189,15 @@ pub fn compile(number_of_primitive_functions: usize, program: &polymede::Program
         }
     }
 
-    // ===functions===
+    // ===Functions===
     for decl in program.function_declarations_in_source_ordering() { 
         state.add_function_name(decl.name())
     }
+    
+    // ===Main===
+    let Some(run) = &program.run_declaration else { unreachable!() };
+    let main = compile_typed_term(&mut state, &run.body);
+
 
     // TODO: This vector shuffling is way too complicated.
     let mut functions: Vec<(FunctionIndex, gmm::Function)> = vec![];
@@ -208,10 +213,11 @@ pub fn compile(number_of_primitive_functions: usize, program: &polymede::Program
 
     let mut final_functions = state.functions;
     final_functions.append(&mut state.anonymous_functions);
+
     gmm::Program {
         number_of_primitive_functions: state.number_of_primitive_functions,
         functions: final_functions,
-        main: gmm::constant(0), // TODO
+        main,
     }
 }
 
@@ -231,10 +237,14 @@ fn compile_var(state: &State, var: &Variable) -> gmm::Term {
     var_index.compile()
 }
 
+fn compile_typed_term(state: &mut State, typed_term: &polymede::TypedTerm) -> gmm::Term {
+    compile_term(state, &typed_term.term)
+}
+
 fn compile_term(state: &mut State, term: &polymede::Term) -> gmm::Term {
     use polymede::Term::*;
     match term {
-        TypedTerm(typed_term) => compile_term(state, &typed_term.term),
+        TypedTerm(typed_term) => compile_typed_term(state, &typed_term),
         VariableUse(var) => compile_var(state, var),
         FunctionApplication(function_name, _, args) => {
             let Some(fn_index) = state.get_function_index(function_name) else { unreachable!() };

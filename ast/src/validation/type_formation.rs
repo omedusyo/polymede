@@ -1,4 +1,4 @@
-use crate::base::{Program, TypeDeclaration, Type, FunctionType, ConstructorDeclaration, FunctionDeclaration, LetDeclaration};
+use crate::base::{Program, TypeDeclaration, Type, FunctionType, ConstructorDeclaration, FunctionDeclaration, RunDeclaration};
 use crate::identifier::Variable;
 use crate::validation:: base::{Result, Error, ErrorWithLocation};
 use std::collections::HashSet;
@@ -15,14 +15,14 @@ pub fn check_program(program: &Program) -> core::result::Result<(), Vec<ErrorWit
     for decl in program.function_declarations.values() {
         match check_types_in_function_declaration(program, decl) {
             Ok(_) => {},
-            Err(e) => errors.push(ErrorWithLocation::TypeDeclaration(decl.name().clone(), e)),
+            Err(e) => errors.push(ErrorWithLocation::FunctionDeclaration(decl.name().clone(), e)),
         }
     }
 
-    for decl in program.let_declarations.values() {
-        match check_types_in_let_declaration(program, decl) {
+    for decl in &program.run_declaration {
+        match check_types_in_run_declaration(program, decl) {
             Ok(_) => {},
-            Err(e) => errors.push(ErrorWithLocation::TypeDeclaration(decl.name().clone(), e)),
+            Err(e) => errors.push(ErrorWithLocation::RunDeclaration(e)),
         }
     }
 
@@ -66,8 +66,8 @@ fn check_types_in_function_declaration(program: &Program, decl: &FunctionDeclara
     check_function_type(program, &type_env, &decl.function.type_)
 }
 
-fn check_types_in_let_declaration(program: &Program, decl: &LetDeclaration) -> Result<()> {
-    let type_env: TypeScope = TypeScope::new(&decl.type_parameters);
+fn check_types_in_run_declaration(program: &Program, decl: &RunDeclaration) -> Result<()> {
+    let type_env: TypeScope = TypeScope::new(&vec![]);
     check_type(program, &type_env, &decl.body.type_)
 }
 

@@ -1,4 +1,3 @@
-
 type Bool = enum { T | F }
 
 type Nat = ind { nat .
@@ -66,3 +65,6 @@ fn map = forall { a, b . # Fn(a -> b), List(a) -> List(b) : { f, xs .
   | Cons(x, state) . Cons(apply f to (x), state)
   }
 }}
+
+
+run # Bool : T

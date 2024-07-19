@@ -41,7 +41,7 @@ pub enum Error {
 pub enum ErrorWithLocation {
     TypeDeclaration(Variable, Error),
     FunctionDeclaration(FunctionName, Error),
-    LetDeclaration(Variable, Error),
+    RunDeclaration(Error),
 }
 
 impl Error {
@@ -86,7 +86,7 @@ impl ErrorWithLocation {
         match self {
             Self::TypeDeclaration(name, e) => format!("In type {} = ...: {}", sh.show_identifier(name), e.show(sh)),
             Self::FunctionDeclaration(name, e) => format!("In fn {} = ...: {}", sh.show_identifier(name), e.show(sh)),
-            Self::LetDeclaration(name, e) => format!("In let {} = ...: {}", sh.show_identifier(name), e.show(sh)),
+            Self::RunDeclaration(e) => format!("In run ...: {}", e.show(sh)),
         }
     }
 }
