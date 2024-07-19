@@ -17,6 +17,7 @@ pub enum Token {
 #[derive(Debug, Copy, Clone)]
 pub enum Keyword {
     Let,
+    Run,
     LocalLet,
     Fn,
     Eq,
@@ -51,6 +52,7 @@ pub const BINDING_SEPARATOR: &'static str = ".";
 
 impl Keyword {
     pub const LET: &'static str = "let";
+    pub const RUN: &'static str = "run";
     pub const LOCAL_LET: &'static str = "let";
     pub const FN: &'static str = "fn";
     pub const EQ: &'static str = "=";
@@ -71,6 +73,7 @@ impl Keyword {
         use Keyword::*;
         match self {
             Let => Self::LET,
+            Run => Self::RUN,
             LocalLet => Self::LOCAL_LET,
             Fn => Self::FN,
             Eq => Self::EQ,

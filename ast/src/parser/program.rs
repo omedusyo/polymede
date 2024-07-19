@@ -1,4 +1,4 @@
-use crate::base::{LetDeclaration, TypedFunction, Function, FunctionType, FunctionDeclaration, ConstructorDeclaration};
+use crate::base::{RunDeclaration, TypedFunction, Function, FunctionType, FunctionDeclaration, ConstructorDeclaration};
 use crate::identifier;
 use crate::identifier::{Variable, FunctionName};
 use crate::parser::lex::{
@@ -26,16 +26,20 @@ pub fn pre_program(state: &mut State) -> Result<PreProgram> {
 }
 
 fn check_program_names_uniqueness(program: &PreProgram) -> Result<()> {
+    match program.run_declarations.len() {
+        0 => return Err(Error::RunDeclarationNotFound),
+        1 => {},
+        _ => return Err(Error::MoreThanOneRunDeclaration),
+    }
+
     let type_duplicates = identifier::duplicates(&program.type_names());
     let constructor_duplicates = identifier::duplicates(&program.constructor_names());
     let function_duplicates = identifier::duplicates(&program.function_names());
-    let let_duplicates = identifier::duplicates(&program.let_names());
-    if !(type_duplicates.is_empty() && constructor_duplicates.is_empty() && function_duplicates.is_empty() && let_duplicates.is_empty()) {
+    if !(type_duplicates.is_empty() && constructor_duplicates.is_empty() && function_duplicates.is_empty()) {
         Err(Error::DuplicateNames {
             type_duplicates,
             constructor_duplicates,
             function_duplicates,
-            let_duplicates,
         })
     } else {
         Ok(())
@@ -45,7 +49,7 @@ fn check_program_names_uniqueness(program: &PreProgram) -> Result<()> {
 fn program_declaration(state: &mut State) -> Result<Declaration> {
     match state.peek_declaration_token()? {
         DeclarationKind::Type => Ok(Declaration::Type(type_declaration(state)?)),
-        DeclarationKind::Let => Ok(Declaration::Let(let_declaration(state)?)),
+        DeclarationKind::Run => Ok(Declaration::Run(run_declaration(state)?)),
         DeclarationKind::Function => Ok(Declaration::Function(function_declaration(state)?)),
     }
 }
@@ -169,29 +173,9 @@ pub fn typed_function(state: &mut State, type_: FunctionType) -> Result<TypedFun
 }
 
 
-pub fn let_declaration(state: &mut State) -> Result<LetDeclaration> {
-    state.request_keyword(Keyword::Let)?;
-    let name = function_name(state)?;
-    state.request_keyword(Keyword::Eq)?;
+pub fn run_declaration(state: &mut State) -> Result<RunDeclaration> {
+    state.request_keyword(Keyword::Run)?;
 
-
-    fn inner_let_declaration(state: &mut State, function_name: FunctionName, type_parameters: Vec<Variable>) -> Result<LetDeclaration> {
-        let typed_term = typed_term(state)?;
-        Ok(LetDeclaration { name: function_name, type_parameters, body: typed_term })
-    }
-    
-    if state.commit_if_next_token_forall()? {
-        // forall encountered
-        state.request_token(Request::OpenCurly)?;
-        let type_parameters = parameter_non_empty_sequence(state)?;
-        state.request_token(Request::BindingSeparator)?;
-
-        let declaration = inner_let_declaration(state, name, type_parameters)?;
-
-        state.request_token(Request::CloseCurly)?;
-        Ok(declaration)
-    } else {
-        // no forall
-        inner_let_declaration(state, name, vec![])
-    }
+    let typed_term = typed_term(state)?;
+    Ok(RunDeclaration { body: typed_term })
 }

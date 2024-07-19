@@ -1,4 +1,4 @@
-use crate::base::{ Program, TypeDeclaration, LetDeclaration, FunctionDeclaration, ConstructorDeclaration};
+use crate::base::{ Program, TypeDeclaration, RunDeclaration, FunctionDeclaration, ConstructorDeclaration};
 use crate::identifier::{Interner, Variable, ConstructorName, FunctionName, Identifier};
 use crate::parser::lex::{
     lexer,
@@ -28,8 +28,9 @@ pub enum Error {
         type_duplicates: Vec<Identifier>,
         constructor_duplicates: Vec<Identifier>,
         function_duplicates: Vec<Identifier>,
-        let_duplicates: Vec<Identifier>
     },
+    MoreThanOneRunDeclaration,
+    RunDeclarationNotFound,
     FunctionHasDifferentNumberOfParametersThanDeclaredInItsType { declared_in_type: usize, parameters: usize },
 }
 
@@ -53,16 +54,14 @@ pub fn parse_program(s: &str) -> Result<Program> {
         program.function_declarations_ordering.push(decl.name());
         program.function_declarations.insert(decl.name(), decl);
     }
-    for decl in pre_program.let_declarations {
-        program.let_declarations.insert(decl.name(), decl);
-    }
+    program.run_declaration = pre_program.run_declarations.into_iter().nth(0);
 
     Ok(program)
 }
 
 pub enum Declaration {
     Type(PreTypeDeclaration),
-    Let(LetDeclaration),
+    Run(RunDeclaration),
     Function(FunctionDeclaration),
 }
 
@@ -70,7 +69,7 @@ pub enum Declaration {
 pub struct PreProgram {
     pub type_declarations: Vec<PreTypeDeclaration>,
     pub function_declarations: Vec<FunctionDeclaration>,
-    pub let_declarations: Vec<LetDeclaration>,
+    pub run_declarations: Vec<RunDeclaration>,
 }
 
 #[derive(Debug)]
@@ -96,7 +95,7 @@ pub enum PreTypeDeclaration {
 
 impl PreProgram {
     pub fn new() -> Self {
-        Self { type_declarations: vec![], function_declarations: vec![], let_declarations: vec![] }
+        Self { type_declarations: vec![], function_declarations: vec![], run_declarations: vec![] }
     }
 
     pub fn add_declaration(&mut self, decl: Declaration) {
@@ -104,8 +103,8 @@ impl PreProgram {
             Declaration::Type(type_declaration) => {
                 self.type_declarations.push(type_declaration)
             },
-            Declaration::Let(let_declaration) => {
-                self.let_declarations.push(let_declaration)
+            Declaration::Run(run_declaration) => {
+                self.run_declarations.push(run_declaration)
             },
             Declaration::Function(function_declaration) => {
                 self.function_declarations.push(function_declaration)
@@ -145,14 +144,6 @@ impl PreProgram {
     pub fn function_names(&self) -> Vec<FunctionName> {
         let mut names = vec![];
         for declaration in &self.function_declarations {
-            names.push(declaration.name.clone())
-        }
-        names
-    }
-
-    pub fn let_names(&self) -> Vec<Variable> {
-        let mut names = vec![];
-        for declaration in &self.let_declarations {
             names.push(declaration.name.clone())
         }
         names

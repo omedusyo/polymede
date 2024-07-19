@@ -1,3 +1,8 @@
+====Add String/i32 types====
+====Human Readable Error messages====
+
+====Proper scoping for the recursive type-variable in inductive type declarations====
+
 ====Compilation of nested patterns====
 See e.g. Simon Peyton Jone's book, The Implementation of Functional Programming Languages for how to do this well.
 
