@@ -19,12 +19,12 @@ pub fn parse_program(s: &str) -> Result<Program, Error> {
 
 #[cfg(test)]
 mod tests {
-    use crate::base::{Term, Type, FunctionDeclaration, LetDeclaration};
+    use crate::base::{Term, Type, FunctionDeclaration, RunDeclaration};
     use crate::identifier::interner;
     use crate::parser::{
         base::{State, Result, Error, PreTypeDeclaration, PreEnumDeclaration, PreIndDeclaration},
         types::type_,
-        program::{pre_program, let_declaration, function_declaration, type_declaration},
+        program::{pre_program, run_declaration, function_declaration, type_declaration},
     };
 
     #[test]
@@ -254,34 +254,26 @@ mod tests {
     }
 
     #[test]
-    fn test_let_declaration_0() -> Result<()> {
+    fn test_run_declaration_0() -> Result<()> {
         let mut interner = interner();
-        let s = "let two = # Nat : S(S(Zero))";
+        let s = "run # Nat : S(S(Zero))";
         let mut state = State::new(s, &mut interner);
 
-        let result = let_declaration(&mut state);
+        let result = run_declaration(&mut state);
         assert!(matches!(result, Ok(_)));
-        let LetDeclaration { name, type_parameters, body: _ } = result?;
-
-        assert_eq!(name.str(&mut interner), "two");
-        assert_eq!(type_parameters.len(), 0);
-
 
         Ok(())
     }
 
     #[test]
-    fn test_let_declaration_1() -> Result<()> {
+    fn test_run_declaration_1() -> Result<()> {
         let mut interner = interner();
-        let s = "let nil = forall { a . # List : Nil }";
+        let s = "run # List(Nat) : Nil";
         let mut state = State::new(s, &mut interner);
 
-        let result = let_declaration(&mut state);
+        let result = run_declaration(&mut state);
         assert!(matches!(result, Ok(_)));
-        let LetDeclaration { name, type_parameters, body: _ } = result?;
-
-        assert_eq!(name.str(&mut interner), "nil");
-        assert_eq!(type_parameters.len(), 1);
+        let RunDeclaration { body: _ } = result?;
 
         Ok(())
     }
@@ -324,6 +316,8 @@ mod tests {
             | F . T\n\
             }\n\
         }\n\
+        \n\
+        run # Bool : T\n\
         ";
         let mut interner = interner();
         let mut state = State::new(s, &mut interner);
@@ -337,7 +331,7 @@ mod tests {
     #[test]
     fn test_program_1() -> Result<()> {
         let s = "\
-        let y = # List(Nat) : Nil\n\
+        run # List(Nat) : Nil\n\
         ";
         let mut interner = interner();
         let mut state = State::new(s, &mut interner);

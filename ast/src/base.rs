@@ -11,7 +11,7 @@ pub struct Program {
     pub type_declarations_ordering: Vec<Variable>,
     pub function_declarations: HashMap<FunctionName, FunctionDeclaration>,
     pub function_declarations_ordering: Vec<FunctionName>,
-    pub let_declarations: HashMap<Variable, LetDeclaration>,
+    pub run_declaration: Option<RunDeclaration>,
     pub constructor_to_type_mapping: HashMap<ConstructorName, Variable>,
 }
 
@@ -23,7 +23,7 @@ impl Program {
             type_declarations_ordering: vec![],
             function_declarations: HashMap::new(),
             function_declarations_ordering: vec![],
-            let_declarations: HashMap::new(),
+            run_declaration: None,
             constructor_to_type_mapping: HashMap::new(),
         }
     }
@@ -116,11 +116,8 @@ pub struct Function {
     pub body: Term,
 }
 
-// TODO: Get rid of this or replace it by a version that doesn't have type parameters.
 #[derive(Debug)]
-pub struct LetDeclaration {
-    pub name: Variable,
-    pub type_parameters: Vec<Variable>,
+pub struct RunDeclaration {
     pub body: TypedTerm,
 }
 
@@ -332,12 +329,6 @@ impl FunctionDeclaration {
             input_types: self.function.type_.input_types.iter().map(|type_| type_apply(&self.type_parameters, type_, type_arguments)).collect(),
             output_type: type_apply(&self.type_parameters, &self.function.type_.output_type, type_arguments)
         }
-    }
-}
-
-impl LetDeclaration {
-    pub fn name(&self) -> Variable {
-        self.name.clone()
     }
 }
 
