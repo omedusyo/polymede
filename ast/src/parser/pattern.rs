@@ -1,8 +1,10 @@
+use crate::base::{Pattern, PatternBranch};
+use crate::identifier;
+use crate::identifier::{Variable, ConstructorName, Identifier};
 use crate::parser::lex::lexer::Request;
 use crate::parser::{
-    base::{State, Result, Error, Pattern, PatternBranch},
-    identifier,
-    identifier::{Variable, ConstructorName, Identifier, identifier, variable},
+    base::{State, Result, Error},
+    identifier::{identifier, variable},
     term::term,
     special::{comma, or_separator},
     combinator::{delimited_nonempty_sequence_to_vector, delimited_possibly_empty_sequence_to_vector},

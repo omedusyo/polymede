@@ -12,12 +12,10 @@ pub struct State<'a> {
 }
 
 #[derive(Debug)]
-// TODO: Introduce Committed vs Recoverable Error
 pub enum Error {
     UnexpectedEnd,
     Expected { requested: Request, found: String },
     ExpectedTypeDeclarationKeyword,
-    ExpectedDeclarationKeyword,
     Nat32LiteralTooBig,
 }
 

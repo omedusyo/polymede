@@ -1,8 +1,6 @@
-use crate::parser::{
-    identifier::{Variable, ConstructorName, FunctionName, Interner},
-    base::Type,
-    show::Show,
-};
+use crate::base::Type;
+use crate::identifier::{Variable, ConstructorName, FunctionName};
+use crate::parser::show::Show;
 
 pub type Result<A> = std::result::Result<A, Error>;
 

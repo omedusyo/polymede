@@ -1,10 +1,12 @@
+use crate::base::{Term, TypedTerm, Type};
+use crate::identifier::Variable;
 use crate::parser::lex::{
     token::Keyword,
     lexer::Request,
 };
 use crate::parser::{
-    base::{State, Result, Term, TypedTerm, Type},
-    identifier::{Variable, variable},
+    base::{State, Result},
+    identifier::variable,
     types::{type_annotation, type_nonempty_sequence},
     pattern::pattern_branches,
     program::function,
