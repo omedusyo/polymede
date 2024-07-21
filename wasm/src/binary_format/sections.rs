@@ -3,7 +3,7 @@ use crate::binary_format::primitives::encoder::Encoder;
 use crate::binary_format::indices::IndexStream;
 
 use crate::base::{
-    types::{FunctionType, ValueType, GlobalType},
+    types::{FunctionType, ValueType, GlobalType, RefType},
     indices::{TypeIndex, FunctionIndex },
     memory::Limit,
     export::Export,
@@ -68,6 +68,40 @@ impl Encoder for FunctionSection {
         let type_indices = self.type_indices.iter().map(|type_index| type_index.emit()).collect();
         byte(Self::ID)
             .seq(cvector(type_indices).enclose())
+    }
+}
+
+// === 4 Table Section ===
+#[derive(Debug)]
+pub struct TableSection {
+    pub table_types: Vec<TableType>
+}
+
+impl TableSection {
+    pub const ID: SectionId = 4;
+}
+
+impl Encoder for TableSection {
+    type S = Seq<Byte, Enclose<CVec<<TableType as Encoder>::S>>>;
+
+    fn emit(&self) -> Self::S {
+        let table_types = self.table_types.iter().map(|table_type| table_type.emit()).collect();
+        byte(Self::ID)
+            .seq(cvector(table_types).enclose())
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct TableType {
+    pub reftype: RefType,
+    pub limit: Limit,
+}
+
+impl Encoder for TableType {
+    type S = Seq<<RefType as Encoder>::S, <Limit as Encoder>::S>;
+
+    fn emit(&self) -> Self::S {
+        self.reftype.emit().seq(self.limit.emit())
     }
 }
 
@@ -312,6 +346,7 @@ pub struct Module {
     pub type_section: Option<TypeSection>,
     pub import_section: Option<ImportSection>,
     pub function_section: Option<FunctionSection>,
+    pub table_section: Option<TableSection>,
     pub memory_section: Option<MemorySection>,
     pub globals_section: Option<GlobalsSection>,
     pub export_section: Option<ExportSection>,
@@ -330,6 +365,7 @@ impl Module {
             type_section: None,
             import_section: None,
             function_section: None,
+            table_section: None,
             memory_section: None,
             globals_section: None,
             export_section: None,
@@ -346,11 +382,12 @@ type HeaderBytes = Seq<Bytes4, Bytes4>;
 
 impl Encoder for Module {
     type S =
-        Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<
+        Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<
             HeaderBytes,
             Option<<TypeSection as Encoder>::S>
         >,  Option<<ImportSection as Encoder>::S>
         >,  Option<<FunctionSection as Encoder>::S>,
+        >,  Option<<TableSection as Encoder>::S>,
         >,  Option<<MemorySection as Encoder>::S>,
         >,  Option<<GlobalsSection as Encoder>::S>,
         >,  Option<<ExportSection as Encoder>::S>,
@@ -375,6 +412,11 @@ impl Encoder for Module {
 
         let function_section = match &self.function_section {
             Some(type_indices) => Some(type_indices.emit()),
+            None => None,
+        };
+
+        let table_section = match &self.table_section {
+            Some(table_section) => Some(table_section.emit()),
             None => None,
         };
 
@@ -417,6 +459,7 @@ impl Encoder for Module {
             .seq(type_section)
             .seq(import_section)
             .seq(function_section)
+            .seq(table_section)
             .seq(memory_section)
             .seq(globals_section)
             .seq(export_section)

@@ -22,7 +22,14 @@
   (import "console" "logStack" (func $log_stack))
   (import "console" "logHeap" (func $log_heap))
 
+
   (table 50 funcref)
+
+  (func $tables_test_0
+    (call_indirect (i32.const 2))
+  )
+
+  (elem (i32.const 0) $true $false $cons)
 
 
   (; ===Examples=== ;)
@@ -329,11 +336,6 @@
     (call $make_env (i32.const 1))
     (call $log_list)
     (call $drop_env)
-  )
-
-
-  (func $tables_test_0
-    (call_indirect (i32.const 2))
   )
 
   (; (elem (i32.const 0) $add $inc $range_test_0) ;)

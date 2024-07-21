@@ -10,6 +10,7 @@ use crate::binary_format::sections::{
     TypeSection,
     ImportSection,
     FunctionSection,
+    TableSection,
     MemorySection,
     GlobalsSection, Global,
     ExportSection,
@@ -17,6 +18,7 @@ use crate::binary_format::sections::{
     CodeSection,
     DataSection, DataItem,
     DataCountSection,
+    TableType,
     Expression, Code, LocalDeclaration
 };
 use crate::base::{
@@ -24,7 +26,7 @@ use crate::base::{
     export::{Export, ExportDescription},
     import::{Import, ImportDescription},
     indices::{TypeIndex, LocalIndex, GlobalIndex, FunctionIndex},
-    types::{NumType, ValueType, FunctionType, BlockType, GlobalType, Mutability},
+    types::{NumType, ValueType, FunctionType, BlockType, RefType, GlobalType, Mutability},
     instructions::Instruction,
 };
 use NumType::*;
@@ -49,8 +51,16 @@ pub fn generate0() -> Vec<u8> {
         TypeIndex(0),
         TypeIndex(2), // empty
     ]});
+    module.table_section = Some(TableSection { table_types: vec![
+        // Limit::MinToInfinity { min: 1 },
+        TableType {
+            reftype: RefType::FuncRef,
+            limit: Limit::MinMax { min: 1, max: 10 },
+        }
+    ]});
     module.memory_section = Some(MemorySection { memory_types: vec![
         // Limit::MinToInfinity { min: 1 },
+        // TODO: How can I determine the max?
         Limit::MinMax { min: 1, max: 10 },
     ]});
     module.globals_section = Some(GlobalsSection { globals: vec![

@@ -36,7 +36,7 @@ TMP_WAT=tmp_wat
 FILE=test
 
 rm $TMP_WASM/$FILE.wasm
-cargo run --bin compiler
+cargo run --bin wasm
 
 wasm2wat $TMP_WASM/$FILE.wasm -o $TMP_WAT/$FILE.wat
 

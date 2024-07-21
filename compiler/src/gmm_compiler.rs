@@ -86,7 +86,7 @@ fn import_runtime(module: &mut Module, program: &gmm::Program, primitives: Primi
         number_of_user_defined_functions: program.functions.len(),
         number_of_primitive_functions: primitives.number_of_primitives,
 
-        number_of_runtime_functions: 12,
+        number_of_runtime_functions: 13,
         const_: import_runtime_function(module, "const", fn_type(vec![TYPE_I32], vec![])),
         get_const: import_runtime_function(module, "get_const", fn_type(vec![], vec![TYPE_I32]) ),
         tuple: import_runtime_function(module, "tuple", fn_type(vec![TYPE_I32, TYPE_I32], vec![])),
@@ -149,7 +149,6 @@ fn compile_term(runtime: &Runtime, number_of_parameters: usize, term: &gmm::Term
                 args.push(call(runtime.to_wasm_function_index(*fn_name), vec![]));
                 Ok(seq(args))
             } else if runtime.is_user_defined(*fn_name) {
-                println!("INDEE WE ARE CALLING USER DEF FUNCTION");
                 let mut args: Vec<Expression> = compile_terms(runtime, number_of_parameters, terms)?;
                 // (call $make_env (i32.const $number_of_arguments))
                 // (call $fn_name)
@@ -166,9 +165,19 @@ fn compile_term(runtime: &Runtime, number_of_parameters: usize, term: &gmm::Term
             }
         },
         gmm::Term::PartialApply(fn_name, terms) => {
+            // I need to compile the terms.
+            // Afterwards I need to bundle the function pointer with those terms.
+            // How is this going to be represented? Wait... I need to shift fn_name...
+            // to account for primitive functions etc...
+            //
+            // Should I just represent this as a some sort of a tuple?
             todo!()
         },
         gmm::Term::CallClosure(closure_term, terms) => {
+            // Compile the closure_term and terms.
+            // Assume we have those on the linear stack.
+            // Then we need to lookup the closure, make a new environment. Copy its partial-env. Extend the
+            // env with args.
             todo!()
         },
         gmm::Term::VarUse(var_name) => {

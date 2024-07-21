@@ -1,9 +1,9 @@
 use crate::binary_format::sections;
-use crate::binary_format::sections::{TypeSection, FunctionSection, ExportSection, ImportSection, CodeSection, MemorySection};
+use crate::binary_format::sections::{TypeSection, FunctionSection, ExportSection, ImportSection, CodeSection, TableSection, MemorySection, TableType};
 use crate::{Encoder, ByteStream};
 use crate::base::{
     indices::{TypeIndex, LocalIndex, GlobalIndex, LabelIndex, FunctionIndex, MemoryIndex},
-    types::{FunctionType, ValueType, BlockType, NumType},
+    types::{FunctionType, ValueType, BlockType, NumType, RefType},
     export::{Export, ExportDescription},
     import::{Import, ImportDescription},
     instructions,
@@ -278,6 +278,13 @@ impl Module {
                 FunctionOrImport::Fn(_) => None,
             }).collect();
             Some(ImportSection { imports })
+        };
+
+        bin_module.table_section = {
+            Some(TableSection { table_types: vec![TableType {
+                reftype: RefType::FuncRef,
+                limit: Limit::MinMax { min: 1, max: self.functions.len() as u32 },
+            }] })
         };
 
         bin_module.code_section = {
