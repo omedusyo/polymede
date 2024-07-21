@@ -252,7 +252,11 @@ fn compile_term(state: &mut State, term: &polymede::Term) -> gmm::Term {
         },
         ConstructorUse(constructor_name, args) => {
             let Some(constructor_index) = state.get_constructor_index(constructor_name) else { unreachable!() };
-            gmm::Term::Tuple(constructor_index, args.iter().map(|arg| compile_term(state, arg)).collect())
+            if args.is_empty() {
+                gmm::Term::Const(constructor_index)
+            } else {
+                gmm::Term::Tuple(constructor_index, args.iter().map(|arg| compile_term(state, arg)).collect())
+            }
         },
         Match(arg, branches) => {
             // TODO: This will have to be replaced by proper

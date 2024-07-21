@@ -21,9 +21,12 @@
   (export "free" (global $FREE))
 
   (; ===Global Constants=== ;)
-  (global $ENV_HEADER_BYTE_SIZE i32 (i32.const 4))
-  (global $ENV_POINTER_BYTE_SIZE i32 (i32.const 4))
-  (global $SCOPE_EXTENSION_HEADER_SIZE i32 (i32.const 8))
+  (global $ENV_HEADER_BYTE_SIZE i32 (i32.const 8)) ;; 8 bytes, 4 bytes for parent env pointer, 4 bytes for env count.
+  (global $PARENT_ENV_POINTER_BYTE_SIZE i32 (i32.const 4))
+  (global $ENV_COUNTER_BYTE_SIZE i32 (i32.const 4))
+  (; Env offset is relative to the current env pointer, which points to the start of the env-arguments. ;)
+  (global $PARENT_ENV_POINTER__OFFSET i32 (i32.const -8))
+  (global $ENV_COUNTER_OFFSET i32 (i32.const -4))
 
   (global $TAGGED_POINTER_BYTE_SIZE i32 (i32.const 5))
   (global $CONST_TAG i32 (i32.const 1))
@@ -111,7 +114,7 @@
   (export "tuple" (func $tuple))
 
   (; Assumes that a pointer to a tuple is on the top of the Linear Stack. ;)
-  (; Moves its to WASM stack ;)
+  (; Moves it to WASM stack ;)
   (func $get_tuple_pointer (result i32)
     (call $dec_stack (i32.const 4))
     (i32.load (global.get $STACK))
@@ -180,7 +183,7 @@
   (; and creates an environment out of them ;)
   (func $make_env (param $count i32)
     (; This is terribly inefficient. We're just shifting the top of the stack ;)
-    (; by $ENV_HEADER_BYTE_SIZE bytes, and then writing the size as the prefix. ;)
+    (; by $ENV_COUNTER_BYTE_SIZE bytes, and then writing the size as the prefix. ;)
 
     (local $byte_size i32)
     (local $source i32)
@@ -188,18 +191,18 @@
 
     (local.set $byte_size (i32.mul (global.get $TAGGED_POINTER_BYTE_SIZE) (local.get $count)))
     (call $dec_stack (local.get $byte_size))
-    (local.set $destination (i32.add (global.get $STACK) (global.get $SCOPE_EXTENSION_HEADER_SIZE)))
+    (local.set $destination (i32.add (global.get $STACK) (global.get $ENV_HEADER_BYTE_SIZE)))
 
     (; ==Copy the arguments== ;)
     (memory.copy (local.get $destination) (global.get $STACK) (local.get $byte_size))
 
     (; ==Saving old ENV register== ;)
     (i32.store (global.get $STACK) (global.get $ENV))
-    (call $inc_stack (global.get $ENV_POINTER_BYTE_SIZE))
+    (call $inc_stack (global.get $PARENT_ENV_POINTER_BYTE_SIZE))
 
     (; ==Set the size== ;)
     (i32.store (global.get $STACK) (local.get $count))
-    (call $inc_stack (global.get $ENV_HEADER_BYTE_SIZE))
+    (call $inc_stack (global.get $ENV_COUNTER_BYTE_SIZE))
 
     (; ==Set the environment on the Linear Stack as the current environment== ;)
     (global.set $ENV (global.get $STACK))
@@ -212,7 +215,7 @@
   (; * Environment header (saved current ENV register followed by the count of variables) ;)
   (; * Followed by the new extended environment with the consumed arguments ;)
   (; The env register is updated to point to this new environment. ;)
-  (func $extend_env (param $arg_count i32)
+  (func $copy_and_extend_env (param $arg_count i32)
     (local $old_env_count i32)
     (local $old_env_byte_size i32)
 
@@ -220,31 +223,41 @@
     (local $destination_arg i32)
     (local $arg_byte_size i32)
 
-    (local.set $old_env_count (i32.load (i32.sub (global.get $ENV) (global.get $ENV_HEADER_BYTE_SIZE))))
+    (local.set $old_env_count (i32.load (i32.add (global.get $ENV) (global.get $ENV_COUNTER_OFFSET))))
     (local.set $old_env_byte_size (i32.mul (global.get $TAGGED_POINTER_BYTE_SIZE) (local.get $old_env_count)))
     (local.set $arg_byte_size (i32.mul (global.get $TAGGED_POINTER_BYTE_SIZE) (local.get $arg_count)))
 
     (call $dec_stack (local.get $arg_byte_size))
 
     (; ==Copying the current arguments to the new env== ;)
-    (local.set $destination_arg (i32.add (global.get $STACK) (i32.add (global.get $SCOPE_EXTENSION_HEADER_SIZE) (local.get $old_env_byte_size))))
+    (local.set $destination_arg (i32.add (global.get $STACK) (i32.add (global.get $ENV_HEADER_BYTE_SIZE) (local.get $old_env_byte_size))))
     (memory.copy (local.get $destination_arg) (global.get $STACK) (local.get $arg_byte_size))
 
     (; ==Copying the old env== ;)
-    (memory.copy (i32.add (global.get $STACK) (global.get $SCOPE_EXTENSION_HEADER_SIZE)) (global.get $ENV) (local.get $old_env_byte_size))
+    (memory.copy (i32.add (global.get $STACK) (global.get $ENV_HEADER_BYTE_SIZE)) (global.get $ENV) (local.get $old_env_byte_size))
 
     (; ==Saving old ENV register== ;)
     (i32.store (global.get $STACK) (global.get $ENV))
-    (call $inc_stack (global.get $ENV_POINTER_BYTE_SIZE))
+    (call $inc_stack (global.get $PARENT_ENV_POINTER_BYTE_SIZE))
 
     (; ==Updating the env register== ;) 
-    (global.set $ENV (i32.add (global.get $STACK) (global.get $ENV_HEADER_BYTE_SIZE)))
+    (global.set $ENV (i32.add (global.get $STACK) (global.get $ENV_COUNTER_BYTE_SIZE)))
 
     (; ==Prefixing the environment with the size ;)
     (i32.store (global.get $STACK) (i32.add (local.get $old_env_count) (local.get $arg_count)))
 
     (; ==Moving the stack== ;)
-    (call $inc_stack (i32.add (global.get $ENV_HEADER_BYTE_SIZE) (i32.add (local.get $old_env_byte_size) (local.get $arg_byte_size))))
+    (call $inc_stack (i32.add (global.get $ENV_COUNTER_BYTE_SIZE) (i32.add (local.get $old_env_byte_size) (local.get $arg_byte_size))))
+  )
+  (export "copy_and_extend_env" (func $copy_and_extend_env))
+
+  (; Increments the current env counter by 1. ;)
+  (; This can be used in the situation where the top of the linear stack is some value that needs to ;)
+  (; included in the current environment, and the environment is directly before that value on the linear stack. ;)
+  (func $extend_env
+    (local $env_count i32)
+    (local.set $env_count (i32.load (i32.add (global.get $ENV) (global.get $ENV_COUNTER_OFFSET))))
+    (i32.store (local.get $env_count) (i32.add (local.get $env_count) (i32.const 1)))
   )
   (export "extend_env" (func $extend_env))
 
@@ -260,7 +273,7 @@
 
   (func $drop_env
     (local $header_start i32)
-    (local.set $header_start (i32.sub (global.get $ENV) (global.get $SCOPE_EXTENSION_HEADER_SIZE)))
+    (local.set $header_start (i32.sub (global.get $ENV) (global.get $ENV_HEADER_BYTE_SIZE)))
 
     (; ==Reset env== ;)
     (global.set $ENV (i32.load (local.get $header_start)))

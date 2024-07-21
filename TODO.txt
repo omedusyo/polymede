@@ -1,6 +1,8 @@
 ====Add String/i32 types====
 ====Human Readable Error messages====
 
+====Make semantically different identifier types into different types (wrap them in structs)====
+
 ====Proper scoping for the recursive type-variable in inductive type declarations====
 
 ====Compilation of nested patterns====

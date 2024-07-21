@@ -32,6 +32,7 @@ struct Runtime {
     read_tag: FunctionIndex,
     get_variant: FunctionIndex,
     make_env: FunctionIndex,
+    copy_and_extend_env: FunctionIndex,
     extend_env: FunctionIndex,
     var: FunctionIndex,
     drop_env: FunctionIndex,
@@ -95,7 +96,8 @@ fn import_runtime(module: &mut Module, program: &gmm::Program, primitives: Primi
         read_tag: import_runtime_function(module, "read_tag", fn_type(vec![], vec![TYPE_I32])),
         get_variant: import_runtime_function(module, "get_variant", fn_type(vec![], vec![TYPE_I32])),
         make_env: import_runtime_function(module, "make_env", fn_type(vec![TYPE_I32], vec![])),
-        extend_env: import_runtime_function(module, "extend_env", fn_type(vec![TYPE_I32], vec![])),
+        copy_and_extend_env: import_runtime_function(module, "extend_env", fn_type(vec![TYPE_I32], vec![])),
+        extend_env: import_runtime_function(module, "extend_env", fn_type(vec![], vec![])),
         var: import_runtime_function(module, "var", fn_type(vec![TYPE_I32], vec![])),
         drop_env: import_runtime_function(module, "drop_env", fn_type(vec![], vec![])),
     };
@@ -177,7 +179,17 @@ fn compile_term(runtime: &Runtime, number_of_parameters: usize, term: &gmm::Term
             }
         },
         gmm::Term::Let(terms, body_term) => {
-            todo!()
+            let mut code = vec![];
+            let mut number_of_parameters = number_of_parameters;
+            code.push(call(runtime.copy_and_extend_env, vec![i32_const(0)]));
+            for term in terms {
+                code.push(compile_term(runtime, number_of_parameters, term)?);
+                number_of_parameters += 1;
+                code.push(call(runtime.extend_env, vec![]));
+            }
+            code.push(compile_term(runtime, number_of_parameters, body_term)?);
+            code.push(call(runtime.drop_env, vec![]));
+            Ok(seq(code))
         },
         gmm::Term::Match(arg, branches) => {
             // branches: Vec<(Pattern, Term)>

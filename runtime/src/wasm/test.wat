@@ -10,7 +10,7 @@
   (import "runtime" "read_tag" (func $read_tag (result i32)))
   (import "runtime" "get_variant" (func $get_variant (result i32)))
   (import "runtime" "make_env" (func $make_env (param $count i32)))
-  (import "runtime" "extend_env" (func $extend_env (param $arg_count i32)))
+  (import "runtime" "copy_and_extend_env" (func $copy_and_extend_env (param $arg_count i32)))
   (import "runtime" "var" (func $var (param $index i32)))
   (import "runtime" "drop_env" (func $drop_env))
 
@@ -116,7 +116,7 @@
         (call $var (i32.const 0)) ;; n
         (call $dec) ;; n - 1
         ;; Start Let
-        (call $extend_env (i32.const 1)) ;; let m := n - 1
+        (call $copy_and_extend_env (i32.const 1)) ;; let m := n - 1
         ;; now our environment is n, xs, m
 
         (call $var (i32.const 2)) ;; m
@@ -277,7 +277,7 @@
     (call $const (i32.const 62))
     (call $log_stack)
 
-    (call $extend_env (i32.const 3))
+    (call $copy_and_extend_env (i32.const 3))
     (call $log_stack)
   )
 
