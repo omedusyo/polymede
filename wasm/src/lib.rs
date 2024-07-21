@@ -10,15 +10,15 @@ use crate::binary_format::sections::{
     TypeSection,
     ImportSection,
     FunctionSection,
-    TableSection,
+    TableSection, TableType,
     MemorySection,
     GlobalsSection, Global,
     ExportSection,
     StartSection,
     CodeSection,
+    ElementSection, Element,
     DataSection, DataItem,
     DataCountSection,
-    TableType,
     Expression, Code, LocalDeclaration
 };
 use crate::base::{
@@ -109,6 +109,13 @@ pub fn generate0() -> Vec<u8> {
         Code {
             locals: vec![],
             expression: Expression { instructions: code_empty }
+        }
+    ]});
+
+    module.element_section = Some(ElementSection { elements: vec![
+        Element {
+            offset_expression: Expression { instructions: vec![Instruction::I32Const(0)] },
+            function_references: vec![FunctionIndex(0)],
         }
     ]});
 
