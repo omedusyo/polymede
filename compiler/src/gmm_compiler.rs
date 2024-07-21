@@ -1,9 +1,9 @@
 use crate::graph_memory_machine as gmm;
 use wasm::{
-    syntax::{Module, TypedFunctionImport, TypedFunction, fn_type, TYPE_I32, Expression, call, i32_const, i32_add, local_get, seq},
+    syntax::{Module, TypedFunctionImport, TypedFunction, fn_type, TYPE_I32, Expression, call, i32_const, i32_add, local_get, i32_eq, seq},
     base::{
         indices::{FunctionIndex},
-        types::{FunctionType},
+        types::{FunctionType, BlockType},
         export::{Export, ExportDescription},
     },
 };
@@ -191,14 +191,42 @@ fn compile_term(runtime: &Runtime, number_of_parameters: usize, term: &gmm::Term
             code.push(call(runtime.drop_env, vec![]));
             Ok(seq(code))
         },
-        gmm::Term::Match(arg, branches) => {
-            // branches: Vec<(Pattern, Term)>
-            todo!()
+        gmm::Term::Match(arg_term, branches) => {
+            let mut code = vec![];
+            code.push(compile_term(runtime, number_of_parameters, arg_term)?);
+            code.push(call(runtime.copy_and_extend_env, vec![i32_const(1)]));
+            let arg_index = number_of_parameters;
+            // TODO: We extend the environment with the argument, which currently is extremely
+            // inefficient.
+            code.push(compile_branches(runtime, number_of_parameters + 1, arg_index as i32, branches)?);
+            code.push(call(runtime.drop_env, vec![]));
+            Ok(seq(code))
         },
         gmm::Term::Seq(terms) => {
             // TODO: I think I need to introduce am explicit pop instruction for the stack.
             todo!()
         },
+    }
+}
+
+fn compile_branches(runtime: &Runtime, number_of_parameters: usize, arg_index: i32, branches: &[(gmm::Pattern, gmm::Term)]) -> Result<Expression> {
+    if branches.is_empty() {
+        Ok(Expression::Unreachable)
+    } else {
+        let (pattern, body) = &branches[0];
+        match pattern {
+            gmm::Pattern::Variant(variant) => {
+                Ok(Expression::IfThenElse {
+                    type_: BlockType::EmptyType,
+                    test: Box::new(i32_eq(call(runtime.var, vec![i32_const(arg_index)]), i32_const(*variant))),
+                    then_body: Box::new(compile_term(runtime, number_of_parameters, body)?),
+                    else_body: Box::new(compile_branches(runtime, number_of_parameters, arg_index, &branches[1..])?),
+                })
+            },
+            gmm::Pattern::Always => {
+                compile_term(runtime, number_of_parameters, body)
+            }
+        }
     }
 }
 
