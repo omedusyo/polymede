@@ -1,5 +1,5 @@
 use crate::binary_format::sections;
-use crate::binary_format::sections::{TypeSection, FunctionSection, ExportSection, ImportSection, CodeSection, TableSection, MemorySection, TableType};
+use crate::binary_format::sections::{TypeSection, FunctionSection, ExportSection, ImportSection, CodeSection, TableSection, MemorySection, TableType, ElementSection, Element};
 use crate::{Encoder, ByteStream};
 use crate::base::{
     indices::{TypeIndex, LocalIndex, GlobalIndex, LabelIndex, FunctionIndex, MemoryIndex},
@@ -15,6 +15,7 @@ pub struct Module {
     // TODO: Bundling Function Imports and Functions into one place is convinient, but not exactly
     // performance friendly.
     functions: Vec<FunctionOrImport>,
+    function_table: Vec<FunctionIndex>,
     exports: Vec<Export>,
     memory_types: Vec<Limit>,
 }
@@ -214,7 +215,7 @@ enum FloatRel2 {
 
 impl Module {
     pub fn empty() -> Self {
-        Self { function_types: vec![], functions: vec![], exports: vec![], memory_types: vec![] }
+        Self { function_types: vec![], functions: vec![], exports: vec![], memory_types: vec![], function_table: vec![] }
     }
 
     pub fn add_function_type(&mut self, fn_type: FunctionType) -> TypeIndex {
@@ -258,6 +259,10 @@ impl Module {
         self.add_function_import(FunctionImport { module_name: fn_import.module_name, name: fn_import.name, type_index })
     }
 
+    pub fn register_function_table(&mut self, function_table: Vec<FunctionIndex>) {
+        self.function_table = function_table
+    }
+
     pub fn binary_format(self) -> sections::Module {
         let mut bin_module = sections::Module::empty();
 
@@ -283,8 +288,15 @@ impl Module {
         bin_module.table_section = {
             Some(TableSection { table_types: vec![TableType {
                 reftype: RefType::FuncRef,
-                limit: Limit::MinMax { min: 1, max: self.functions.len() as u32 },
-            }] })
+                limit: Limit::MinMax { min: 1, max: self.function_table.len() as u32 },
+            }]})
+        };
+
+        bin_module.element_section = {
+            Some(ElementSection { elements: vec![Element {
+                offset_expression: sections::Expression { instructions: vec![instructions::Instruction::I32Const(0)] },
+                function_references: self.function_table,
+            }]})
         };
 
         bin_module.code_section = {

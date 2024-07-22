@@ -7,7 +7,7 @@ pub struct LabelIndex(pub u32);
 
 #[derive(Debug, Copy, Clone)]
 pub struct TypeIndex(pub u32);
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 pub struct FunctionIndex(pub u32);
 #[derive(Debug, Copy, Clone)]
 pub struct MemoryIndex(pub u32);

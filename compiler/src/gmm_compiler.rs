@@ -7,6 +7,7 @@ use wasm::{
         export::{Export, ExportDescription},
     },
 };
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub enum CompilationError {
@@ -17,10 +18,15 @@ pub enum CompilationError {
 
 pub type Result<A> = std::result::Result<A, CompilationError>;
 
+type FunctionTableIndex = i32;
+
 #[derive(Debug)]
 struct Runtime {
     number_of_user_defined_functions: usize,
     number_of_primitive_functions: usize,
+
+    function_table_map: HashMap<FunctionIndex, FunctionTableIndex>,
+    function_table: Vec<FunctionIndex>,
 
     number_of_runtime_functions: usize,
     const_: FunctionIndex,
@@ -36,6 +42,8 @@ struct Runtime {
     extend_env: FunctionIndex,
     var: FunctionIndex,
     drop_env: FunctionIndex,
+    partial_apply: FunctionIndex,
+    call_closure: FunctionIndex,
 }
 
 pub struct PrimitiveFunctions {
@@ -75,6 +83,23 @@ impl Runtime {
     fn is_user_defined(&self, fn_name: gmm::FunctionName) -> bool {
         self.number_of_primitive_functions <= fn_name && fn_name < self.number_of_primitive_functions + self.number_of_user_defined_functions
     }
+
+    fn register_function_for_runtime(&mut self, fn_name: gmm::FunctionName) -> FunctionTableIndex {
+        let fn_index = self.to_wasm_function_index(fn_name);
+        match self.function_table_map.get(&fn_index) {
+            Some(fn_table_index) => *fn_table_index,
+            None => {
+                let fn_table_index = self.function_table.len() as i32;
+                self.function_table_map.insert(fn_index, fn_table_index);
+                self.function_table.push(fn_index);
+                fn_table_index
+            }
+        }
+    }
+
+    fn function_table(&self) -> &[FunctionIndex] {
+        &self.function_table
+    }
 }
 
 fn import_runtime_function(module: &mut Module, fn_name: &str, type_: FunctionType) -> FunctionIndex {
@@ -86,7 +111,10 @@ fn import_runtime(module: &mut Module, program: &gmm::Program, primitives: Primi
         number_of_user_defined_functions: program.functions.len(),
         number_of_primitive_functions: primitives.number_of_primitives,
 
-        number_of_runtime_functions: 13,
+        function_table_map: HashMap::new(),
+        function_table: vec![],
+
+        number_of_runtime_functions: 15,
         const_: import_runtime_function(module, "const", fn_type(vec![TYPE_I32], vec![])),
         get_const: import_runtime_function(module, "get_const", fn_type(vec![], vec![TYPE_I32]) ),
         tuple: import_runtime_function(module, "tuple", fn_type(vec![TYPE_I32, TYPE_I32], vec![])),
@@ -100,6 +128,8 @@ fn import_runtime(module: &mut Module, program: &gmm::Program, primitives: Primi
         extend_env: import_runtime_function(module, "extend_env", fn_type(vec![], vec![])),
         var: import_runtime_function(module, "var", fn_type(vec![TYPE_I32], vec![])),
         drop_env: import_runtime_function(module, "drop_env", fn_type(vec![], vec![])),
+        partial_apply: import_runtime_function(module, "partial_apply", fn_type(vec![TYPE_I32, TYPE_I32], vec![])),
+        call_closure: import_runtime_function(module, "call_closure", fn_type(vec![], vec![TYPE_I32])),
     };
 
     import_runtime_function(module, "add", fn_type(vec![], vec![]));
@@ -113,7 +143,7 @@ pub struct PrimitiveFunctionNames {
     pub inc: gmm::FunctionName,
 }
 
-fn compile_terms(runtime: &Runtime, number_of_parameters: usize, terms: &[gmm::Term]) -> Result<Vec<Expression>> {
+fn compile_terms(runtime: &mut Runtime, number_of_parameters: usize, terms: &[gmm::Term]) -> Result<Vec<Expression>> {
     let mut args: Vec<Expression> = Vec::with_capacity(terms.len());
     for term in terms {
         let expression = compile_term(runtime, number_of_parameters, term)?;
@@ -122,7 +152,7 @@ fn compile_terms(runtime: &Runtime, number_of_parameters: usize, terms: &[gmm::T
     Ok(args)
 }
 
-fn compile_term(runtime: &Runtime, number_of_parameters: usize, term: &gmm::Term) -> Result<Expression> {
+fn compile_term(runtime: &mut Runtime, number_of_parameters: usize, term: &gmm::Term) -> Result<Expression> {
     use Expression::*;
     match term {
         gmm::Term::Const(variant) => {
@@ -165,20 +195,18 @@ fn compile_term(runtime: &Runtime, number_of_parameters: usize, term: &gmm::Term
             }
         },
         gmm::Term::PartialApply(fn_name, terms) => {
-            // I need to compile the terms.
-            // Afterwards I need to bundle the function pointer with those terms.
-            // How is this going to be represented? Wait... I need to shift fn_name...
-            // to account for primitive functions etc...
-            //
-            // Should I just represent this as a some sort of a tuple?
-            todo!()
+            let mut code: Vec<Expression> = compile_terms(runtime, number_of_parameters, terms)?;
+            let fn_table_index: FunctionTableIndex = runtime.register_function_for_runtime(*fn_name);
+            code.push(call(runtime.partial_apply, vec![i32_const(fn_table_index), i32_const(terms.len() as i32)]));
+            Ok(seq(code))
         },
         gmm::Term::CallClosure(closure_term, terms) => {
-            // Compile the closure_term and terms.
-            // Assume we have those on the linear stack.
-            // Then we need to lookup the closure, make a new environment. Copy its partial-env. Extend the
-            // env with args.
-            todo!()
+            let mut code: Vec<Expression> = vec![compile_term(runtime, number_of_parameters, closure_term)?];
+            for compiled_term in compile_terms(runtime, number_of_parameters, terms)? {
+                code.push(compiled_term)
+            }
+            code.push(call(runtime.call_closure, vec![i32_const(terms.len() as i32)]));
+            Ok(seq(code))
         },
         gmm::Term::VarUse(var_name) => {
             if *var_name < number_of_parameters {
@@ -218,7 +246,7 @@ fn compile_term(runtime: &Runtime, number_of_parameters: usize, term: &gmm::Term
     }
 }
 
-fn compile_branches(runtime: &Runtime, number_of_parameters: usize, arg_index: i32, branches: &[(gmm::Pattern, gmm::Term)]) -> Result<Expression> {
+fn compile_branches(runtime: &mut Runtime, number_of_parameters: usize, arg_index: i32, branches: &[(gmm::Pattern, gmm::Term)]) -> Result<Expression> {
     if branches.is_empty() {
         Ok(Expression::Unreachable)
     } else {
@@ -239,25 +267,26 @@ fn compile_branches(runtime: &Runtime, number_of_parameters: usize, arg_index: i
     }
 }
 
-fn compile_function(runtime: &Runtime, number_of_parameters: usize, body: &gmm::Term) -> Result<TypedFunction> {
+fn compile_function(runtime: &mut Runtime, number_of_parameters: usize, body: &gmm::Term) -> Result<TypedFunction> {
     Ok(TypedFunction {
         type_: fn_type(vec![], vec![]),
         locals: vec![],
-        body: compile_term(&runtime, number_of_parameters, body)?,
+        body: compile_term(runtime, number_of_parameters, body)?,
     })
 }
 
 pub fn compile(program: gmm::Program, primitives: PrimitiveFunctions) -> Result<Module> {
     let mut module = Module::empty();
-    let runtime = import_runtime(&mut module, &program, primitives);
+    let mut runtime = import_runtime(&mut module, &program, primitives);
 
     for function in program.functions {
-        module.add_typed_function(compile_function(&runtime, function.number_of_parameters, &function.body)?);
+        module.add_typed_function(compile_function(&mut runtime, function.number_of_parameters, &function.body)?);
     }
 
     // TODO: You need to setup initial empty environment
-    let main = module.add_typed_function(compile_function(&runtime, 0, &program.main)?);
+    let main = module.add_typed_function(compile_function(&mut runtime, 0, &program.main)?);
     module.add_export(Export { name: "main".to_string(), export_description: ExportDescription::Function(main) });
+    module.register_function_table(runtime.function_table);
 
     Ok(module)
 }

@@ -287,6 +287,19 @@
   )
   (export "drop_env" (func $drop_env))
 
+  (; Bundle a function pointer together with $arg_count many values (which are assummed to be on the linear stack) and put in on the heap. ;)
+  (func $partial_apply (param $fn_index i32) (param $arg_count i32)
+    unreachable
+  )
+  (export "partial_apply" (func $partial_apply))
+
+  (; Assume on top of the linear stack there is $arg_count many arguments and a closure below them. ;)
+  (; Copy closure's partial environment and extend it with the arguments. ;)
+  (func $call_closure (param $arg_count i32)
+    unreachable
+  )
+  (export "call_closure" (func $call_closure))
+
   (; ===Primitive Operations=== ;)
   (func $add
     (call $const (i32.add (call $get_const) (call $get_const)))
