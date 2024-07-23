@@ -256,7 +256,10 @@ fn compile_branches(runtime: &mut Runtime, number_of_parameters: usize, arg_inde
             gmm::Pattern::Variant(variant) => {
                 Ok(Expression::IfThenElse {
                     type_: BlockType::EmptyType,
-                    test: Box::new(i32_eq(call(runtime.var, vec![i32_const(arg_index)]), i32_const(*variant))),
+                    test: Box::new(seq(vec![
+                            call(runtime.var, vec![i32_const(arg_index)]),
+                            i32_eq(call(runtime.get_variant, vec![]), i32_const(*variant)),
+                    ])),
                     then_body: Box::new(compile_term(runtime, number_of_parameters, body)?),
                     else_body: Box::new(compile_branches(runtime, number_of_parameters, arg_index, &branches[1..])?),
                 })
