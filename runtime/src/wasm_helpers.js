@@ -71,9 +71,12 @@ function run(bytes, on_instance) {
     // TODO: This probably doesn't even make sense
   }
 
-  const GLOBAL = {};
+  const memory = new WebAssembly.Memory({ initial: 2, maximum: 10 });
+  const closure_table = new WebAssembly.Table({ initial: 0, element: "anyfunc" });
+
+  const buffer = memory.buffer;
+  const GLOBAL = { BUFFER: buffer };
   const LOG = [];
-  let buffer;
 
   const config = {
     console: {
@@ -89,13 +92,15 @@ function run(bytes, on_instance) {
         printRawHeap(buffer);
       },
     },
+    env: {
+      memory,
+      closure_table,
+    },
   };
 
   WebAssembly.instantiate(bytes, config).then(({ instance }) => {
-    const { memory, init, stack_start, stack, env, heap, free, frame } = instance.exports;
-    buffer = memory.buffer;
+    const { init, stack_start, stack, env, heap, free, frame } = instance.exports;
 
-    GLOBAL.BUFFER = memory.buffer;
     GLOBAL.STACK_START = stack_start;
     GLOBAL.STACK = stack;
     GLOBAL.ENV = env;

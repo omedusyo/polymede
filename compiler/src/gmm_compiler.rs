@@ -1,8 +1,8 @@
 use crate::graph_memory_machine as gmm;
 use wasm::{
-    syntax::{Module, TypedFunctionImport, TypedFunction, fn_type, TYPE_I32, Expression, call, i32_const, i32_add, local_get, i32_eq, seq},
+    syntax::{Module, TypedFunctionImport, TypedFunction, fn_type, TYPE_I32, Expression, call, call_indirect, i32_const, i32_add, local_get, i32_eq, seq},
     base::{
-        indices::{FunctionIndex},
+        indices::{FunctionIndex, TableIndex},
         types::{FunctionType, BlockType},
         export::{Export, ExportDescription},
     },
@@ -38,6 +38,7 @@ struct Runtime {
     read_tag: FunctionIndex,
     get_variant: FunctionIndex,
     make_env: FunctionIndex,
+    make_env_from: FunctionIndex,
     copy_and_extend_env: FunctionIndex,
     extend_env: FunctionIndex,
     var: FunctionIndex,
@@ -114,7 +115,7 @@ fn import_runtime(module: &mut Module, program: &gmm::Program, primitives: Primi
         function_table_map: HashMap::new(),
         function_table: vec![],
 
-        number_of_runtime_functions: 15,
+        number_of_runtime_functions: 16,
         const_: import_runtime_function(module, "const", fn_type(vec![TYPE_I32], vec![])),
         get_const: import_runtime_function(module, "get_const", fn_type(vec![], vec![TYPE_I32]) ),
         tuple: import_runtime_function(module, "tuple", fn_type(vec![TYPE_I32, TYPE_I32], vec![])),
@@ -124,12 +125,13 @@ fn import_runtime(module: &mut Module, program: &gmm::Program, primitives: Primi
         read_tag: import_runtime_function(module, "read_tag", fn_type(vec![], vec![TYPE_I32])),
         get_variant: import_runtime_function(module, "get_variant", fn_type(vec![], vec![TYPE_I32])),
         make_env: import_runtime_function(module, "make_env", fn_type(vec![TYPE_I32], vec![])),
+        make_env_from: import_runtime_function(module, "make_env_from", fn_type(vec![TYPE_I32, TYPE_I32], vec![])),
         copy_and_extend_env: import_runtime_function(module, "extend_env", fn_type(vec![TYPE_I32], vec![])),
-        extend_env: import_runtime_function(module, "extend_env", fn_type(vec![], vec![])),
+        extend_env: import_runtime_function(module, "extend_env", fn_type(vec![TYPE_I32], vec![])),
         var: import_runtime_function(module, "var", fn_type(vec![TYPE_I32], vec![])),
         drop_env: import_runtime_function(module, "drop_env", fn_type(vec![], vec![])),
         partial_apply: import_runtime_function(module, "partial_apply", fn_type(vec![TYPE_I32, TYPE_I32], vec![])),
-        call_closure: import_runtime_function(module, "call_closure", fn_type(vec![], vec![TYPE_I32])),
+        call_closure: import_runtime_function(module, "call_closure", fn_type(vec![TYPE_I32], vec![])),
     };
 
     import_runtime_function(module, "add", fn_type(vec![], vec![]));
@@ -153,7 +155,6 @@ fn compile_terms(runtime: &mut Runtime, number_of_parameters: usize, terms: &[gm
 }
 
 fn compile_term(runtime: &mut Runtime, number_of_parameters: usize, term: &gmm::Term) -> Result<Expression> {
-    use Expression::*;
     match term {
         gmm::Term::Const(variant) => {
             Ok(call(runtime.const_, vec![i32_const(*variant)]))
@@ -222,7 +223,7 @@ fn compile_term(runtime: &mut Runtime, number_of_parameters: usize, term: &gmm::
             for term in terms {
                 code.push(compile_term(runtime, number_of_parameters, term)?);
                 number_of_parameters += 1;
-                code.push(call(runtime.extend_env, vec![]));
+                code.push(call(runtime.extend_env, vec![i32_const(1)]));
             }
             code.push(compile_term(runtime, number_of_parameters, body_term)?);
             code.push(call(runtime.drop_env, vec![]));

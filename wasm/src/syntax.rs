@@ -2,7 +2,7 @@ use crate::binary_format::sections;
 use crate::binary_format::sections::{TypeSection, FunctionSection, ExportSection, ImportSection, CodeSection, TableSection, MemorySection, TableType, ElementSection, Element};
 use crate::{Encoder, ByteStream};
 use crate::base::{
-    indices::{TypeIndex, LocalIndex, GlobalIndex, LabelIndex, FunctionIndex, MemoryIndex},
+    indices::{TypeIndex, LocalIndex, GlobalIndex, LabelIndex, FunctionIndex, TableIndex, MemoryIndex},
     types::{FunctionType, ValueType, BlockType, NumType, RefType},
     export::{Export, ExportDescription},
     import::{Import, ImportDescription},
@@ -73,6 +73,7 @@ pub enum Expression {
     IfThenElse { type_: BlockType, test: Box<Expression>, then_body: Box<Expression>, else_body: Box<Expression> },
     Br(LabelIndex),
     Call(FunctionIndex, Vec<Expression>),
+    CallIndirect(TypeIndex, TableIndex, Vec<Expression>),
     Return(Box<Expression>),
 
     // ===Variable Instructions===
@@ -288,16 +289,20 @@ impl Module {
         bin_module.table_section = {
             Some(TableSection { table_types: vec![TableType {
                 reftype: RefType::FuncRef,
-                limit: Limit::MinMax { min: 1, max: self.function_table.len() as u32 },
+                limit: {
+                    let number_of_closures = self.function_table.len() as u32;
+                    Limit::MinMax { min: number_of_closures, max: number_of_closures }
+                },
             }]})
         };
 
-        bin_module.element_section = {
-            Some(ElementSection { elements: vec![Element {
-                offset_expression: sections::Expression { instructions: vec![instructions::Instruction::I32Const(0)] },
-                function_references: self.function_table,
-            }]})
-        };
+        // TODO
+        //bin_module.element_section = {
+        //    Some(ElementSection { elements: vec![Element {
+        //        offset_expression: sections::Expression { instructions: vec![instructions::Instruction::I32Const(0)] },
+        //        function_references: self.function_table,
+        //    }]})
+        //};
 
         bin_module.code_section = {
             let codes: Vec<sections::Code> = self.functions.into_iter().filter_map(|fn_| match fn_ {
@@ -389,6 +394,12 @@ impl Expression {
                         binary_format_instructions(arg, instructions);
                     }
                     instructions.push(instructions::Instruction::Call(index))
+                },
+                Expression::CallIndirect(type_index, table_index, args) => {
+                    for arg in args {
+                        binary_format_instructions(arg, instructions);
+                    }
+                    instructions.push(instructions::Instruction::CallIndirect(type_index, table_index))
                 },
                 Expression::Return(expr) => {
                     binary_format_instructions(*expr, instructions);
@@ -534,6 +545,10 @@ pub fn branch(i: u32) -> Expression {
 
 pub fn call(fn_index: FunctionIndex, args: Vec<Expression>) -> Expression {
     Expression::Call(fn_index, args)
+}
+
+pub fn call_indirect(type_index: TypeIndex, table_index: TableIndex, args: Vec<Expression>) -> Expression {
+    Expression::CallIndirect(type_index, table_index, args)
 }
 
 pub fn i32_memory_get(address: Expression) -> Expression {

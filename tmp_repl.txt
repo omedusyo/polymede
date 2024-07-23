@@ -81,7 +81,12 @@ cargo run --bin compiler
 
 cargo run --bin compiler -- -f examples/simple_test.pmd
 
-cargo run --bin compiler -- -f examples/closure_test.pmd
+cargo run --bin compiler -- -f examples/closure_test.pmd -o tmp/closure_test
+
+rm test_out.wasm
+cargo run --bin compiler -- -f test.pmd -o test_out
+
+wasm2wat test_out.wasm -o test_out.wat
 
 TMP_WASM=tmp_wasm
 MODULE=out00
