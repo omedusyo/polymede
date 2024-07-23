@@ -2,7 +2,7 @@ use crate::graph_memory_machine as gmm;
 use wasm::{
     syntax::{Module, TypedFunctionImport, TypedFunction, fn_type, TYPE_I32, Expression, call, call_indirect, i32_const, i32_add, local_get, i32_eq, seq},
     base::{
-        indices::{FunctionIndex, TableIndex},
+        indices::{FunctionIndex, TableIndex, TypeIndex},
         types::{FunctionType, BlockType},
         export::{Export, ExportDescription},
     },
@@ -25,6 +25,8 @@ struct Runtime {
     number_of_user_defined_functions: usize,
     number_of_primitive_functions: usize,
 
+    function_type_for_call_indirect: TypeIndex,
+
     function_table_map: HashMap<FunctionIndex, FunctionTableIndex>,
     function_table: Vec<FunctionIndex>,
 
@@ -44,7 +46,7 @@ struct Runtime {
     var: FunctionIndex,
     drop_env: FunctionIndex,
     partial_apply: FunctionIndex,
-    call_closure: FunctionIndex,
+    make_env_from_closure: FunctionIndex,
 }
 
 pub struct PrimitiveFunctions {
@@ -108,10 +110,12 @@ fn import_runtime_function(module: &mut Module, fn_name: &str, type_: FunctionTy
 }
 
 fn import_runtime(module: &mut Module, program: &gmm::Program, primitives: PrimitiveFunctions) -> Runtime {
+    let function_type_for_call_indirect = module.add_function_type(FunctionType { domain: vec![], codomain: vec![] });
     let runtime = Runtime {
         number_of_user_defined_functions: program.functions.len(),
         number_of_primitive_functions: primitives.number_of_primitives,
 
+        function_type_for_call_indirect,
         function_table_map: HashMap::new(),
         function_table: vec![],
 
@@ -131,7 +135,7 @@ fn import_runtime(module: &mut Module, program: &gmm::Program, primitives: Primi
         var: import_runtime_function(module, "var", fn_type(vec![TYPE_I32], vec![])),
         drop_env: import_runtime_function(module, "drop_env", fn_type(vec![], vec![])),
         partial_apply: import_runtime_function(module, "partial_apply", fn_type(vec![TYPE_I32, TYPE_I32], vec![])),
-        call_closure: import_runtime_function(module, "call_closure", fn_type(vec![TYPE_I32], vec![])),
+        make_env_from_closure: import_runtime_function(module, "make_env_from_closure", fn_type(vec![TYPE_I32], vec![TYPE_I32])),
     };
 
     import_runtime_function(module, "add", fn_type(vec![], vec![]));
@@ -206,7 +210,8 @@ fn compile_term(runtime: &mut Runtime, number_of_parameters: usize, term: &gmm::
             for compiled_term in compile_terms(runtime, number_of_parameters, terms)? {
                 code.push(compiled_term)
             }
-            code.push(call(runtime.call_closure, vec![i32_const(terms.len() as i32)]));
+            code.push(call_indirect(runtime.function_type_for_call_indirect, TableIndex(0), vec![call(runtime.make_env_from_closure, vec![i32_const(terms.len() as i32)])]));
+            code.push(call(runtime.drop_env, vec![]));
             Ok(seq(code))
         },
         gmm::Term::VarUse(var_name) => {

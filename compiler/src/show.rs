@@ -165,7 +165,7 @@ pub fn show_term(term: &Term, next_parameter: usize) -> PrettyString {
             for arg in args {
                 strs.push(seq(vec![
                         string(format!("let {} = ", count)),
-                        ignore_indentation(show_term(arg, count + 1)),
+                        ignore_indentation(show_term(arg, count)),
                         str("; "),
                 ]));
                 count += 1;

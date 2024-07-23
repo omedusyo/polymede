@@ -264,7 +264,7 @@ impl Module {
         self.function_table = function_table
     }
 
-    pub fn binary_format(self) -> sections::Module {
+    pub fn binary_format(mut self) -> sections::Module {
         let mut bin_module = sections::Module::empty();
 
         bin_module.type_section = Some(TypeSection { function_types: self.function_types });
@@ -279,30 +279,28 @@ impl Module {
 
         bin_module.import_section = {
             // TODO: Can this be done without cloning of strings?
-            let imports: Vec<Import> = self.functions.iter().filter_map(|fn_| match fn_ {
+            let mut imports: Vec<Import> = self.functions.iter().filter_map(|fn_| match fn_ {
                 FunctionOrImport::Import(fn_import) => Some(Import { module_name: fn_import.module_name.clone(), name: fn_import.name.clone(), import_description: ImportDescription::FunctionTypeIndex(fn_import.type_index) }),
                 FunctionOrImport::Fn(_) => None,
             }).collect();
+
+            imports.push(Import {
+                module_name: "env".to_string(), name: "closure_table".to_string(),
+                import_description: {
+                    let number_of_closures = self.function_table.len() as u32;
+                    ImportDescription::TableType(RefType::FuncRef, Limit::MinMax { min: number_of_closures, max: number_of_closures })
+                }
+            });
+
             Some(ImportSection { imports })
         };
 
-        bin_module.table_section = {
-            Some(TableSection { table_types: vec![TableType {
-                reftype: RefType::FuncRef,
-                limit: {
-                    let number_of_closures = self.function_table.len() as u32;
-                    Limit::MinMax { min: number_of_closures, max: number_of_closures }
-                },
+        bin_module.element_section = {
+            Some(ElementSection { elements: vec![Element {
+                offset_expression: sections::Expression { instructions: vec![instructions::Instruction::I32Const(0)] },
+                function_references: self.function_table,
             }]})
         };
-
-        // TODO
-        //bin_module.element_section = {
-        //    Some(ElementSection { elements: vec![Element {
-        //        offset_expression: sections::Expression { instructions: vec![instructions::Instruction::I32Const(0)] },
-        //        function_references: self.function_table,
-        //    }]})
-        //};
 
         bin_module.code_section = {
             let codes: Vec<sections::Code> = self.functions.into_iter().filter_map(|fn_| match fn_ {

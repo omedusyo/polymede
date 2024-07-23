@@ -312,12 +312,10 @@ fn compile_term(state: &mut State, term: &polymede::Term) -> gmm::Term {
         },
         Let(bindings, body) => {
             state.open_env();
-            let mut vars: Vec<Variable> = Vec::with_capacity(bindings.len());
             let mut gmm_args: Vec<gmm::Term> = Vec::with_capacity(bindings.len());
             for (var, term) in bindings {
-                vars.push(var.clone());
+                gmm_args.push(compile_term(state, term));
                 state.extend_var(var.clone());
-                gmm_args.push(compile_term(state, term))
             }
             let gmm_body = compile_term(state, body);
             state.close_env();

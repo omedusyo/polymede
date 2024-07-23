@@ -88,6 +88,21 @@ cargo run --bin compiler -- -f test.pmd -o test_out
 
 wasm2wat test_out.wasm -o test_out.wat
 
+cat test_out.wat
+
+
+# recompile runtime
+wat2wasm ../runtime/src/wasm/runtime.wat -o runtime.wasm
+
+# compile and link
+rm test_out.*
+cargo run --bin compiler -- -f test.pmd -o test_out
+
+wasm-merge --enable-bulk-memory runtime.wasm runtime test_out.wasm test_out  -o output.wasm
+
+wasm2wat output.wasm -o output.wat
+cat output.wat
+
 TMP_WASM=tmp_wasm
 MODULE=out00
 rm $TMP_WASM/$MODULE.wasm
@@ -126,4 +141,14 @@ for `wasm-merge`
 https://github.com/WebAssembly/binaryen/releases
 
 
+
+
+==tables==
+
+wat2wasm table1.wat -o table1.wasm
+wat2wasm table2.wat -o table2.wasm
+
+wasm-merge --enable-bulk-memory table1.wat table1 table2.wat table2 -o output.wasm
+
+cat output.wat
 

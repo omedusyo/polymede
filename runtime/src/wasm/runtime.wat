@@ -2,7 +2,6 @@
 ;;       Also introduce `read` functions that will just copy stuff from the linear stack to WASM stack without consumption.
 
 (module
-  (import "env" "closure_table" (table 0 funcref))
   (import "env" "memory" (memory 0))
 
   (; Linear Stack := Linear Memory Stack ;)
@@ -320,8 +319,8 @@
   (export "partial_apply" (func $partial_apply))
 
   (; Assume on top of the linear stack there is $arg_count many arguments and a closure below them. ;)
-  (; Copy closure's partial environment and extend it with the arguments. Then call the closure. ;)
-  (func $call_closure (param $arg_count i32)
+  (; Copy closure's partial environment and extend it with the arguments. Then return the function_pointer. ;)
+  (func $make_env_from_closure (param $arg_count i32) (result i32)
     (local $closure_pointer i32)
     (local $closure_env_count i32)
     (local $fn_pointer i32)
@@ -345,10 +344,9 @@
     ;; Extend environment with arguments.
     (call $extend_env (local.get $arg_count))
 
-    (call_indirect (local.get $fn_pointer))
-    (call $drop_env)
+    (local.get $fn_pointer)
   )
-  (export "call_closure" (func $call_closure))
+  (export "make_env_from_closure" (func $make_env_from_closure))
 
   (; ===Primitive Operations=== ;)
   (func $add
