@@ -127,6 +127,7 @@ pub enum Type {
     VariableUse(Variable),
     TypeApplication(ConstructorName, Vec<Type>),
     Arrow(Box<FunctionType>),
+    I32,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -146,6 +147,7 @@ pub struct TypedTerm {
 #[derive(Debug, Clone)]
 pub enum Term {
     TypedTerm(Box<TypedTerm>),
+    Int(i32),
     VariableUse(Variable),
     FunctionApplication(Variable, Vec<Type>, Vec<Term>),
     ConstructorUse(ConstructorName, Vec<Term>),
@@ -428,6 +430,7 @@ fn free_variables(env: &mut Env, term: &Term) {
         VariableUse(var) => {
             env.attempt_to_register_free(var)
         },
+        Int(_) => {}, 
         FunctionApplication(_, _, args) => {
             for arg in args {
                 free_variables(env, arg)
@@ -508,6 +511,7 @@ pub fn type_apply(type_parameters: &[Variable], type_body: &Type, type_arguments
                 let applied_output_type = traverse(position_map, &fn_type.output_type, type_arguments);
                 Arrow(Box::new(FunctionType { input_types: applied_input_types, output_type: applied_output_type }))
             },
+            I32 => I32,
         }
     }
 

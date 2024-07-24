@@ -31,7 +31,11 @@ pub fn type_(state: &mut State) -> Result<Type> {
                 }
             } else {
                 // A type constant
-                Ok(Type::TypeApplication(constructor_name, vec![]))
+                if constructor_name.str(state.interner()) == "I32" {
+                    Ok(Type::I32)
+                } else {
+                    Ok(Type::TypeApplication(constructor_name, vec![]))
+                }
             }
         }
     }

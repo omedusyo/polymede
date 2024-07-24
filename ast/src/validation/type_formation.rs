@@ -120,7 +120,8 @@ pub fn check_type(program: &Program, type_env: &TypeScope, type_: &Type) -> Resu
         },
         Arrow(function_type) => {
             check_function_type(program, type_env, function_type)
-        }
+        },
+        I32 => Ok(()),
     }
 }
 
@@ -177,7 +178,8 @@ fn check_positive_occurance(type_var0: &Variable, type_: &Type) -> Result<()> {
                     check(type_var0, type_, polarity.flip())?
                 }
                 check(type_var0, &function_type.output_type, polarity)
-            }
+            },
+            I32 => Ok(()),
         }
     }
 
