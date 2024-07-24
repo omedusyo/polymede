@@ -4,7 +4,6 @@ type Bool = enum {
 | F
 }
 
-
 // this is also a comment.
 // think that `x := Nat`, so that
 // Nat = Z | S(Nat)
@@ -32,6 +31,8 @@ type List(a) = ind { x .
 | Nil
 | Cons(a, x)
 }
+
+fn i32_test = # I32 -> Pair(I32, I32) : { x . Pair(-002147483648, x) }
 
 fn id_bool = # Bool -> Bool : { x . x }
 

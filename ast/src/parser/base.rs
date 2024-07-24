@@ -29,6 +29,7 @@ pub enum Error {
         constructor_duplicates: Vec<Identifier>,
         function_duplicates: Vec<Identifier>,
     },
+    TypeHasForbiddenName { received: String },
     MoreThanOneRunDeclaration,
     RunDeclarationNotFound,
     FunctionHasDifferentNumberOfParametersThanDeclaredInItsType { declared_in_type: usize, parameters: usize },
@@ -192,6 +193,10 @@ impl <'lex_state, 'interner> State<'lex_state, 'interner> {
 
     pub fn is_next_token_start_type_annotation(&mut self) -> Result<bool> {
         self.lexer_state.is_next_token_start_type_annotation().map_err(Error::LexError)
+    }
+
+    pub fn commit_if_next_token_int(&mut self) -> Result<Option<i32>> {
+        self.lexer_state.commit_if_next_token_int().map_err(Error::LexError)
     }
 
     pub fn commit_if_next_token_forall(&mut self) -> Result<bool> {

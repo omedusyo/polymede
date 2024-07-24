@@ -10,7 +10,7 @@ pub enum Token {
     Identifier(String),
     Separator(SeparatorSymbol),
     BindingSeparator,
-    Nat32(u32),
+    Int32(i32),
     End,
 }
 

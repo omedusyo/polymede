@@ -74,12 +74,28 @@ fn constructor_declaration_sequence(state: &mut State) -> Result<Vec<Constructor
     delimited_possibly_empty_sequence_to_vector( state, constructor_declaration, or_separator)
 }
 
+static FORBIDDEN_CONSTRUCTOR_NAMES:[&str;3] = ["Fn", "I32", "String"];
+
+fn is_type_name_forbidden(name: &str) -> bool { 
+    for forbidden_name in FORBIDDEN_CONSTRUCTOR_NAMES {
+        if forbidden_name == name { return true }
+    }
+    return false
+}
+
 // TODO: Make sure that for ind type declarations the recursive type-variable doesn't shadow any of
 // its parameters.
 pub fn type_declaration(state: &mut State) -> Result<PreTypeDeclaration> {
     state.request_keyword(Keyword::Type_)?;
 
-    let constructor_name = constructor_name(state)?;
+    let type_name = constructor_name(state)?;
+
+    {
+        let constructor_name_str = type_name.str(state.interner());
+        if is_type_name_forbidden(constructor_name_str) {
+            return Err(Error::TypeHasForbiddenName { received: constructor_name_str.to_string() })
+        }
+    }
 
     let type_parameters: Vec<Variable> = if state.is_next_token_open_paren()? {
         state.request_token(Request::OpenParen)?;
@@ -97,7 +113,7 @@ pub fn type_declaration(state: &mut State) -> Result<PreTypeDeclaration> {
     let declaration = match keyword {
         Keyword::Enum => {
             PreTypeDeclaration::Enum(PreEnumDeclaration {
-                name: constructor_name,
+                name: type_name,
                 type_parameters,
                 constructors: constructor_declaration_sequence(state)?
             })
@@ -108,7 +124,7 @@ pub fn type_declaration(state: &mut State) -> Result<PreTypeDeclaration> {
             state.request_token(Request::BindingSeparator)?;
 
             PreTypeDeclaration::Ind(PreIndDeclaration {
-                name: constructor_name,
+                name: type_name,
                 type_parameters,
                 recursive_type_var,
                 constructors: constructor_declaration_sequence(state)?

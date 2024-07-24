@@ -15,8 +15,9 @@ pub struct State<'a> {
 pub enum Error {
     UnexpectedEnd,
     Expected { requested: Request, found: String },
+    ExpectedI32 { found: String },
     ExpectedTypeDeclarationKeyword,
-    Nat32LiteralTooBig,
+    Int32LiteralOutOfBounds,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -47,7 +48,6 @@ pub enum Request {
     Identifier,
     Separator(SeparatorSymbol),
     BindingSeparator,
-    Nat32,
     End,
 }
 
@@ -242,9 +242,6 @@ impl <'state> State<'state> {
                 }
                 let s: String = chars.into_iter().collect();
                 return Ok(LocatedToken::new(Token::Identifier(s), identifier_start_position))
-            }
-            Request::Nat32 => {
-                self.nat32(request)
             },
             Request::Separator(separator_symbol) => {
                 let c = self.read_char_or_fail_when_end()?;
@@ -339,8 +336,8 @@ impl <'state> State<'state> {
         }
     }
 
-    fn nat32(&mut self, request: Request) -> Result<LocatedToken> {
-        fn digit(c: char) -> Option<u32> {
+    pub fn commit_if_next_token_int(&mut self) -> Result<Option<i32>> {
+        fn digit(c: char) -> Option<i32> {
             match c {
                 '0' => Some(0),
                 '1' => Some(1),
@@ -355,23 +352,32 @@ impl <'state> State<'state> {
                 _ => None,
             }
         }
+        let test: i32 = 2147483647;
+        //2147483647
+        //-2147483648.
 
-        // Consume one digit (fail otherwise)
-        let c = self.read_char_or_fail_when_end()?;
-        let mut sum: u32;
-        let token_position: Position;
+        let mut c = self.read_char_or_fail_when_end()?;
+        let is_positive = match c {
+            '-' => {
+                self.advance();
+                c = self.read_char_or_fail_when_end()?;
+                false
+            },
+            _ if c.is_digit(10) => true,
+            _ => return Ok(None),
+        };
+        // We commit.
+
+        let mut sum: i32;
         match digit(c) {
             Some(d) => {
-                token_position = self.advance();
-
-                sum = d;
+                sum = if is_positive { d } else { -d };
+                self.advance();
             },
-            None => {
-                return Err(Error::Expected { requested: request, found: c.to_string() })
-            }
+            None => return Err(Error::ExpectedI32 { found: c.to_string() })
         }
 
-        // Here atleast one digit was consumed.
+        // Atleast one digit was consumed.
         // Ignore all zeroes.
         if sum == 0 {
             loop {
@@ -380,7 +386,7 @@ impl <'state> State<'state> {
                         self.advance();
                     },
                     Ok(_) => break,
-                    Err(_) => return Ok(LocatedToken::new(Token::Nat32(0), token_position))
+                    Err(_) => return Ok(Some(0))
                 }
             }
         }
@@ -390,28 +396,32 @@ impl <'state> State<'state> {
         while let Ok(c) = self.read_char_or_fail_when_end() {
             match digit(c) {
                 Some(d) => {
-                        self.advance();
+                    self.advance();
 
                     // Watch out for 32 bit overflow.
                     match sum.checked_mul(10) {
                         Some(mul_10_sum) => {
-                            match mul_10_sum.checked_add(d) {
+                            match mul_10_sum.checked_add(if is_positive { d } else { -d }) {
                                 Some(new_sum) => {
+                                    println!("{}", new_sum);
                                     sum = new_sum
                                 },
-                                None => return Err(Error::Nat32LiteralTooBig)
+                                None => {
+                                    println!("add too big");
+                                    return Err(Error::Int32LiteralOutOfBounds)
+                                }
                             }
                         },
-                        None => return Err(Error::Nat32LiteralTooBig)
+                        None => {
+                            println!("mul too big");
+                            return Err(Error::Int32LiteralOutOfBounds)
+                        }
                     }
-                    
                 },
-                None => {
-                    break
-                }
+                None => break,
             }
         }
             
-        Ok(LocatedToken::new(Token::Nat32(sum), token_position))
+        Ok(Some(sum))
     }
 }
