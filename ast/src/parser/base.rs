@@ -1,4 +1,4 @@
-use crate::base::{ Program, TypeDeclaration, RunDeclaration, FunctionDeclaration, ConstructorDeclaration};
+use crate::base::{ Program, TypeDeclaration, RunDeclaration, FunctionDeclaration, ForeignFunctionDeclaration, UserFunctionDeclaration, ConstructorDeclaration};
 use crate::identifier::{Interner, Variable, ConstructorName, FunctionName, Identifier};
 use crate::parser::lex::{
     lexer,
@@ -145,7 +145,7 @@ impl PreProgram {
     pub fn function_names(&self) -> Vec<FunctionName> {
         let mut names = vec![];
         for declaration in &self.function_declarations {
-            names.push(declaration.name.clone())
+            names.push(declaration.name().clone())
         }
         names
     }

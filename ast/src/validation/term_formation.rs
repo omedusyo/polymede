@@ -1,4 +1,4 @@
-use crate::base::{Program, TypeDeclaration, Type, FunctionDeclaration, RunDeclaration, Term, Pattern, PatternBranch};
+use crate::base::{Program, TypeDeclaration, Type, FunctionDeclaration, UserFunctionDeclaration, RunDeclaration, Term, Pattern, PatternBranch};
 use crate::identifier::{Variable, FunctionName, ConstructorName};
 use crate::validation:: {
     base::{Result, Error, ErrorWithLocation},
@@ -20,7 +20,7 @@ pub fn check_program(program: &Program) -> core::result::Result<(), Vec<ErrorWit
     for decl in program.function_declarations.values() {
         match check_function_declaration(program, decl) {
             Ok(_) => {},
-            Err(e) => errors.push(ErrorWithLocation::FunctionDeclaration(decl.name.clone(), e)),
+            Err(e) => errors.push(ErrorWithLocation::FunctionDeclaration(decl.name().clone(), e)),
         }
     }
 
@@ -45,18 +45,25 @@ fn check_run_declaration(program: &Program, decl: &RunDeclaration) -> Result<()>
 }
 
 fn check_function_declaration(program: &Program, decl: &FunctionDeclaration) -> Result<()> {
-    let type_env = TypeScope::new(&decl.type_parameters);
-    let mut env = Environment::new(program, &type_env);
-    let function_type = &decl.function.type_;
-    let function_parameters = &decl.function.function.parameters;
+    match decl {
+        FunctionDeclaration::User(decl) => {
+            let type_env = TypeScope::new(&decl.type_parameters);
+            let mut env = Environment::new(program, &type_env);
+            let function_type = &decl.function.type_;
+            let function_parameters = &decl.function.function.parameters;
 
-    env.open_env();
-    for (var, type_) in function_parameters.iter().zip(&function_type.input_types) {
-        env.extend(var, type_);
+            env.open_env();
+            for (var, type_) in function_parameters.iter().zip(&function_type.input_types) {
+                env.extend(var, type_);
+            }
+
+            type_check(&mut env, &decl.function.function.body, &function_type.output_type)?;
+            Ok(())
+        },
+        FunctionDeclaration::Foreign(decl) => {
+            Ok(())
+        },
     }
-
-    type_check(&mut env, &decl.function.function.body, &function_type.output_type)?;
-    Ok(())
 }
 
 impl <'env>Environment<'env> {
@@ -163,13 +170,26 @@ fn type_infer(env: &mut Environment, term: &Term) -> Result<Type> {
         },
         FunctionApplication(function_name, type_args, args) => {
             let Some(fn_decl) = env.get_function_declaration(function_name) else { return Err(Error::FunctionDoesntExist { function_name: function_name.clone() }) };
-            if fn_decl.type_arity() != type_args.len() { return Err(Error::ApplyingWrongNumberOfTypeArgumentsToFunction { function_name: function_name.clone(), expected: fn_decl.type_arity(), received: type_args.len() }) }
-            let fn_type = fn_decl.type_apply(type_args);
-            if fn_type.input_types.len() != args.len() { return Err(Error::ApplyingWrongNumberOfArgumentsToFunction { function_name: function_name.clone(), expected: fn_type.input_types.len(), received: args.len() }); }
-            for (arg, type_) in args.iter().zip(&fn_type.input_types) {
-                type_check(env, arg, type_)?
+            match fn_decl {
+                FunctionDeclaration::User(fn_decl) => {
+                    if fn_decl.type_arity() != type_args.len() { return Err(Error::ApplyingWrongNumberOfTypeArgumentsToFunction { function_name: function_name.clone(), expected: fn_decl.type_arity(), received: type_args.len() }) }
+                    let fn_type = fn_decl.type_apply(type_args);
+                    if fn_type.input_types.len() != args.len() { return Err(Error::ApplyingWrongNumberOfArgumentsToFunction { function_name: function_name.clone(), expected: fn_type.input_types.len(), received: args.len() }); }
+                    for (arg, type_) in args.iter().zip(&fn_type.input_types) {
+                        type_check(env, arg, type_)?
+                    }
+                    Ok(fn_type.output_type)
+                },
+                FunctionDeclaration::Foreign(fn_decl) => {
+                    if type_args.len() != 0 { return Err(Error::ApplyingWrongNumberOfTypeArgumentsToFunction { function_name: function_name.clone(), expected: 0, received: type_args.len() }) }
+                    let fn_type = fn_decl.type_.clone();
+                    if fn_type.input_types.len() != args.len() { return Err(Error::ApplyingWrongNumberOfArgumentsToFunction { function_name: function_name.clone(), expected: fn_type.input_types.len(), received: args.len() }); }
+                    for (arg, type_) in args.iter().zip(&fn_type.input_types) {
+                        type_check(env, arg, type_)?
+                    }
+                    Ok(fn_type.output_type)
+                },
             }
-            Ok(fn_type.output_type)
         },
         Match(_arg, _branches) => {
             // TODO: We could infer arg, then infer branches and check that all of the branches
@@ -266,16 +286,33 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
         },
         FunctionApplication(function_name, type_args, args) => {
             let Some(fn_decl) = env.get_function_declaration(function_name) else { return Err(Error::FunctionDoesntExist { function_name: function_name.clone() }) };
-            if fn_decl.type_arity() != type_args.len() { return Err(Error::ApplyingWrongNumberOfTypeArgumentsToFunction { function_name: function_name.clone(), expected: fn_decl.type_arity(), received: type_args.len() }) }
-            let fn_type = fn_decl.type_apply(type_args);
-            if fn_type.input_types.len() != args.len() { return Err(Error::ApplyingWrongNumberOfArgumentsToFunction { function_name: function_name.clone(), expected: fn_type.input_types.len(), received: args.len() }); }
-            for (arg, type_) in args.iter().zip(&fn_type.input_types) {
-                type_check(env, arg, type_)?
-            }
-            if eq_type(&fn_type.output_type, expected_type) {
-                Ok(())
-            } else {
-                Err(Error::FunctionOutputTypeDoesntMatchExpectedType { function_name: function_name.clone(), expected_type: expected_type.clone(), received_type: fn_type.output_type })
+            match fn_decl {
+                FunctionDeclaration::User(fn_decl) => {
+                    if fn_decl.type_arity() != type_args.len() { return Err(Error::ApplyingWrongNumberOfTypeArgumentsToFunction { function_name: function_name.clone(), expected: fn_decl.type_arity(), received: type_args.len() }) }
+                    let fn_type = fn_decl.type_apply(type_args);
+                    if fn_type.input_types.len() != args.len() { return Err(Error::ApplyingWrongNumberOfArgumentsToFunction { function_name: function_name.clone(), expected: fn_type.input_types.len(), received: args.len() }); }
+                    for (arg, type_) in args.iter().zip(&fn_type.input_types) {
+                        type_check(env, arg, type_)?
+                    }
+                    if eq_type(&fn_type.output_type, expected_type) {
+                        Ok(())
+                    } else {
+                        Err(Error::FunctionOutputTypeDoesntMatchExpectedType { function_name: function_name.clone(), expected_type: expected_type.clone(), received_type: fn_type.output_type })
+                    }
+                },
+                FunctionDeclaration::Foreign(fn_decl) => {
+                    if type_args.len() != 0 { return Err(Error::ApplyingWrongNumberOfTypeArgumentsToFunction { function_name: function_name.clone(), expected: 0, received: type_args.len() }) }
+                    let fn_type = fn_decl.type_.clone();
+                    if fn_type.input_types.len() != args.len() { return Err(Error::ApplyingWrongNumberOfArgumentsToFunction { function_name: function_name.clone(), expected: fn_type.input_types.len(), received: args.len() }); }
+                    for (arg, type_) in args.iter().zip(&fn_type.input_types) {
+                        type_check(env, arg, type_)?
+                    }
+                    if eq_type(&fn_type.output_type, expected_type) {
+                        Ok(())
+                    } else {
+                        Err(Error::FunctionOutputTypeDoesntMatchExpectedType { function_name: function_name.clone(), expected_type: expected_type.clone(), received_type: fn_type.output_type })
+                    }
+                },
             }
         },
         Match(arg, branches) => {

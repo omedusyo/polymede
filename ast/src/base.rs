@@ -98,10 +98,23 @@ pub enum TypeDeclaration {
 }
 
 #[derive(Debug)]
-pub struct FunctionDeclaration {
+pub enum FunctionDeclaration {
+    User(UserFunctionDeclaration),
+    Foreign(ForeignFunctionDeclaration),
+}
+
+#[derive(Debug)]
+pub struct UserFunctionDeclaration {
     pub name: FunctionName,
     pub type_parameters: Vec<Variable>,
     pub function: TypedFunction,
+}
+
+#[derive(Debug)]
+pub struct ForeignFunctionDeclaration {
+    pub name: FunctionName,
+    pub type_: FunctionType,
+    pub external_name: String,
 }
 
 #[derive(Debug)]
@@ -316,6 +329,15 @@ impl IndDeclaration {
 
 impl FunctionDeclaration {
     pub fn name(&self) -> FunctionName {
+        match self {
+            Self::User(decl) => decl.name(),
+            Self::Foreign(decl) => decl.name(),
+        }
+    }
+}
+
+impl UserFunctionDeclaration {
+    pub fn name(&self) -> FunctionName {
         self.name.clone()
     }
 
@@ -331,6 +353,16 @@ impl FunctionDeclaration {
             input_types: self.function.type_.input_types.iter().map(|type_| type_apply(&self.type_parameters, type_, type_arguments)).collect(),
             output_type: type_apply(&self.type_parameters, &self.function.type_.output_type, type_arguments)
         }
+    }
+}
+
+impl ForeignFunctionDeclaration {
+    pub fn name(&self) -> FunctionName {
+        self.name.clone()
+    }
+
+    pub fn external_name(&self) -> &str {
+        &self.external_name
     }
 }
 
