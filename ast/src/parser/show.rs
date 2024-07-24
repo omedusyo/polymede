@@ -101,6 +101,7 @@ impl <'show>Show<'show> {
                 let fn_type_str = self.show_function_type(&*function_type);
                 format!("Fn({fn_type_str})")
             },
+            I32 => "I32".to_string(),
         }
     }
 
