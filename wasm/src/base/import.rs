@@ -1,6 +1,6 @@
 use crate::base::{
     indices::TypeIndex,
-    types::GlobalType,
+    types::{GlobalType, RefType},
     memory::Limit,
 };
 
@@ -14,6 +14,7 @@ pub struct Import {
 #[derive(Debug)]
 pub enum ImportDescription {
     FunctionTypeIndex(TypeIndex),
+    TableType(RefType, Limit),
     MemoryType(Limit),
     GlobalType(GlobalType),
 }

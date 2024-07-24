@@ -1,9 +1,7 @@
-// Requires: `wasm-merge` and `wat2wasm`
+// This module requires: `wasm-merge` and `wat2wasm`
 
 const fs = require("fs");
-// const exec = require("child_process").exec;
 const child_process = require("child_process");
-const assert = require('assert');
 
 function exec(cmd) {
   return new Promise((resolve, reject) => {
@@ -17,69 +15,11 @@ function exec(cmd) {
   });
 }
 
-const TESTS = [];
-
-// ===Tests===
-TESTS.push(({ exports }, { LOG }) => {
-  console.log("EXAMPLE STACK 0");
-  exports.example_stack_0();
-  assert.deepEqual(LOG,
-    [ 1,    5,0,0,0, // 5
-      1,    7,0,0,0, // 7
-
-      1,   12,0,0,0, // 5 + 7 == 12
-    ]
-  );
-});
-
-TESTS.push(({ exports }, { LOG }) => {
-  console.log("RANGE TEST 0");
-  exports.range_test_0(5);
-  assert.deepEqual(LOG,
-    [0, 1, 2, 3, 4, 5555555]
-  );
-});
-
-
-// ===Setup===
-function main() {
-  const module_name = process.argv[2];
-  console.log(`module_name: ${module_name}`);
-
-  compile(module_name).then(bytes => {
-    // run tests
-    TESTS.forEach(test => {
-      run(bytes, test);
-    });
-  }).catch(err => {
-    console.log(err);
-  });
-}
-
-function compile(in_module) {
-  // Compiles runtime + module and links them into one `output.wasm` module
-
-  const runtime_module = "runtime";
-  const output_module = "output";
-
-  const wat_path = "runtime/src/wasm";
-  const wasm_path = "tmp_wasm/runtime";
-
-  // ===.wat compilation===
-  return wat2wasm(wat_path, wasm_path, in_module)
-    .then(_ => wat2wasm(wat_path, wasm_path, runtime_module))
-  // ===static merging===
-    .then(_ => wasm_merge(wasm_path, [in_module, runtime_module], output_module))
-  // ===bytes===
-    .then(_ => {
-      return wasm2bytes(wasm_path, output_module);
-    });
-}
-
 function wat2wasm(wat_path, wasm_path, module_name) {
   const cmd = `wat2wasm ${wat_path}/${module_name}.wat -o ${wasm_path}/${module_name}.wasm`;
   return exec(cmd);
 }
+module.exports.wat2wasm = wat2wasm;
 
 function wasm_merge(wasm_path, modules, out_module) {
   const merge_args = [];
@@ -89,12 +29,14 @@ function wasm_merge(wasm_path, modules, out_module) {
   const cmd = `wasm-merge --enable-bulk-memory ${merge_args.join(" ")} -o ${wasm_path}/${out_module}.wasm`;
   return exec(cmd);
 }
+module.exports.wasm_merge = wasm_merge;
 
 function wasm2bytes(wasm_path, module) {
   const file = fs.readFileSync(`${wasm_path}/${module}.wasm`);
   const bytes = new Uint8Array(file);
   return bytes;
 }
+module.exports.wasm2bytes = wasm2bytes;
 
 function run(bytes, on_instance) {
 
@@ -129,9 +71,12 @@ function run(bytes, on_instance) {
     // TODO: This probably doesn't even make sense
   }
 
-  const GLOBAL = {};
+  const memory = new WebAssembly.Memory({ initial: 2, maximum: 10 });
+  const closure_table = new WebAssembly.Table({ initial: 0, element: "anyfunc" });
+
+  const buffer = memory.buffer;
+  const GLOBAL = { BUFFER: buffer };
   const LOG = [];
-  let buffer;
 
   const config = {
     console: {
@@ -147,13 +92,15 @@ function run(bytes, on_instance) {
         printRawHeap(buffer);
       },
     },
+    env: {
+      memory,
+      closure_table,
+    },
   };
 
   WebAssembly.instantiate(bytes, config).then(({ instance }) => {
-    const { memory, init, stack_start, stack, env, heap, free, frame } = instance.exports;
-    buffer = memory.buffer;
+    const { init, stack_start, stack, env, heap, free, frame } = instance.exports;
 
-    GLOBAL.BUFFER = memory.buffer;
     GLOBAL.STACK_START = stack_start;
     GLOBAL.STACK = stack;
     GLOBAL.ENV = env;
@@ -161,10 +108,7 @@ function run(bytes, on_instance) {
     GLOBAL.FREE = free;
     GLOBAL.FRAME = frame;
 
-    const array = new Uint8Array(buffer);
-
-    on_instance(instance, { GLOBAL, LOG, buffer });
+    on_instance(instance, { GLOBAL, LOG, buffer, config });
   });
 }
-
-main();
+module.exports.run = run;

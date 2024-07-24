@@ -2,8 +2,7 @@
 ;;       Also introduce `read` functions that will just copy stuff from the linear stack to WASM stack without consumption.
 
 (module
-  (memory 2 10)
-  (export "memory" (memory 0))
+  (import "env" "memory" (memory 0))
 
   (; Linear Stack := Linear Memory Stack ;)
   (global $stack_start (mut i32) (i32.const 0))
@@ -21,9 +20,12 @@
   (export "free" (global $FREE))
 
   (; ===Global Constants=== ;)
-  (global $ENV_HEADER_BYTE_SIZE i32 (i32.const 4))
-  (global $ENV_POINTER_BYTE_SIZE i32 (i32.const 4))
-  (global $SCOPE_EXTENSION_HEADER_SIZE i32 (i32.const 8))
+  (global $ENV_HEADER_BYTE_SIZE i32 (i32.const 8)) ;; 8 bytes, 4 bytes for parent env pointer, 4 bytes for env count.
+  (global $PARENT_ENV_POINTER_BYTE_SIZE i32 (i32.const 4))
+  (global $ENV_COUNTER_BYTE_SIZE i32 (i32.const 4))
+  (; Env offset is relative to the current env pointer, which points to the start of the env-arguments. ;)
+  (global $PARENT_ENV_POINTER__OFFSET i32 (i32.const -8))
+  (global $ENV_COUNTER_OFFSET i32 (i32.const -4))
 
   (global $TAGGED_POINTER_BYTE_SIZE i32 (i32.const 5))
   (global $CONST_TAG i32 (i32.const 1))
@@ -111,7 +113,7 @@
   (export "tuple" (func $tuple))
 
   (; Assumes that a pointer to a tuple is on the top of the Linear Stack. ;)
-  (; Moves its to WASM stack ;)
+  (; Moves it to WASM stack ;)
   (func $get_tuple_pointer (result i32)
     (call $dec_stack (i32.const 4))
     (i32.load (global.get $STACK))
@@ -180,7 +182,7 @@
   (; and creates an environment out of them ;)
   (func $make_env (param $count i32)
     (; This is terribly inefficient. We're just shifting the top of the stack ;)
-    (; by $ENV_HEADER_BYTE_SIZE bytes, and then writing the size as the prefix. ;)
+    (; by $ENV_COUNTER_BYTE_SIZE bytes, and then writing the size as the prefix. ;)
 
     (local $byte_size i32)
     (local $source i32)
@@ -188,18 +190,18 @@
 
     (local.set $byte_size (i32.mul (global.get $TAGGED_POINTER_BYTE_SIZE) (local.get $count)))
     (call $dec_stack (local.get $byte_size))
-    (local.set $destination (i32.add (global.get $STACK) (global.get $SCOPE_EXTENSION_HEADER_SIZE)))
+    (local.set $destination (i32.add (global.get $STACK) (global.get $ENV_HEADER_BYTE_SIZE)))
 
     (; ==Copy the arguments== ;)
     (memory.copy (local.get $destination) (global.get $STACK) (local.get $byte_size))
 
     (; ==Saving old ENV register== ;)
     (i32.store (global.get $STACK) (global.get $ENV))
-    (call $inc_stack (global.get $ENV_POINTER_BYTE_SIZE))
+    (call $inc_stack (global.get $PARENT_ENV_POINTER_BYTE_SIZE))
 
     (; ==Set the size== ;)
     (i32.store (global.get $STACK) (local.get $count))
-    (call $inc_stack (global.get $ENV_HEADER_BYTE_SIZE))
+    (call $inc_stack (global.get $ENV_COUNTER_BYTE_SIZE))
 
     (; ==Set the environment on the Linear Stack as the current environment== ;)
     (global.set $ENV (global.get $STACK))
@@ -207,12 +209,37 @@
   )
   (export "make_env" (func $make_env))
 
+  (func $make_env_from (param $pointer i32) (param $count i32)
+    (local $byte_size i32)
+    (local $source i32)
+    (local $destination i32)
+
+    (local.set $byte_size (i32.mul (global.get $TAGGED_POINTER_BYTE_SIZE) (local.get $count)))
+    (local.set $destination (i32.add (global.get $STACK) (global.get $ENV_HEADER_BYTE_SIZE)))
+
+    (; ==Copy the arguments== ;)
+    (memory.copy (local.get $destination) (local.get $pointer) (local.get $byte_size))
+
+    (; ==Saving old ENV register== ;)
+    (i32.store (global.get $STACK) (global.get $ENV))
+    (call $inc_stack (global.get $PARENT_ENV_POINTER_BYTE_SIZE))
+
+    (; ==Set the size== ;)
+    (i32.store (global.get $STACK) (local.get $count))
+    (call $inc_stack (global.get $ENV_COUNTER_BYTE_SIZE))
+
+    (; ==Set the environment on the Linear Stack as the current environment== ;)
+    (global.set $ENV (global.get $STACK))
+    (call $inc_stack (local.get $byte_size))
+  )
+  (export "make_env_from" (func $make_env_from))
+
   (; Assume N arguments on the stack (here N == $arg_count) ;)
   (; The N arguments are consumed, and in their place we have ;)
   (; * Environment header (saved current ENV register followed by the count of variables) ;)
   (; * Followed by the new extended environment with the consumed arguments ;)
   (; The env register is updated to point to this new environment. ;)
-  (func $extend_env (param $arg_count i32)
+  (func $copy_and_extend_env (param $arg_count i32)
     (local $old_env_count i32)
     (local $old_env_byte_size i32)
 
@@ -220,31 +247,41 @@
     (local $destination_arg i32)
     (local $arg_byte_size i32)
 
-    (local.set $old_env_count (i32.load (i32.sub (global.get $ENV) (global.get $ENV_HEADER_BYTE_SIZE))))
+    (local.set $old_env_count (i32.load (i32.add (global.get $ENV) (global.get $ENV_COUNTER_OFFSET))))
     (local.set $old_env_byte_size (i32.mul (global.get $TAGGED_POINTER_BYTE_SIZE) (local.get $old_env_count)))
     (local.set $arg_byte_size (i32.mul (global.get $TAGGED_POINTER_BYTE_SIZE) (local.get $arg_count)))
 
     (call $dec_stack (local.get $arg_byte_size))
 
     (; ==Copying the current arguments to the new env== ;)
-    (local.set $destination_arg (i32.add (global.get $STACK) (i32.add (global.get $SCOPE_EXTENSION_HEADER_SIZE) (local.get $old_env_byte_size))))
+    (local.set $destination_arg (i32.add (global.get $STACK) (i32.add (global.get $ENV_HEADER_BYTE_SIZE) (local.get $old_env_byte_size))))
     (memory.copy (local.get $destination_arg) (global.get $STACK) (local.get $arg_byte_size))
 
     (; ==Copying the old env== ;)
-    (memory.copy (i32.add (global.get $STACK) (global.get $SCOPE_EXTENSION_HEADER_SIZE)) (global.get $ENV) (local.get $old_env_byte_size))
+    (memory.copy (i32.add (global.get $STACK) (global.get $ENV_HEADER_BYTE_SIZE)) (global.get $ENV) (local.get $old_env_byte_size))
 
     (; ==Saving old ENV register== ;)
     (i32.store (global.get $STACK) (global.get $ENV))
-    (call $inc_stack (global.get $ENV_POINTER_BYTE_SIZE))
+    (call $inc_stack (global.get $PARENT_ENV_POINTER_BYTE_SIZE))
 
     (; ==Updating the env register== ;) 
-    (global.set $ENV (i32.add (global.get $STACK) (global.get $ENV_HEADER_BYTE_SIZE)))
+    (global.set $ENV (i32.add (global.get $STACK) (global.get $ENV_COUNTER_BYTE_SIZE)))
 
     (; ==Prefixing the environment with the size ;)
     (i32.store (global.get $STACK) (i32.add (local.get $old_env_count) (local.get $arg_count)))
 
     (; ==Moving the stack== ;)
-    (call $inc_stack (i32.add (global.get $ENV_HEADER_BYTE_SIZE) (i32.add (local.get $old_env_byte_size) (local.get $arg_byte_size))))
+    (call $inc_stack (i32.add (global.get $ENV_COUNTER_BYTE_SIZE) (i32.add (local.get $old_env_byte_size) (local.get $arg_byte_size))))
+  )
+  (export "copy_and_extend_env" (func $copy_and_extend_env))
+
+  (; Increments the current env counter by $count. ;)
+  (; This can be used in the situation where the top of the linear stack is some value that needs to be ;)
+  (; included in the current environment, and the environment is directly before that value on the linear stack. ;)
+  (func $extend_env (param $count i32)
+    (local $env_count i32)
+    (local.set $env_count (i32.load (i32.add (global.get $ENV) (global.get $ENV_COUNTER_OFFSET))))
+    (i32.store (local.get $env_count) (i32.add (local.get $env_count) (local.get $count)))
   )
   (export "extend_env" (func $extend_env))
 
@@ -260,7 +297,7 @@
 
   (func $drop_env
     (local $header_start i32)
-    (local.set $header_start (i32.sub (global.get $ENV) (global.get $SCOPE_EXTENSION_HEADER_SIZE)))
+    (local.set $header_start (i32.sub (global.get $ENV) (global.get $ENV_HEADER_BYTE_SIZE)))
 
     (; ==Reset env== ;)
     (global.set $ENV (i32.load (local.get $header_start)))
@@ -273,4 +310,58 @@
     (global.set $STACK (i32.add (local.get $header_start) (global.get $TAGGED_POINTER_BYTE_SIZE)))
   )
   (export "drop_env" (func $drop_env))
+
+  (; Bundle a function pointer together with $arg_count many values (which are assummed to be on the linear stack) and put in on the heap. ;)
+  (func $partial_apply (param $fn_index i32) (param $arg_count i32)
+    (; Stores closure as a tuple whose components are the arguments, and whose function pointer is the tuple's variant. ;)
+    (call $tuple (local.get $fn_index) (local.get $arg_count))
+  )
+  (export "partial_apply" (func $partial_apply))
+
+  (; Assume on top of the linear stack there is $arg_count many arguments and a closure below them. ;)
+  (; Copy closure's partial environment and extend it with the arguments. Then return the function_pointer. ;)
+  (func $make_env_from_closure (param $arg_count i32) (result i32)
+    (local $closure_pointer i32)
+    (local $closure_env_count i32)
+    (local $fn_pointer i32)
+
+    (call $dec_stack (local.get $arg_count))
+    (local.set $closure_pointer (call $get_tuple_pointer))
+    (local.set $closure_env_count (i32.load8_u (i32.add (local.get $closure_pointer) (global.get $TUPLE_COUNT_OFFSET))))
+    (local.set $fn_pointer (i32.load (i32.add (local.get $closure_pointer) (global.get $TUPLE_VARIANT_OFFSET))))
+
+    (call $inc_stack (global.get $TAGGED_POINTER_BYTE_SIZE))
+    
+    ;; Shift arguments on the stack so there's enough room for closure's environment.
+    (memory.copy
+      (i32.add (global.get $STACK) (i32.add (global.get $ENV_HEADER_BYTE_SIZE) (i32.mul (global.get $TAGGED_POINTER_BYTE_SIZE) (local.get $closure_env_count))))
+      (i32.add (global.get $STACK) (global.get $TAGGED_POINTER_BYTE_SIZE))
+      (i32.mul (global.get $TAGGED_POINTER_BYTE_SIZE) (local.get $arg_count)))
+
+    ;; Open closure's environment.
+    (call $make_env_from (i32.add (local.get $closure_pointer) (global.get $TUPLE_COUNT_OFFSET)) (local.get $closure_env_count))
+
+    ;; Extend environment with arguments.
+    (call $extend_env (local.get $arg_count))
+
+    (local.get $fn_pointer)
+  )
+  (export "make_env_from_closure" (func $make_env_from_closure))
+
+  (; ===Primitive Operations=== ;)
+  (func $add
+    (call $const (i32.add (call $get_const) (call $get_const)))
+  )
+  (export "add" (func $add))
+
+  (func $inc
+    (call $const (i32.add (call $get_const) (i32.const 1)))
+  )
+  (export "inc" (func $inc))
+
+  (func $dec
+    (call $const (i32.sub (call $get_const) (i32.const 1)))
+  )
+  (export "dec" (func $dec))
 )
+

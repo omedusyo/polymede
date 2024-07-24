@@ -10,11 +10,13 @@ use crate::binary_format::sections::{
     TypeSection,
     ImportSection,
     FunctionSection,
+    TableSection, TableType,
     MemorySection,
     GlobalsSection, Global,
     ExportSection,
     StartSection,
     CodeSection,
+    ElementSection, Element,
     DataSection, DataItem,
     DataCountSection,
     Expression, Code, LocalDeclaration
@@ -24,7 +26,7 @@ use crate::base::{
     export::{Export, ExportDescription},
     import::{Import, ImportDescription},
     indices::{TypeIndex, LocalIndex, GlobalIndex, FunctionIndex},
-    types::{NumType, ValueType, FunctionType, BlockType, GlobalType, Mutability},
+    types::{NumType, ValueType, FunctionType, BlockType, RefType, GlobalType, Mutability},
     instructions::Instruction,
 };
 use NumType::*;
@@ -49,8 +51,16 @@ pub fn generate0() -> Vec<u8> {
         TypeIndex(0),
         TypeIndex(2), // empty
     ]});
+    module.table_section = Some(TableSection { table_types: vec![
+        // Limit::MinToInfinity { min: 1 },
+        TableType {
+            reftype: RefType::FuncRef,
+            limit: Limit::MinMax { min: 1, max: 10 },
+        }
+    ]});
     module.memory_section = Some(MemorySection { memory_types: vec![
         // Limit::MinToInfinity { min: 1 },
+        // TODO: How can I determine the max?
         Limit::MinMax { min: 1, max: 10 },
     ]});
     module.globals_section = Some(GlobalsSection { globals: vec![
@@ -99,6 +109,13 @@ pub fn generate0() -> Vec<u8> {
         Code {
             locals: vec![],
             expression: Expression { instructions: code_empty }
+        }
+    ]});
+
+    module.element_section = Some(ElementSection { elements: vec![
+        Element {
+            offset_expression: Expression { instructions: vec![Instruction::I32Const(0)] },
+            function_references: vec![FunctionIndex(0)],
         }
     ]});
 

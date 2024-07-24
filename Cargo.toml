@@ -7,5 +7,3 @@ members = [
     "wasm",
     "runtime"
 ]
-
-[workspace.dependencies]

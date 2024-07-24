@@ -10,29 +10,27 @@
   (import "runtime" "read_tag" (func $read_tag (result i32)))
   (import "runtime" "get_variant" (func $get_variant (result i32)))
   (import "runtime" "make_env" (func $make_env (param $count i32)))
-  (import "runtime" "extend_env" (func $extend_env (param $arg_count i32)))
+  (import "runtime" "copy_and_extend_env" (func $copy_and_extend_env (param $arg_count i32)))
   (import "runtime" "var" (func $var (param $index i32)))
   (import "runtime" "drop_env" (func $drop_env))
+
+  (import "runtime" "add" (func $add))
+  (import "runtime" "inc" (func $inc))
+  (import "runtime" "dec" (func $dec))
 
   (import "console" "log" (func $log (param i32)))
   (import "console" "logStack" (func $log_stack))
   (import "console" "logHeap" (func $log_heap))
 
-  (table 50 funcref)
+  (; (table 1024 funcref) ;)
+  (; (export "closure_table" (table 0)) ;)
 
+  (; (func $tables_test_0 ;)
+  (;   (call_indirect (i32.const 2)) ;)
+  (; ) ;)
 
-  (; ===Primitive Operations=== ;)
-  (func $add
-    (call $const (i32.add (call $get_const) (call $get_const)))
-  )
+  (; (elem (i32.const 0) $true $false $cons) ;)
 
-  (func $inc
-    (call $const (i32.add (call $get_const) (i32.const 1)))
-  )
-
-  (func $dec
-    (call $const (i32.sub (call $get_const) (i32.const 1)))
-  )
 
   (; ===Examples=== ;)
   (; ==functions== ;)
@@ -125,7 +123,7 @@
         (call $var (i32.const 0)) ;; n
         (call $dec) ;; n - 1
         ;; Start Let
-        (call $extend_env (i32.const 1)) ;; let m := n - 1
+        (call $copy_and_extend_env (i32.const 1)) ;; let m := n - 1
         ;; now our environment is n, xs, m
 
         (call $var (i32.const 2)) ;; m
@@ -286,7 +284,7 @@
     (call $const (i32.const 62))
     (call $log_stack)
 
-    (call $extend_env (i32.const 3))
+    (call $copy_and_extend_env (i32.const 3))
     (call $log_stack)
   )
 
@@ -339,16 +337,6 @@
     (call $log_list)
     (call $drop_env)
   )
-
-
-  (func $tables_test_0
-    (call_indirect (i32.const 2))
-  )
-
-  (; (elem (i32.const 0) $add $inc $range_test_0) ;)
-  (elem (i32.const 0) $add)
-  (elem (i32.const 1) $inc)
-  (elem (i32.const 2) $range_test_0)
 
   (export "example_stack_0" (func $example_stack_0))
   (export "example_heap_0" (func $example_heap_0))

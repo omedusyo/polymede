@@ -36,7 +36,7 @@ TMP_WAT=tmp_wat
 FILE=test
 
 rm $TMP_WASM/$FILE.wasm
-cargo run --bin compiler
+cargo run --bin wasm
 
 wasm2wat $TMP_WASM/$FILE.wasm -o $TMP_WAT/$FILE.wat
 
@@ -81,7 +81,40 @@ cargo run --bin compiler
 
 cargo run --bin compiler -- -f examples/simple_test.pmd
 
-cargo run --bin compiler -- -f examples/closure_test.pmd
+cargo run --bin compiler -- -f examples/closure_test.pmd -o tmp/closure_test
+
+rm test_out.wasm
+cargo run --bin compiler -- -f test.pmd -o test_out
+
+wasm2wat test_out.wasm -o test_out.wat
+
+cat test_out.wat
+
+
+# recompile runtime
+wat2wasm ../runtime/src/wasm/runtime.wat -o runtime.wasm
+
+# compile and link
+rm test_out.*
+cargo run --bin compiler -- -f test.pmd -o test_out
+
+wasm-merge --enable-bulk-memory runtime.wasm runtime test_out.wasm test_out  -o output.wasm
+
+wasm2wat output.wasm -o output.wat
+cat output.wat
+
+TMP_WASM=tmp_wasm
+MODULE=out00
+rm $TMP_WASM/$MODULE.wasm
+cargo run --bin compiler
+
+wasm2wat $TMP_WASM/$MODULE.wasm 
+
+wasm2wat $TMP_WASM/$MODULE.wasm  -v
+
+node runtime/src/run_gmm.js $MODULE
+
+wasm2wat $TMP_WASM/output.wasm 
 
 # ===WASM Runtime Support===
 
@@ -94,8 +127,11 @@ cargo run --bin runtime
 # wat2wasm runtime/src/wasm/$FILE.wat -o tmp_wasm/runtime/$FILE.wasm --debug-names
 # wat2wasm runtime/src/wasm/$FILE.wat -o tmp_wasm/runtime/$FILE.wasm -v
 
-FILE=test
-node runtime/src/run.js $FILE
+node runtime/src/test.js
+
+MODULE=test
+node runtime/src/compile_wasm.js $MODULE
+
 
 # wasm-merge --enable-bulk-memory tmp_wasm/runtime/test.wasm test tmp_wasm/runtime/runtime.wasm runtime -o tmp_wasm/runtime/output.wasm
 # wasm2wat tmp_wasm/runtime/output.wasm 
@@ -105,4 +141,14 @@ for `wasm-merge`
 https://github.com/WebAssembly/binaryen/releases
 
 
+
+
+==tables==
+
+wat2wasm table1.wat -o table1.wasm
+wat2wasm table2.wat -o table2.wasm
+
+wasm-merge --enable-bulk-memory table1.wat table1 table2.wat table2 -o output.wasm
+
+cat output.wat
 

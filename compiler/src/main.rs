@@ -1,13 +1,14 @@
 mod graph_memory_machine;
 mod interpreter;
 mod polymede_compiler;
+mod gmm_compiler;
 mod show;
 
 use std::io;
 use std::io::Write;
 use std::fs;
+
 use clap::Parser;
-use wasm;
 use ast::parser;
 
 type Result<A> = std::result::Result<A, io::Error>;
@@ -17,6 +18,52 @@ type Result<A> = std::result::Result<A, io::Error>;
 struct Args {
     #[arg(short, long)]
     file: String,
+    #[arg(short, long)]
+    out: String,
+}
+
+fn example_compilation0() -> Vec<u8> {
+    use crate::graph_memory_machine::{Program, Function, constant, tuple, project, var, call, call_closure, partial_apply, pattern_match};
+    let standard_primitives = gmm_compiler::PrimitiveFunctions::standard();
+
+    // functions
+    let singleton = standard_primitives.number_of_primitives;
+
+    // constructors
+    let nil = 0;
+    let cons = 1;
+    let program = Program {
+        number_of_primitive_functions: standard_primitives.number_of_primitives,
+        functions: vec![
+            // fn singleton(x) {
+            //   Tuple(Cons, [x, Const(Nil)])
+            // }
+            Function {
+                number_of_parameters: 1,
+                body: {
+                    let x = 0;
+                    tuple(cons, vec![var(x), constant(nil)])
+                }
+            }
+        ],
+        // TODO: How to call primitive functions?
+        // main: constant(666),
+        // main: {
+        //     let nil = 0;
+        //     let cons = 1;
+        //     tuple(cons, vec![constant(666), constant(nil)])
+        // },
+        // main: {
+        //     call(standard_primitives.inc, vec![constant(666)])
+        // },
+        main: {
+            call(singleton, vec![constant(230)])
+        },
+    };
+    
+    let module = gmm_compiler::compile(program, standard_primitives).unwrap();
+    let bytes = module.bytes();
+    bytes
 }
 
 fn check_program(program: &ast::base::Program) -> core::result::Result<(), Vec<ast::validation::base::ErrorWithLocation>> {
@@ -26,55 +73,69 @@ fn check_program(program: &ast::base::Program) -> core::result::Result<(), Vec<a
 }
 
 fn main() -> Result<()> {
-    // let bytes = wasm::generate0();
-    // let bytes = wasm::generate1();
-    // let bytes = wasm::generate_factorial();
-    // let bytes = wasm::generate_memory0();
-    //let bytes = wasm::generate_memory1();
-
-    //let mut file = fs::OpenOptions::new()
-    //    .create(true) // To create a new file
-    //    .write(true)
-    //    // either use the ? operator or unwrap since it returns a Result
-    //    .open("./tmp_wasm/test.wasm")?;
-    //
-    //file.write_all(&bytes)?;
-    //
-    //println!("{bytes:?}");
-    
-
     let args = Args::parse();
-    let str = fs::read_to_string(args.file)?;
-    match parser::parse_program(&str) {
-        Ok(program) => {
-            let sh = parser::show::Show::new(&program.interner());
-            println!("===Signature .pmd===");
-            println!("{}", sh.show_program_declarations(&program));
+    let file_name = fs::read_to_string(args.file)?;
 
-            match check_program(&program) {
-                Ok(()) => {
-                    let gmm_program = polymede_compiler::compile(250, &program);
-                    let s = show::show_program(&gmm_program).str();
-                    println!("");
-                    println!("");
-                    println!("===Compiled .gmm===");
-                    println!("{}", s);
-                },
-                Err(errors) => {
-                    println!("===TYPE ERROR===");
-                    for e in errors {
-                        println!("{}\n", e.show(&sh))
-                    }
-                }
+    // ===Parsing===
+    let program = {
+        match parser::parse_program(&file_name) {
+            Ok(program) => program,
+            Err(err) => {
+                println!("====PARSING ERROR===");
+                println!("{:?}", err);
+                return Ok(())
+            },
+        }
+    };
+
+    let sh = parser::show::Show::new(&program.interner());
+    let interface_str = sh.show_program_declarations(&program);
+    let mut out_interface_file = fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .open(&format!("{}.pmdi", args.out))?;
+    out_interface_file.write(interface_str.as_bytes())?;
+
+    // ===Type Checking===
+    match check_program(&program) {
+        Err(errors) => {
+            println!("===TYPE ERROR===");
+            for e in errors {
+                println!("{}\n", e.show(&sh))
             }
         },
-        Err(err) => {
-            println!("====PARSING ERROR===");
-            println!("{:?}", err);
-        },
+        _ => {}
     }
-    // TODO
-    //example0();
+
+    // ===.pmd ~> .gmm compiler===
+    let standard_primitives = gmm_compiler::PrimitiveFunctions::standard();
+
+    let gmm_program = polymede_compiler::compile(standard_primitives.number_of_primitives, &program);
+    let gmm_str = show::show_program(&gmm_program).str();
+
+    let mut out_gmm_file = fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .open(&format!("{}.gmm", args.out))?;
+    out_gmm_file.write(gmm_str.as_bytes())?;
+
+    // ===.gmm ~> .wasm compiler===
+    let module = {
+        match gmm_compiler::compile(gmm_program, standard_primitives) {
+            Ok(module) => module,
+            Err(err) => {
+                println!("===COMPILATION ERROR===");
+                println!("{:?}", err);
+                return Ok(())
+            },
+        }
+    };
+    let bytes = module.bytes();
+    let mut wasm_file = fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .open(&format!("{}.wasm", args.out))?;
+    wasm_file.write(&bytes)?;
 
     Ok(())
 }

@@ -252,7 +252,11 @@ fn compile_term(state: &mut State, term: &polymede::Term) -> gmm::Term {
         },
         ConstructorUse(constructor_name, args) => {
             let Some(constructor_index) = state.get_constructor_index(constructor_name) else { unreachable!() };
-            gmm::Term::Tuple(constructor_index, args.iter().map(|arg| compile_term(state, arg)).collect())
+            if args.is_empty() {
+                gmm::Term::Const(constructor_index)
+            } else {
+                gmm::Term::Tuple(constructor_index, args.iter().map(|arg| compile_term(state, arg)).collect())
+            }
         },
         Match(arg, branches) => {
             // TODO: This will have to be replaced by proper
@@ -308,12 +312,10 @@ fn compile_term(state: &mut State, term: &polymede::Term) -> gmm::Term {
         },
         Let(bindings, body) => {
             state.open_env();
-            let mut vars: Vec<Variable> = Vec::with_capacity(bindings.len());
             let mut gmm_args: Vec<gmm::Term> = Vec::with_capacity(bindings.len());
             for (var, term) in bindings {
-                vars.push(var.clone());
+                gmm_args.push(compile_term(state, term));
                 state.extend_var(var.clone());
-                gmm_args.push(compile_term(state, term))
             }
             let gmm_body = compile_term(state, body);
             state.close_env();

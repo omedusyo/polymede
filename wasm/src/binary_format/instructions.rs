@@ -23,6 +23,7 @@ impl Instruction {
 
     pub const RETURN: u8 = 0x0f;
     pub const CALL: u8 = 0x10;
+    pub const CALL_INDIRECT: u8 = 0x11;
 
     pub const END: u8 = 0x0B;
 
@@ -97,6 +98,7 @@ pub enum InstructionStream {
     ConstI32(Seq<Byte, I32ToSignedLEB128>),
     ConstI64(Seq<Byte, I64ToSignedLEB128>),
     SimpleWithIndex(Seq<Byte, IndexStream>),
+    SimpleWithDoubleIndex(Seq<Byte, Seq<IndexStream, IndexStream>>),
     // Not just a block instruction, but also if-then, loop
     BlockExpr(Seq<
         Seq<Byte, <BlockType as Encoder>::S>,
@@ -136,6 +138,10 @@ impl InstructionStream {
         Self::SimpleWithIndex(byte(opcode).seq(index.emit()))
     }
 
+    fn simple_with_double_index<I0: Index, I1: Index>(opcode: u8, index0: I0, index1: I1) -> Self {
+        Self::SimpleWithDoubleIndex(byte(opcode).seq(index0.emit().seq(index1.emit())))
+    }
+
     fn block_expr(opcode: u8, block_type: &BlockType, instructions: &[Instruction]) -> Self {
         let header = byte(opcode).seq(block_type.emit());
         let instructions = instructions.iter().map(|instruction| instruction.emit()).collect();
@@ -168,6 +174,7 @@ impl ByteStream for InstructionStream {
             Self::ConstI32(s) => s.next(),
             Self::ConstI64(s) => s.next(),
             Self::SimpleWithIndex(s) => s.next(),
+            Self::SimpleWithDoubleIndex(s) => s.next(),
             Self::BlockExpr(s) => s.next(),
             Self::IfThenElseExpr(s) => s.next(),
             Self::InstructionWithMemoryArgument(s) => s.next(),
@@ -198,6 +205,7 @@ impl Encoder for Instruction {
             Br(i) => InstructionStream::simple_with_index(Self::BR, *i),
             BrIf(i) => InstructionStream::simple_with_index(Self::BR_IF, *i),
             Call(i) => InstructionStream::simple_with_index(Self::CALL, *i),
+            CallIndirect(type_i, table_i) => InstructionStream::simple_with_double_index(Self::CALL_INDIRECT, *type_i, *table_i),
             Return => InstructionStream::simple(Self::RETURN),
 
             // ===Variables Instructions===

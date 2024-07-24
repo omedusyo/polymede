@@ -1,9 +1,9 @@
 use crate::binary_format::sections;
-use crate::binary_format::sections::{TypeSection, FunctionSection, ExportSection, ImportSection, CodeSection, MemorySection};
+use crate::binary_format::sections::{TypeSection, FunctionSection, ExportSection, ImportSection, CodeSection, TableSection, MemorySection, TableType, ElementSection, Element};
 use crate::{Encoder, ByteStream};
 use crate::base::{
-    indices::{TypeIndex, LocalIndex, GlobalIndex, LabelIndex, FunctionIndex, MemoryIndex},
-    types::{FunctionType, ValueType, BlockType, NumType},
+    indices::{TypeIndex, LocalIndex, GlobalIndex, LabelIndex, FunctionIndex, TableIndex, MemoryIndex},
+    types::{FunctionType, ValueType, BlockType, NumType, RefType},
     export::{Export, ExportDescription},
     import::{Import, ImportDescription},
     instructions,
@@ -15,6 +15,7 @@ pub struct Module {
     // TODO: Bundling Function Imports and Functions into one place is convinient, but not exactly
     // performance friendly.
     functions: Vec<FunctionOrImport>,
+    function_table: Vec<FunctionIndex>,
     exports: Vec<Export>,
     memory_types: Vec<Limit>,
 }
@@ -52,9 +53,9 @@ struct FunctionImport {
 }
 
 pub struct TypedFunctionImport {
-    module_name: String,
-    name: String,
-    type_: FunctionType,
+    pub module_name: String,
+    pub name: String,
+    pub type_: FunctionType,
 }
 
 
@@ -72,6 +73,7 @@ pub enum Expression {
     IfThenElse { type_: BlockType, test: Box<Expression>, then_body: Box<Expression>, else_body: Box<Expression> },
     Br(LabelIndex),
     Call(FunctionIndex, Vec<Expression>),
+    CallIndirect(TypeIndex, TableIndex, Vec<Expression>),
     Return(Box<Expression>),
 
     // ===Variable Instructions===
@@ -214,7 +216,7 @@ enum FloatRel2 {
 
 impl Module {
     pub fn empty() -> Self {
-        Self { function_types: vec![], functions: vec![], exports: vec![], memory_types: vec![] }
+        Self { function_types: vec![], functions: vec![], exports: vec![], memory_types: vec![], function_table: vec![] }
     }
 
     pub fn add_function_type(&mut self, fn_type: FunctionType) -> TypeIndex {
@@ -258,7 +260,11 @@ impl Module {
         self.add_function_import(FunctionImport { module_name: fn_import.module_name, name: fn_import.name, type_index })
     }
 
-    pub fn binary_format(self) -> sections::Module {
+    pub fn register_function_table(&mut self, function_table: Vec<FunctionIndex>) {
+        self.function_table = function_table
+    }
+
+    pub fn binary_format(mut self) -> sections::Module {
         let mut bin_module = sections::Module::empty();
 
         bin_module.type_section = Some(TypeSection { function_types: self.function_types });
@@ -273,11 +279,27 @@ impl Module {
 
         bin_module.import_section = {
             // TODO: Can this be done without cloning of strings?
-            let imports: Vec<Import> = self.functions.iter().filter_map(|fn_| match fn_ {
+            let mut imports: Vec<Import> = self.functions.iter().filter_map(|fn_| match fn_ {
                 FunctionOrImport::Import(fn_import) => Some(Import { module_name: fn_import.module_name.clone(), name: fn_import.name.clone(), import_description: ImportDescription::FunctionTypeIndex(fn_import.type_index) }),
                 FunctionOrImport::Fn(_) => None,
             }).collect();
+
+            imports.push(Import {
+                module_name: "env".to_string(), name: "closure_table".to_string(),
+                import_description: {
+                    let number_of_closures = self.function_table.len() as u32;
+                    ImportDescription::TableType(RefType::FuncRef, Limit::MinMax { min: number_of_closures, max: number_of_closures })
+                }
+            });
+
             Some(ImportSection { imports })
+        };
+
+        bin_module.element_section = {
+            Some(ElementSection { elements: vec![Element {
+                offset_expression: sections::Expression { instructions: vec![instructions::Instruction::I32Const(0)] },
+                function_references: self.function_table,
+            }]})
         };
 
         bin_module.code_section = {
@@ -370,6 +392,12 @@ impl Expression {
                         binary_format_instructions(arg, instructions);
                     }
                     instructions.push(instructions::Instruction::Call(index))
+                },
+                Expression::CallIndirect(type_index, table_index, args) => {
+                    for arg in args {
+                        binary_format_instructions(arg, instructions);
+                    }
+                    instructions.push(instructions::Instruction::CallIndirect(type_index, table_index))
                 },
                 Expression::Return(expr) => {
                     binary_format_instructions(*expr, instructions);
@@ -515,6 +543,10 @@ pub fn branch(i: u32) -> Expression {
 
 pub fn call(fn_index: FunctionIndex, args: Vec<Expression>) -> Expression {
     Expression::Call(fn_index, args)
+}
+
+pub fn call_indirect(type_index: TypeIndex, table_index: TableIndex, args: Vec<Expression>) -> Expression {
+    Expression::CallIndirect(type_index, table_index, args)
 }
 
 pub fn i32_memory_get(address: Expression) -> Expression {

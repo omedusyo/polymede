@@ -1,5 +1,5 @@
 use crate::base::{
-    indices::{LocalIndex, GlobalIndex, DataIndex, LabelIndex, FunctionIndex},
+    indices::{LocalIndex, GlobalIndex, DataIndex, LabelIndex, TypeIndex, FunctionIndex, TableIndex},
     types::BlockType,
     memory::MemoryArgument,
 };
@@ -18,6 +18,7 @@ pub enum Instruction {
     Br(LabelIndex),
     BrIf(LabelIndex),
     Call(FunctionIndex),
+    CallIndirect(TypeIndex, TableIndex),
 
     Return,
 
