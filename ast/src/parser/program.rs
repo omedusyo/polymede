@@ -7,9 +7,9 @@ use crate::parser::lex::{
 };
 use crate::parser::{
     base::{State, Result, Error, PreProgram, Declaration, PreIndDeclaration, PreEnumDeclaration, PreTypeDeclaration},
-    identifier::{variable, constructor_name, function_name},
+    identifier::{variable, constructor_name, function_name, foreign_function_name},
     term::{term, typed_term},
-    types::{type_nonempty_sequence, function_type_annotation},
+    types::{foreign_function_type, type_nonempty_sequence, function_type_annotation},
     pattern::{parameter_non_empty_sequence, parameter_possibly_empty_sequence},
     special::{or_separator, do_nothing},
     combinator::delimited_possibly_empty_sequence_to_vector,
@@ -140,8 +140,13 @@ pub fn type_declaration(state: &mut State) -> Result<PreTypeDeclaration> {
 
 // ===Function Declarations===
 pub fn foreign_function_declaration(state: &mut State) -> Result<ForeignFunctionDeclaration> {
-    // TODO
-    todo!()
+    state.request_keyword(Keyword::Foreign)?;
+    let external_name = foreign_function_name(state)?;
+    state.request_keyword(Keyword::Fn)?;
+    let name = function_name(state)?;
+    state.request_keyword(Keyword::TypeAnnotationSeparator)?;
+    let type_ = foreign_function_type(state)?;
+    Ok(ForeignFunctionDeclaration { name, type_, external_name })
 }
 
 pub fn user_function_declaration(state: &mut State) -> Result<UserFunctionDeclaration> {

@@ -1,4 +1,4 @@
-use crate::base::{ Program, TypeDeclaration, RunDeclaration, FunctionDeclaration, ForeignFunctionDeclaration, UserFunctionDeclaration, ConstructorDeclaration};
+use crate::base::{ Program, TypeDeclaration, RunDeclaration, FunctionDeclaration, ConstructorDeclaration, Type};
 use crate::identifier::{Interner, Variable, ConstructorName, FunctionName, Identifier};
 use crate::parser::lex::{
     lexer,
@@ -22,6 +22,7 @@ pub enum Error {
     ExpectedTypeConstructorOrTypeVarOrAnythingInPattern { received: Identifier },
     ExpectedTerm { received: Identifier },
     ExpectedTypeConstructor { received: Identifier },
+    ExpectedPrimitiveType { received: Type },
     DuplicateVariableNames { duplicates: Vec<Identifier> },
     // Atleast one vector is non-empty.
     DuplicateNames {

@@ -1,4 +1,4 @@
-use crate::identifier::{Interner, interner, Variable, ConstructorName, FunctionName, Identifier};
+use crate::identifier::{Interner, interner, Variable, ConstructorName, FunctionName, ExternalName, Identifier};
 use crate::parser::base::PreTypeDeclaration;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -114,7 +114,7 @@ pub struct UserFunctionDeclaration {
 pub struct ForeignFunctionDeclaration {
     pub name: FunctionName,
     pub type_: FunctionType,
-    pub external_name: String,
+    pub external_name: ExternalName,
 }
 
 #[derive(Debug)]
@@ -361,8 +361,8 @@ impl ForeignFunctionDeclaration {
         self.name.clone()
     }
 
-    pub fn external_name(&self) -> &str {
-        &self.external_name
+    pub fn external_name(&self) -> ExternalName {
+        self.external_name.clone()
     }
 }
 

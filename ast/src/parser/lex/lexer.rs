@@ -44,6 +44,7 @@ pub enum Request {
     CloseAngle,
     OpenCurly,
     CloseCurly,
+    Quote,
     Keyword(token::Keyword),
     TypeDeclarationKeyword,
     Identifier,
@@ -207,6 +208,9 @@ impl <'state> State<'state> {
             },
             Request::CloseCurly => {
                 self.match_string("}", request, Token::CloseCurly)
+            },
+            Request::Quote => {
+                self.match_string("\"", request, Token::CloseCurly)
             },
             Request::Keyword(keyword) => {
                 self.match_keyword(request, keyword)

@@ -6,6 +6,7 @@ pub enum Token {
     CloseAngle,
     OpenCurly,
     CloseCurly,
+    Quote,
     Keyword(Keyword),
     Identifier(String),
     Separator(SeparatorSymbol),
@@ -20,6 +21,7 @@ pub enum Keyword {
     Run,
     LocalLet,
     Fn,
+    Foreign,
     Eq,
     Arrow,
     Type_,
@@ -55,6 +57,7 @@ impl Keyword {
     pub const RUN: &'static str = "run";
     pub const LOCAL_LET: &'static str = "let";
     pub const FN: &'static str = "fn";
+    pub const FOREIGN: &'static str = "foreign";
     pub const EQ: &'static str = "=";
     pub const ARROW: &'static str = "->";
     pub const ENUM: &'static str = "enum";
@@ -76,6 +79,7 @@ impl Keyword {
             Run => Self::RUN,
             LocalLet => Self::LOCAL_LET,
             Fn => Self::FN,
+            Foreign => Self::FOREIGN,
             Eq => Self::EQ,
             Arrow => Self::ARROW,
             Enum => Self::ENUM,
