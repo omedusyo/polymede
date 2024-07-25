@@ -32,9 +32,6 @@ type List(a) = ind { x .
 | Cons(a, x)
 }
 
-foreign "i32_add"
-fn i32_add : I32, I32 -> I32
-
 fn i32_test = # I32 -> Pair(I32, I32) : { x . Pair(-002147483648, x) }
 
 fn id_bool = # Bool -> Bool : { x . x }

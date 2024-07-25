@@ -22,6 +22,50 @@ struct Args {
     out: String,
 }
 
+fn example_compilation0() -> Vec<u8> {
+    use crate::graph_memory_machine::{Program, Function, constant, tuple, project, var, call, call_closure, partial_apply, pattern_match};
+    let standard_primitives = gmm_compiler::PrimitiveFunctions::standard();
+
+    // functions
+    let singleton = standard_primitives.number_of_primitives;
+
+    // constructors
+    let nil = 0;
+    let cons = 1;
+    let program = Program {
+        number_of_primitive_functions: standard_primitives.number_of_primitives,
+        functions: vec![
+            // fn singleton(x) {
+            //   Tuple(Cons, [x, Const(Nil)])
+            // }
+            Function {
+                number_of_parameters: 1,
+                body: {
+                    let x = 0;
+                    tuple(cons, vec![var(x), constant(nil)])
+                }
+            }
+        ],
+        // TODO: How to call primitive functions?
+        // main: constant(666),
+        // main: {
+        //     let nil = 0;
+        //     let cons = 1;
+        //     tuple(cons, vec![constant(666), constant(nil)])
+        // },
+        // main: {
+        //     call(standard_primitives.inc, vec![constant(666)])
+        // },
+        main: {
+            call(singleton, vec![constant(230)])
+        },
+    };
+    
+    let module = gmm_compiler::compile(program, standard_primitives).unwrap();
+    let bytes = module.bytes();
+    bytes
+}
+
 fn check_program(program: &ast::base::Program) -> core::result::Result<(), Vec<ast::validation::base::ErrorWithLocation>> {
     ast::validation::type_formation::check_program(&program)?;
     ast::validation::term_formation::check_program(&program)?;
@@ -64,7 +108,9 @@ fn main() -> Result<()> {
     }
 
     // ===.pmd ~> .gmm compiler===
-    let gmm_program = polymede_compiler::compile(&program);
+    let standard_primitives = gmm_compiler::PrimitiveFunctions::standard();
+
+    let gmm_program = polymede_compiler::compile(standard_primitives.number_of_primitives, &program);
     let gmm_str = show::show_program(&gmm_program).str();
 
     let mut out_gmm_file = fs::OpenOptions::new()
@@ -75,7 +121,7 @@ fn main() -> Result<()> {
 
     // ===.gmm ~> .wasm compiler===
     let module = {
-        match gmm_compiler::compile(gmm_program) {
+        match gmm_compiler::compile(gmm_program, standard_primitives) {
             Ok(module) => module,
             Err(err) => {
                 println!("===COMPILATION ERROR===");
@@ -94,49 +140,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn example_compilation0() -> Vec<u8> {
-    use crate::graph_memory_machine::{Program, FunctionOrImport, Function, constant, tuple, project, var, call, call_closure, partial_apply, pattern_match};
-
-    // functions
-    let singleton = 0;
-
-    // constructors
-    let nil = 0;
-    let cons = 1;
-    let program = Program {
-        functions: vec![
-            // fn singleton(x) {
-            //   Tuple(Cons, [x, Const(Nil)])
-            // }
-            FunctionOrImport::Fn(Function {
-                number_of_parameters: 1,
-                body: {
-                    let x = 0;
-                    tuple(cons, vec![var(x), constant(nil)])
-                }
-            })
-        ],
-        // TODO: How to call primitive functions?
-        // main: constant(666),
-        // main: {
-        //     let nil = 0;
-        //     let cons = 1;
-        //     tuple(cons, vec![constant(666), constant(nil)])
-        // },
-        // main: {
-        //     call(standard_primitives.inc, vec![constant(666)])
-        // },
-        main: {
-            call(singleton, vec![constant(230)])
-        },
-    };
-
-    let module = gmm_compiler::compile(program).unwrap();
-    let bytes = module.bytes();
-    bytes
-}
-
-// TODO: Fix or get rid of this.
 fn example0() {
     use graph_memory_machine::*;
 
@@ -144,15 +147,13 @@ fn example0() {
         let add = 0;
         let another_add = 1;
         Program {
+            // Assume the first primitive function is `inc`.
+            number_of_primitive_functions: 1,
             functions: vec![
-                FunctionOrImport::Import(FunctionImport {
-                    number_of_parameters: 1,
-                    external_name: "inc".to_string(),
-                }),
                 // fn another_add(self, x, y) {
                 //     x + y
                 // }
-                FunctionOrImport::Fn(Function {
+                Function {
                     number_of_parameters: 3,
                     body: {
                         // let self_var = 0;
@@ -160,12 +161,13 @@ fn example0() {
                         let y = 2;
                         call(add, vec![var(x), var(y)])
                     }
-                })
+                }
             ],
             main: call_closure(partial_apply(another_add, vec![constant(5)]), vec![constant(6)]),
         }
     };
 
+    println!("is this exec?");
     let term = {
         let add = 0;
         let x = 1;

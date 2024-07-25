@@ -1,4 +1,4 @@
-use crate::base::{Program, Type, FunctionType, TypeDeclaration, FunctionDeclaration, ForeignFunctionDeclaration, UserFunctionDeclaration, RunDeclaration, EnumDeclaration, IndDeclaration, ConstructorDeclaration};
+use crate::base::{Program, Type, FunctionType, TypeDeclaration, FunctionDeclaration, RunDeclaration, EnumDeclaration, IndDeclaration, ConstructorDeclaration};
 use crate::identifier::{Identifier, Interner};
 
 pub struct Show<'a> {
@@ -69,22 +69,13 @@ impl <'show>Show<'show> {
     }
 
     fn show_function_declaration(&self, declaration: &FunctionDeclaration) -> String {
-        let fn_name = declaration.name();
-        let name_str = fn_name.str(self.interner());
-        match declaration {
-            FunctionDeclaration::User(declaration) => {
-                let type_ = self.show_function_type(&declaration.function.type_);
-                if declaration.type_parameters.is_empty() {
-                    format!("fn {name_str} : {type_} ")
-                } else {
-                    let type_var_strs = self.show_sequence_of_identifiers(&declaration.type_parameters);
-                    format!("fn {name_str} : forall {{ {type_var_strs} . {type_} }}")
-                }
-            },
-            FunctionDeclaration::Foreign(declaration) => {
-                let type_ = self.show_function_type(&declaration.type_);
-                format!("fn {name_str} : {type_} ")
-            },
+        let name_str = declaration.name.str(self.interner());
+        let type_ = self.show_function_type(&declaration.function.type_);
+        if declaration.type_parameters.is_empty() {
+            format!("fn {name_str} : {type_} ")
+        } else {
+            let type_var_strs = self.show_sequence_of_identifiers(&declaration.type_parameters);
+            format!("fn {name_str} : forall {{ {type_var_strs} . {type_} }}")
         }
     }
 

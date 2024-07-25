@@ -16,7 +16,6 @@ pub enum Error {
     UnexpectedEnd,
     Expected { requested: Request, found: String },
     ExpectedI32 { found: String },
-    ExpectedDeclarationKeyword,
     ExpectedTypeDeclarationKeyword,
     Int32LiteralOutOfBounds,
 }
@@ -44,7 +43,6 @@ pub enum Request {
     CloseAngle,
     OpenCurly,
     CloseCurly,
-    Quote,
     Keyword(token::Keyword),
     TypeDeclarationKeyword,
     Identifier,
@@ -57,8 +55,7 @@ pub enum Request {
 pub enum DeclarationKind {
     Type,
     Run,
-    UserFunction,
-    ForeignFunction,
+    Function,
 }
 
 enum WhitespaceState {
@@ -209,9 +206,6 @@ impl <'state> State<'state> {
             Request::CloseCurly => {
                 self.match_string("}", request, Token::CloseCurly)
             },
-            Request::Quote => {
-                self.match_string("\"", request, Token::CloseCurly)
-            },
             Request::Keyword(keyword) => {
                 self.match_keyword(request, keyword)
             },
@@ -337,18 +331,8 @@ impl <'state> State<'state> {
         match c {
             't' => Ok(DeclarationKind::Type),
             'r' => Ok(DeclarationKind::Run),
-            'f' => {
-                let saved_state = self.clone();
-                self.advance();
-                let c = self.read_char_or_fail_when_end()?;
-                *self = saved_state;
-                match c {
-                    'o' => Ok(DeclarationKind::ForeignFunction),
-                    'n' => Ok(DeclarationKind::UserFunction),
-                    _ => Err(Error::ExpectedDeclarationKeyword),
-                }
-            },
-            _ => Err(Error::ExpectedDeclarationKeyword),
+            'f' => Ok(DeclarationKind::Function),
+            _ => Err(Error::ExpectedTypeDeclarationKeyword),
         }
     }
 

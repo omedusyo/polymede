@@ -4,7 +4,7 @@ use crate::parser::lex::{
     lexer::Request,
 };
 use crate::parser::{
-    base::{State, Result, Error},
+    base::{State, Result},
     special::{VariableOrConstructorName, comma, constructor_name_or_variable},
     combinator::{delimited_nonempty_sequence_to_vector, delimited_possibly_empty_sequence_to_vector},
 };
@@ -41,21 +41,9 @@ pub fn type_(state: &mut State) -> Result<Type> {
     }
 }
 
-pub fn primitive_type(state: &mut State) -> Result<Type> {
-    let type_ = type_(state)?;
-    use Type::*;
-    match type_ {
-        I32 => Ok(I32),
-        _ => Err(Error::ExpectedPrimitiveType { received: type_ }),
-    }
-}
 // Parses   T1, T2, T3, T4 possibly empty
 pub fn type_possibly_empty_sequence(state: &mut State) -> Result<Vec<Type>> {
     delimited_possibly_empty_sequence_to_vector(state, type_, comma)
-}
-
-pub fn primitive_type_possibly_empty_sequence(state: &mut State) -> Result<Vec<Type>> {
-    delimited_possibly_empty_sequence_to_vector(state, primitive_type, comma)
 }
 
 pub fn type_nonempty_sequence(state: &mut State) -> Result<Vec<Type>> {
@@ -67,13 +55,6 @@ pub fn function_type(state: &mut State) -> Result<FunctionType> {
     let input_types = type_possibly_empty_sequence(state)?;
     state.request_keyword(Keyword::Arrow)?;
     let output_type = type_(state)?;
-    Ok(FunctionType { input_types, output_type })
-}
-
-pub fn foreign_function_type(state: &mut State) -> Result<FunctionType> {
-    let input_types = primitive_type_possibly_empty_sequence(state)?;
-    state.request_keyword(Keyword::Arrow)?;
-    let output_type = primitive_type(state)?;
     Ok(FunctionType { input_types, output_type })
 }
 

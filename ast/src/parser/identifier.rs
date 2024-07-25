@@ -1,4 +1,4 @@
-use crate::identifier::{Identifier, ConstructorName, FunctionName, ExternalName, Variable};
+use crate::identifier::{Identifier, ConstructorName, FunctionName, Variable};
 use crate::parser::lex::{
     lexer::{LocatedToken, Request},
     token::Token,
@@ -26,11 +26,4 @@ pub fn variable(state: &mut State) -> Result<Variable> {
 
 pub fn function_name(state: &mut State) -> Result<FunctionName> {
     variable(state)
-}
-
-pub fn foreign_function_name(state: &mut State) -> Result<ExternalName> {
-    state.request_token(Request::Quote)?;
-    let external_name = variable(state)?;
-    state.request_token(Request::Quote)?;
-    Ok(external_name)
 }

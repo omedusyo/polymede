@@ -1,4 +1,4 @@
-use crate::graph_memory_machine::{Term, Pattern, Variant, Program, Function, FunctionImport, FunctionOrImport, FunctionName, VarName};
+use crate::graph_memory_machine::{Term, Pattern, Variant, Program, Function, FunctionName, VarName};
 
 type Result<A> = std::result::Result<A, RuntimeError>;
 
@@ -17,7 +17,6 @@ enum RuntimeError {
     AttemptToPatternMatchOnByteArray,
     AttemptToPatternMatchOnClosure,
     NoMatchesFound,
-    UnsupportedPrimitiveFunction { import: FunctionImport }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -41,13 +40,8 @@ type PrimitiveFunction = fn (Vec<Value>) -> Result<Value>;
 
 #[derive(Debug)]
 struct FunctionEnvironment {
-    functions: Vec<FunctionOrPrimitive>,
-}
-
-#[derive(Debug)]
-enum FunctionOrPrimitive {
-    Function(Function),
-    Primitive(PrimitiveFunction),
+    primitive_functions: Vec<PrimitiveFunction>,
+    functions: Vec<Function>,
 }
 
 impl Value {
@@ -90,20 +84,18 @@ impl VarEnvironment {
 
 impl FunctionEnvironment {
     fn apply(&self, fn_name: FunctionName, args: Vec<Value>) -> Result<Value> {
-        let Some(function) = self.functions.get(fn_name) else { return Err(RuntimeError::UndefinedFunction(fn_name)) };
-        let function = &self.functions[fn_name];
-        match function {
-            FunctionOrPrimitive::Function(function) => {
-                if function.number_of_parameters == args.len() {
-                    let mut env = VarEnvironment(args);
-                    self.interpret(&function.body, &mut env)
-                } else {
-                    Err(RuntimeError::WrongNumberOfArguments { expected: function.number_of_parameters, received: args.len() })
-                }
-            },
-            FunctionOrPrimitive::Primitive(function) => {
-                function(args)
-            },
+        if fn_name < self.primitive_functions.len() {
+            self.primitive_functions[fn_name](args)
+        } else if fn_name - self.primitive_functions.len() < self.functions.len() {
+            let function = &self.functions[fn_name - self.primitive_functions.len()];
+            if function.number_of_parameters == args.len() {
+                let mut env = VarEnvironment(args);
+                self.interpret(&function.body, &mut env)
+            } else {
+                Err(RuntimeError::WrongNumberOfArguments { expected: function.number_of_parameters, received: args.len() })
+            }
+        } else {
+            Err(RuntimeError::UndefinedFunction(fn_name))
         }
     }
 
@@ -115,6 +107,7 @@ impl FunctionEnvironment {
         }
         Ok(values)
     }
+
 
     fn interpret(&self, term: &Term, var_env: &mut VarEnvironment) -> Result<Value> {
         use Term::*;
@@ -189,30 +182,10 @@ impl FunctionEnvironment {
     }
 }
 
-fn run(program: Program) -> Result<Value> {
-    let mut functions = vec![];
-    for function in program.functions {
-        match function {
-            FunctionOrImport::Fn(function) => {
-                functions.push(FunctionOrPrimitive::Function(function))
-            },
-            FunctionOrImport::Import(import) => {
-                functions.push(FunctionOrPrimitive::Primitive(
-                    if import.external_name == "i32_inc" {
-                        increment
-                    } else if import.external_name == "i32_dec" {
-                        decrement
-                    } else if import.external_name == "i32_add" {
-                        addition
-                    } else {
-                        return Err(RuntimeError::UnsupportedPrimitiveFunction { import })
-                    }
-                ))
-            }
-        }
-    }
+fn run(program: Program, primitive_functions: Vec<PrimitiveFunction>) -> Result<Value> {
     let fn_env = FunctionEnvironment {
-        functions,
+        primitive_functions,
+        functions: program.functions,
     };
     let mut env = VarEnvironment::new();
 
@@ -258,24 +231,23 @@ fn addition(args: Vec<Value>) -> Result<Value> {
 
 mod tests {
     use super::*;
-    use crate::graph_memory_machine::{FunctionImport, constant, tuple, project, var, call, call_closure, partial_apply, pattern_match};
+    use crate::graph_memory_machine::{constant, tuple, project, var, call, call_closure, partial_apply, pattern_match};
 
     #[test]
     fn test_constant() -> Result<()> {
         // functions
         let inc = 0;
         let program = Program {
-            functions: vec![
-                FunctionOrImport::Import(FunctionImport {
-                    number_of_parameters: 1,
-                    external_name: "i32_inc".to_string(),
-                }),
-            ],
+            // Assume the first primitive function is `inc`.
+            number_of_primitive_functions: 1,
+            functions: vec![],
             // main: call(inc, vec![constant(666)]),
             main: call(inc, vec![call(inc, vec![constant(666)])]),
         };
 
-        let val = run(program)?;
+        let primitive_functions: Vec<PrimitiveFunction> = vec![ increment ];
+
+        let val = run(program, primitive_functions)?;
 
         assert!(val == Value::Const(668));
         Ok(())
@@ -291,22 +263,26 @@ mod tests {
         let cons = 1;
 
         let program = Program {
+            // Assume the first primitive function is `inc`.
+            number_of_primitive_functions: 0,
             functions: vec![
                 // fn singleton(x) {
                 //   Tuple(Cons, [x, Const(Nil)])
                 // }
-                FunctionOrImport::Fn(Function {
+                Function {
                     number_of_parameters: 1,
                     body: {
                         let x = 0;
                         tuple(cons, vec![var(x), constant(nil)])
                     }
-                }),
+                }
             ],
             main: call(singleton, vec![constant(666)]),
         };
 
-        let val = run(program)?;
+        let primitive_functions: Vec<PrimitiveFunction> = vec![];
+
+        let val = run(program, primitive_functions)?;
 
         use Value::*;
         assert!(val == Tuple(cons, vec![Const(666), Const(nil)]));
@@ -325,26 +301,25 @@ mod tests {
 
         let program = Program {
             // Assume the first primitive function is `inc`.
+            number_of_primitive_functions: 1,
             functions: vec![
-                FunctionOrImport::Import(FunctionImport {
-                    number_of_parameters: 1,
-                    external_name: "i32_inc".to_string(),
-                }),
                 // fn singleton(x) {
                 //   Tuple(Cons, [call inc(x), Const(Nil)])
                 // }
-                FunctionOrImport::Fn(Function {
+                Function {
                     number_of_parameters: 1,
                     body: {
                         let x = 0;
                         tuple(cons, vec![call(inc, vec![var(x)]), constant(nil)])
                     }
-                }),
+                }
             ],
             main: call(singleton, vec![constant(666)]),
         };
 
-        let val = run(program)?;
+        let primitive_functions: Vec<PrimitiveFunction> = vec![increment];
+
+        let val = run(program, primitive_functions)?;
 
         use Value::*;
         assert!(val == Tuple(cons, vec![Const(667), Const(nil)]));
@@ -360,6 +335,8 @@ mod tests {
         let t = 1;
         let f = 0;
         let program = Program {
+            // Assume the first primitive function is `inc`.
+            number_of_primitive_functions: 2,
             functions: vec![
                 // fn is_zero(n) {
                 //   match n {
@@ -367,7 +344,7 @@ mod tests {
                 //   | _ -> f
                 //   }
                 // }
-                FunctionOrImport::Fn(Function {
+                Function {
                     number_of_parameters: 1,
                     body: {
                         let n = 0;
@@ -379,12 +356,14 @@ mod tests {
                             ]
                         )
                     }
-                }),
+                }
             ],
             main: call(is_zero, vec![constant(0)])
         };
 
-        let val = run(program)?;
+        let primitive_functions: Vec<PrimitiveFunction> = vec![];
+
+        let val = run(program, primitive_functions)?;
         assert!(val == Value::Const(t));
         
         Ok(())
@@ -400,22 +379,15 @@ mod tests {
         // constructors
         let program = Program {
             // Assume the first primitive function is `inc`.
+            number_of_primitive_functions: 2,
             functions: vec![
-                FunctionOrImport::Import(FunctionImport {
-                    number_of_parameters: 2,
-                    external_name: "i32_add".to_string(),
-                }),
-                FunctionOrImport::Import(FunctionImport {
-                    number_of_parameters: 1,
-                    external_name: "i32_dec".to_string(),
-                }),
                 // fn sum(n) {
                 //   match n {
                 //   | 0 -> 0
                 //   | _ -> n + sum(dec(n))
                 //   }
                 // }
-                FunctionOrImport::Fn(Function {
+                Function {
                     number_of_parameters: 1,
                     body: {
                         let n = 0;
@@ -427,12 +399,14 @@ mod tests {
                             ]
                         )
                     }
-                }),
+                }
             ],
             main: call(sum, vec![constant(5)])
         };
 
-        let val = run(program)?;
+        let primitive_functions: Vec<PrimitiveFunction> = vec![addition, decrement];
+
+        let val = run(program, primitive_functions)?;
         assert!(val == Value::Const(15));
         
         Ok(())
@@ -450,11 +424,9 @@ mod tests {
         let cons = 1;
 
         let program = Program {
+            // Assume the first primitive function is `dec`.
+            number_of_primitive_functions: 1,
             functions: vec![
-                FunctionOrImport::Import(FunctionImport {
-                    number_of_parameters: 1,
-                    external_name: "i32_dec".to_string(),
-                }),
                 // fn rangeLoop(n, xs) {
                 //  match n {
                 //  | Const(nil) -> xs
@@ -463,7 +435,7 @@ mod tests {
                 //      call rangeLoop(m, cons(m, xs)))
                 //  }
                 // }
-                FunctionOrImport::Fn(Function {
+                Function {
                     number_of_parameters: 2,
                     body: {
                         let n = 0;
@@ -481,22 +453,24 @@ mod tests {
                             )
                         ])
                     },
-                }),
+                },
                 // fn range(n) {
                 //   call rangeLoop(n, Const(Nil))
                 // }
-                FunctionOrImport::Fn(Function {
+                Function {
                     number_of_parameters: 1,
                     body: {
                         let n = 0;
                         call(range_loop, vec![var(n), constant(nil)])
                     },
-                }),
+                }
             ],
             main: call(range, vec![constant(3)]),
         };
 
-        let val = run(program)?;
+        let primitive_functions: Vec<PrimitiveFunction> = vec![ decrement ];
+
+        let val = run(program, primitive_functions)?;
 
         use Value::*;
         fn construct(x: Value, xs: Value) -> Value {
@@ -516,15 +490,13 @@ mod tests {
         let another_add = 1;
 
         let program = Program {
+            // Assume the first primitive function is `inc`.
+            number_of_primitive_functions: 1,
             functions: vec![
-                FunctionOrImport::Import(FunctionImport {
-                    number_of_parameters: 1,
-                    external_name: "i32_add".to_string(),
-                }),
                 // fn another_add(self, x, y) {
                 //     x + y
                 // }
-                FunctionOrImport::Fn(Function {
+                Function {
                     number_of_parameters: 3,
                     body: {
                         // let self_var = 0;
@@ -532,12 +504,14 @@ mod tests {
                         let y = 2;
                         call(add, vec![var(x), var(y)])
                     }
-                }),
+                }
             ],
             main: call_closure(partial_apply(another_add, vec![constant(5)]), vec![constant(6)]),
         };
 
-        let val = run(program)?;
+        let primitive_functions: Vec<PrimitiveFunction> = vec![ addition ];
+
+        let val = run(program, primitive_functions)?;
 
         assert!(val == Value::Const(11));
         Ok(())

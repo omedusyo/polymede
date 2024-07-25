@@ -79,8 +79,6 @@ cat $TMP_WAT/another_test_decompile.wat
 
 cargo test -p compiler
 
-cargo build -p compiler
-
 cargo run --bin compiler
 
 cargo run --bin compiler -- -f examples/simple_test.pmd
