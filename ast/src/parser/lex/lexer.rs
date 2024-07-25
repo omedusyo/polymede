@@ -419,17 +419,14 @@ impl <'state> State<'state> {
                         Some(mul_10_sum) => {
                             match mul_10_sum.checked_add(if is_positive { d } else { -d }) {
                                 Some(new_sum) => {
-                                    println!("{}", new_sum);
                                     sum = new_sum
                                 },
                                 None => {
-                                    println!("add too big");
                                     return Err(Error::Int32LiteralOutOfBounds)
                                 }
                             }
                         },
                         None => {
-                            println!("mul too big");
                             return Err(Error::Int32LiteralOutOfBounds)
                         }
                     }
