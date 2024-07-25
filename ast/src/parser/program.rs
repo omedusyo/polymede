@@ -1,4 +1,4 @@
-use crate::base::{RunDeclaration, TypedFunction, Function, FunctionType, FunctionDeclaration, ConstructorDeclaration};
+use crate::base::{RunDeclaration, TypedFunction, Function, FunctionType, FunctionDeclaration, ForeignFunctionDeclaration, UserFunctionDeclaration, ConstructorDeclaration};
 use crate::identifier;
 use crate::identifier::{Variable, FunctionName};
 use crate::parser::lex::{
@@ -7,9 +7,9 @@ use crate::parser::lex::{
 };
 use crate::parser::{
     base::{State, Result, Error, PreProgram, Declaration, PreIndDeclaration, PreEnumDeclaration, PreTypeDeclaration},
-    identifier::{variable, constructor_name, function_name},
+    identifier::{variable, constructor_name, function_name, foreign_function_name},
     term::{term, typed_term},
-    types::{type_nonempty_sequence, function_type_annotation},
+    types::{foreign_function_type, type_nonempty_sequence, function_type_annotation},
     pattern::{parameter_non_empty_sequence, parameter_possibly_empty_sequence},
     special::{or_separator, do_nothing},
     combinator::delimited_possibly_empty_sequence_to_vector,
@@ -50,7 +50,8 @@ fn program_declaration(state: &mut State) -> Result<Declaration> {
     match state.peek_declaration_token()? {
         DeclarationKind::Type => Ok(Declaration::Type(type_declaration(state)?)),
         DeclarationKind::Run => Ok(Declaration::Run(run_declaration(state)?)),
-        DeclarationKind::Function => Ok(Declaration::Function(function_declaration(state)?)),
+        DeclarationKind::UserFunction => Ok(Declaration::Function(FunctionDeclaration::User(user_function_declaration(state)?))),
+        DeclarationKind::ForeignFunction => Ok(Declaration::Function(FunctionDeclaration::Foreign(foreign_function_declaration(state)?))),
     }
 }
 
@@ -137,17 +138,27 @@ pub fn type_declaration(state: &mut State) -> Result<PreTypeDeclaration> {
     Ok(declaration)
 }
 
-// ===Function/Let Declarations===
-pub fn function_declaration(state: &mut State) -> Result<FunctionDeclaration> {
+// ===Function Declarations===
+pub fn foreign_function_declaration(state: &mut State) -> Result<ForeignFunctionDeclaration> {
+    state.request_keyword(Keyword::Foreign)?;
+    let external_name = foreign_function_name(state)?;
+    state.request_keyword(Keyword::Fn)?;
+    let name = function_name(state)?;
+    state.request_keyword(Keyword::TypeAnnotationSeparator)?;
+    let type_ = foreign_function_type(state)?;
+    Ok(ForeignFunctionDeclaration { name, type_, external_name })
+}
+
+pub fn user_function_declaration(state: &mut State) -> Result<UserFunctionDeclaration> {
     state.request_keyword(Keyword::Fn)?;
     let function_name = function_name(state)?;
     state.request_keyword(Keyword::Eq)?;
 
 
-    fn inner_function_declaration(state: &mut State, function_name: FunctionName, type_parameters: Vec<Variable>) -> Result<FunctionDeclaration> {
+    fn inner_function_declaration(state: &mut State, function_name: FunctionName, type_parameters: Vec<Variable>) -> Result<UserFunctionDeclaration> {
         let type_ = function_type_annotation(state)?;
         let function = typed_function(state, type_)?;
-        Ok(FunctionDeclaration { name: function_name, type_parameters, function })
+        Ok(UserFunctionDeclaration { name: function_name, type_parameters, function })
     }
 
     if state.commit_if_next_token_forall()? {

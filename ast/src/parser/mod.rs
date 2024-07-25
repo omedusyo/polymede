@@ -19,12 +19,12 @@ pub fn parse_program(s: &str) -> Result<Program, Error> {
 
 #[cfg(test)]
 mod tests {
-    use crate::base::{Term, Type, FunctionDeclaration, RunDeclaration};
+    use crate::base::{Term, Type, UserFunctionDeclaration, RunDeclaration};
     use crate::identifier::interner;
     use crate::parser::{
         base::{State, Result, Error, PreTypeDeclaration, PreEnumDeclaration, PreIndDeclaration},
         types::type_,
-        program::{pre_program, run_declaration, function_declaration, type_declaration},
+        program::{pre_program, run_declaration, user_function_declaration, type_declaration},
     };
 
     #[test]
@@ -189,9 +189,9 @@ mod tests {
         let s = "fn square = # Nat -> Nat : { x . mul(x, x) }";
         let mut state = State::new(s, &mut interner);
 
-        let result = function_declaration(&mut state);
+        let result = user_function_declaration(&mut state);
         assert!(matches!(result, Ok(_)));
-        let FunctionDeclaration { name, type_parameters, function } = result?;
+        let UserFunctionDeclaration { name, type_parameters, function } = result?;
 
         assert_eq!(name.str(&mut interner), "square");
         assert_eq!(type_parameters.len(), 0);
@@ -219,9 +219,9 @@ mod tests {
         let s = "fn id = forall { a . # a -> a : { x . x } }";
         let mut state = State::new(s, &mut interner);
 
-        let result = function_declaration(&mut state);
+        let result = user_function_declaration(&mut state);
         assert!(matches!(result, Ok(_)));
-        let FunctionDeclaration { name, type_parameters, function } = result?;
+        let UserFunctionDeclaration { name, type_parameters, function } = result?;
 
         assert_eq!(name.str(&mut interner), "id");
         assert_eq!(type_parameters.len(), 1);
@@ -243,9 +243,9 @@ mod tests {
         let s = "fn map = forall { a, b . # Fn(a -> b), List(a) -> List(b) : { f, xs . fold xs { Nil . Nil | Cons(x, state) . Cons(f(x), state) } } }";
         let mut state = State::new(s, &mut interner);
 
-        let result = function_declaration(&mut state);
+        let result = user_function_declaration(&mut state);
         assert!(matches!(result, Ok(_)));
-        let FunctionDeclaration { name, type_parameters, function: _ } = result?;
+        let UserFunctionDeclaration { name, type_parameters, function: _ } = result?;
 
         assert_eq!(name.str(&mut interner), "map");
         assert_eq!(type_parameters.len(), 2);
@@ -284,7 +284,7 @@ mod tests {
         let s = "fn f = # Nat -> Nat : { x . let {, y = # Nat : add(x, One), z = # Nat : add(x, Two) . mul(y, z) } }";
         let mut state = State::new(s, &mut interner);
 
-        let result = function_declaration(&mut state);
+        let result = user_function_declaration(&mut state);
         assert!(matches!(result, Ok(_)));
 
         Ok(())
@@ -296,7 +296,7 @@ mod tests {
         let s = "fn twice = forall { a, b . # Fn(a -> b), a -> b : { f, a . apply f to (apply f to (a)) }}";
         let mut state = State::new(s, &mut interner);
 
-        let result = function_declaration(&mut state);
+        let result = user_function_declaration(&mut state);
         assert!(matches!(result, Ok(_)));
 
         Ok(())

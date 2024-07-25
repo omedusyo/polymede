@@ -1,4 +1,4 @@
-use crate::base::{Program, TypeDeclaration, Type, FunctionType, ConstructorDeclaration, FunctionDeclaration, RunDeclaration};
+use crate::base::{Program, TypeDeclaration, Type, FunctionType, ConstructorDeclaration, FunctionDeclaration, ForeignFunctionDeclaration, UserFunctionDeclaration, RunDeclaration};
 use crate::identifier::Variable;
 use crate::validation:: base::{Result, Error, ErrorWithLocation};
 use std::collections::HashSet;
@@ -62,8 +62,16 @@ fn check_constructor_declaration(program: &Program, type_env: &TypeScope, decl: 
 }
 
 fn check_types_in_function_declaration(program: &Program, decl: &FunctionDeclaration) -> Result<()> {
-    let type_env: TypeScope = TypeScope::new(&decl.type_parameters);
-    check_function_type(program, &type_env, &decl.function.type_)
+    match decl {
+        FunctionDeclaration::User(decl) => {
+            let type_env: TypeScope = TypeScope::new(&decl.type_parameters);
+            check_function_type(program, &type_env, &decl.function.type_)
+        },
+        FunctionDeclaration::Foreign(decl) => {
+            let type_env: TypeScope = TypeScope::new(&vec![]);
+            check_function_type(program, &type_env, &decl.type_)
+        },
+    }
 }
 
 fn check_types_in_run_declaration(program: &Program, decl: &RunDeclaration) -> Result<()> {

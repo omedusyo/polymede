@@ -2,6 +2,7 @@ pub type Variant = i32;
 
 pub type FunctionName = usize;
 pub type VarName = usize;
+pub type ExternalName = String;
 pub type ComponentIndex = u8; // max 256 components
 
 #[derive(Debug)]
@@ -33,15 +34,26 @@ pub enum Pattern {
 
 #[derive(Debug)]
 pub struct Program {
-    pub number_of_primitive_functions: usize,
-    pub functions: Vec<Function>,
+    pub functions: Vec<FunctionOrImport>,
     pub main: Term,
+}
+
+#[derive(Debug)]
+pub enum FunctionOrImport {
+    Fn(Function),
+    Import(FunctionImport),
 }
 
 #[derive(Debug)]
 pub struct Function {
     pub number_of_parameters: usize,
     pub body: Term,
+}
+
+#[derive(Debug)]
+pub struct FunctionImport {
+    pub number_of_parameters: usize,
+    pub external_name: ExternalName,
 }
 
 pub fn constant(v: Variant) -> Term {
