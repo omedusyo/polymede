@@ -114,7 +114,7 @@ fn import_runtime_function(module: &mut Module, fn_name: &str, type_: FunctionTy
 
 fn import_primitive_function(module: &mut Module, external_name: String) -> FunctionIndex {
     let type_ = FunctionType { domain: vec![], codomain: vec![] };
-    module.add_typed_function_import(TypedFunctionImport { module_name: "primitive".to_string(), name: external_name, type_ })
+    module.add_typed_function_import(TypedFunctionImport { module_name: "primitives".to_string(), name: external_name, type_ })
 }
 
 fn import_runtime(module: &mut Module) -> Runtime {

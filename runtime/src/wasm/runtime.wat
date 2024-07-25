@@ -347,21 +347,5 @@
     (local.get $fn_pointer)
   )
   (export "make_env_from_closure" (func $make_env_from_closure))
-
-  (; ===Primitive Operations=== ;)
-  (func $add
-    (call $const (i32.add (call $get_const) (call $get_const)))
-  )
-  (export "add" (func $add))
-
-  (func $inc
-    (call $const (i32.add (call $get_const) (i32.const 1)))
-  )
-  (export "inc" (func $inc))
-
-  (func $dec
-    (call $const (i32.sub (call $get_const) (i32.const 1)))
-  )
-  (export "dec" (func $dec))
 )
 

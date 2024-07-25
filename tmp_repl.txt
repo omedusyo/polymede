@@ -98,14 +98,18 @@ cat test_out.wat
 # recompile runtime
 wat2wasm ../runtime/src/wasm/runtime.wat -o runtime.wasm
 
+# recompile primitives
+wat2wasm ../runtime/src/wasm/primitives.wat -o primitives.wasm
+
 # compile and link
 rm test_out.*
 cargo run --bin compiler -- -f test.pmd -o test_out
+wasm2wat test_out.wasm -o test_out.wat
 
-wasm-merge --enable-bulk-memory runtime.wasm runtime test_out.wasm test_out  -o output.wasm
-
+wasm-merge --enable-bulk-memory runtime.wasm runtime primitives.wasm primitives test_out.wasm test_out  -o output.wasm
 wasm2wat output.wasm -o output.wat
 cat output.wat
+
 
 TMP_WASM=tmp_wasm
 MODULE=out00
