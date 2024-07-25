@@ -13,12 +13,10 @@ struct VariableIndex {
 }
 
 struct State {
-    number_of_primitive_functions: usize,
-    function_count: FunctionIndex,
-    function_mapping: HashMap<FunctionName, FunctionIndex>,
-    functions: Vec<gmm::Function>,
-    anonymous_functions: Vec<gmm::Function>,
     constructor_mapping: HashMap<ConstructorName, ConstructorIndex>,
+
+    function_mapping: HashMap<FunctionName, FunctionIndex>,
+    anonymous_functions: Vec<gmm::Function>,
 
     env: Env,
 }
@@ -106,15 +104,11 @@ impl Env {
 }
 
 impl State {
-    pub fn new(number_of_primitive_functions: usize) -> Self {
+    pub fn new() -> Self {
         Self {
-            number_of_primitive_functions,
-
-            function_count: 0,
-            function_mapping: HashMap::new(),
-            functions: vec![],
-            anonymous_functions: vec![],
             constructor_mapping: HashMap::new(),
+            function_mapping: HashMap::new(),
+            anonymous_functions: vec![],
             env: Env::new(),
         }
     }
@@ -134,22 +128,14 @@ impl State {
     }
 
     fn get_function_index(&self, function_name: &FunctionName) -> Option<FunctionIndex> {
-        match self.function_mapping.get(function_name) {
-            Some(i) => Some(i + self.number_of_primitive_functions),
-            None => None
-        }
-    }
-
-    fn add_function_name(&mut self, function_name: FunctionName) {
-        self.function_mapping.insert(function_name, self.function_count);
-        self.function_count += 1;
+        self.function_mapping.get(function_name).copied()
     }
 
     fn add_anonymous_function(&mut self, gmm_function: gmm::Function) -> usize {
         let anonymous_fn_index = self.anonymous_functions.len();
         self.anonymous_functions.push(gmm_function);
 
-        self.number_of_primitive_functions + self.function_count + anonymous_fn_index
+        self.function_mapping.len() + anonymous_fn_index
     }
 
     fn open_env(&mut self) {
@@ -177,9 +163,9 @@ impl State {
     }
 }
 
-pub fn compile(number_of_primitive_functions: usize, program: &polymede::Program) -> gmm::Program {
-    let mut state = State::new(number_of_primitive_functions);
-    // ===Constructors===
+pub fn compile(program: &polymede::Program) -> gmm::Program {
+    let mut state = State::new();
+    // ===Constructor Name ~> Constructor Index===
     for decl in program.type_declarations_in_source_ordering() {
         let mut count: ConstructorIndex = 0;
 
@@ -189,9 +175,13 @@ pub fn compile(number_of_primitive_functions: usize, program: &polymede::Program
         }
     }
 
-    // ===Functions===
-    for decl in program.function_declarations_in_source_ordering() { 
-        state.add_function_name(decl.name())
+    // ===Function Name ~> Function Index===
+    {
+        let mut next_function_index: FunctionIndex = 0;
+        for decl in program.function_declarations_in_source_ordering() { 
+            state.function_mapping.insert(decl.name(), next_function_index);
+            next_function_index += 1;
+        }
     }
     
     // ===Main===
@@ -199,29 +189,34 @@ pub fn compile(number_of_primitive_functions: usize, program: &polymede::Program
     let main = compile_typed_term(&mut state, &run.body);
 
 
-    // TODO: This vector shuffling is way too complicated.
-    let mut functions: Vec<(FunctionIndex, gmm::Function)> = vec![];
+    // ===Functions===
+    let mut functions: Vec<gmm::FunctionOrImport> = Vec::with_capacity(state.function_mapping.len());
     for decl in program.function_declarations_in_source_ordering() { 
-        let Some(fn_index) = state.get_function_index(&decl.name()) else { unreachable!() };
-        functions.push((fn_index, compile_function_declaration(&mut state, &decl.function.function)));
+        match decl {
+            polymede::FunctionDeclaration::User(decl) => {
+                functions.push(gmm::FunctionOrImport::Fn(compile_function(&mut state, &decl.function.function)));
+            },
+            polymede::FunctionDeclaration::Foreign(decl) => {
+                let gmm_import = gmm::FunctionImport {
+                    number_of_parameters: decl.type_.input_types.len(),
+                    external_name: decl.external_name.str(program.interner()).to_string(),
+                };
+                functions.push(gmm::FunctionOrImport::Import(gmm_import));
+            }
+        }
     }
-    functions.sort_by(|(i, _), (j, _)| i.partial_cmp(j).unwrap());
 
-    for (_, function) in functions {
-        state.functions.push(function)
+    for anon_fn in state.anonymous_functions {
+        functions.push(gmm::FunctionOrImport::Fn(anon_fn));
     }
-
-    let mut final_functions = state.functions;
-    final_functions.append(&mut state.anonymous_functions);
 
     gmm::Program {
-        number_of_primitive_functions: state.number_of_primitive_functions,
-        functions: final_functions,
+        functions,
         main,
     }
 }
 
-fn compile_function_declaration(state: &mut State, function: &polymede::Function) -> gmm::Function {
+fn compile_function(state: &mut State, function: &polymede::Function) -> gmm::Function {
     state.open_env();
     state.extend_vars(function.parameters.clone());
     let gmm_function = gmm::Function {
@@ -297,7 +292,7 @@ fn compile_term(state: &mut State, term: &polymede::Term) -> gmm::Term {
                 function_with_extended_parameters.parameters = new_parameters;
 
                 let old_env = state.reset_env();
-                let gmm_function = compile_function_declaration(state, &function_with_extended_parameters);
+                let gmm_function = compile_function(state, &function_with_extended_parameters);
                 state.restore_env(old_env);
                 gmm_function
             };

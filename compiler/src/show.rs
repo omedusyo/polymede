@@ -1,4 +1,4 @@
-use crate::graph_memory_machine::{Program, Function, Term, Pattern};
+use crate::graph_memory_machine::{Program, Function, FunctionOrImport, FunctionImport, Term, Pattern};
 
 pub enum PrettyString {
     String(String),
@@ -93,7 +93,14 @@ fn ignore_indentation(s: PrettyString) -> PrettyString {
 pub fn show_program(program: &Program) -> PrettyString {
     let mut ss = vec![];
     for (i, function) in program.functions.iter().enumerate() {
-        ss.push(show_function(function, i + program.number_of_primitive_functions))
+        match function {
+            FunctionOrImport::Fn(function) => {
+                ss.push(show_function(function, i))
+            },
+            FunctionOrImport::Import(import) => {
+                ss.push(show_import(import, i))
+            },
+        }
     }
 
     ss.push(show_term(&program.main, 0));
@@ -107,6 +114,11 @@ pub fn show_function(function: &Function, function_index: usize) -> PrettyString
         indent(show_term(&function.body, function.number_of_parameters)),
         str("}"),
     ])
+}
+
+pub fn show_import(import: &FunctionImport, function_index: usize) -> PrettyString {
+    let parameters: Vec<_> = (0..import.number_of_parameters).map(|i| string(format!("{}", i))).collect();
+    seq(vec![str("fn "), string(format!("{}", function_index)), str("("), comma_seq(parameters), str(") { foreign_import(\""), string(import.external_name.clone()), str("\") }")])
 }
 
 pub fn show_term(term: &Term, next_parameter: usize) -> PrettyString {
