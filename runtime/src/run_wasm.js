@@ -3,12 +3,10 @@ const { showValue, deepReadRawPointer, readRawPointer, readTuple } = require("./
 
 function run(bytes) {
   const memory = new WebAssembly.Memory({ initial: 2, maximum: 10 });
-  const closure_table = new WebAssembly.Table({ initial: 0, element: "anyfunc" });
 
   const config = {
     env: {
       memory,
-      closure_table,
     },
   };
 

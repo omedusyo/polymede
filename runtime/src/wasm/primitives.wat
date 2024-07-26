@@ -12,18 +12,24 @@
   (import "runtime" "var" (func $var (param $index i32)))
   (import "runtime" "drop_env" (func $drop_env))
 
-  (func $add
-    (call $const (i32.add (call $get_const) (call $get_const)))
-  )
+  (func $add (call $const (i32.add (call $get_const) (call $get_const))))
   (export "i32_add" (func $add))
 
-  (func $inc
-    (call $const (i32.add (call $get_const) (i32.const 1)))
-  )
+  (func $mul (call $const (i32.mul (call $get_const) (call $get_const))))
+  (export "i32_mul" (func $mul))
+
+  (func $eq (call $const (i32.eq (call $get_const) (call $get_const))))
+  (export "i32_eq" (func $eq))
+
+  (func $leq (call $const (i32.le_s (call $get_const) (call $get_const))))
+  (export "i32_leq" (func $leq))
+
+  (func $lt (call $const (i32.lt_s (call $get_const) (call $get_const))))
+  (export "i32_lt" (func $lt))
+
+  (func $inc (call $const (i32.add (call $get_const) (i32.const 1))))
   (export "i32_inc" (func $inc))
 
-  (func $dec
-    (call $const (i32.sub (call $get_const) (i32.const 1)))
-  )
+  (func $dec (call $const (i32.sub (call $get_const) (i32.const 1))))
   (export "i32_dec" (func $dec))
 )
