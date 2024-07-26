@@ -368,9 +368,8 @@ impl <'state> State<'state> {
                 _ => None,
             }
         }
-        let test: i32 = 2147483647;
-        //2147483647
-        //-2147483648.
+
+        self.consume_whitespace();
 
         let mut c = self.read_char_or_fail_when_end()?;
         let is_positive = match c {

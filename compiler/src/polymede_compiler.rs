@@ -268,6 +268,7 @@ fn compile_term(state: &mut State, term: &polymede::Term) -> gmm::Term {
                         let Some(constructor_index) = state.get_constructor_index(constructor_name) else { unreachable!() };
                         gmm::Pattern::Variant(constructor_index)
                     },
+                    Int(x) => gmm::Pattern::Variant(*x),
                     Variable(_) => gmm::Pattern::Always,
                     Anything(_) => gmm::Pattern::Always,
                 };
@@ -333,7 +334,8 @@ fn pattern_to_indices(pattern: &polymede::Pattern, indices: &mut Vec<(Variable, 
         Variable(var) => {
             indices.push((var.clone(), VariableIndex { index: var_index, projections: depth }))
         },
-        Anything(_) => {}
+        Int(_) => {},
+        Anything(_) => {},
     }
 }
 
@@ -346,6 +348,7 @@ fn pattern_to_indices_simple(pattern: &polymede::Pattern, indices: &mut Vec<(Var
             for (i, pattern) in patterns.iter().enumerate() {
                 match pattern {
                     Constructor(_, _) => todo!("We don't yet support nested patterns during compilation."),
+                    Int(_) => todo!("We don't yet support nested patterns during compilation."),
                     Variable(var) => {
                         indices.push((var.clone(), VariableIndex { index: var_index, projections: vec![i as u8] }))
                     }
@@ -356,6 +359,7 @@ fn pattern_to_indices_simple(pattern: &polymede::Pattern, indices: &mut Vec<(Var
         Variable(var) => {
             indices.push((var.clone(), VariableIndex { index: var_index, projections: vec![] }))
         },
+        Int(_) => {},
         Anything(_) => {}
     }
 }

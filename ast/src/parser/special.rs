@@ -56,6 +56,39 @@ pub enum StartTerm {
     Lambda,
 }
 
+pub enum StartPattern {
+    Variable(Variable),
+    ConstructorConstant(ConstructorName),
+    ConstructorApplication(ConstructorName),
+    Int(i32),
+    Anything(Variable),
+}
+
+pub fn start_pattern(state: &mut State) -> Result<StartPattern> {
+    match state.commit_if_next_token_int()? {
+        Some(x) => return Ok(StartPattern::Int(x)),
+        None => {},
+    }
+    let id = identifier(state)?;
+    let c = id.first_char(state.interner());
+    if c.is_ascii_uppercase() {
+        // constructor
+        if state.is_next_token_open_paren()? {
+            Ok(StartPattern::ConstructorApplication(id))
+        } else {
+            // constructor constant
+            Ok(StartPattern::ConstructorConstant(id))
+        }
+    } else if c.is_ascii_lowercase() {
+        // variable
+        Ok(StartPattern::Variable(id))
+    } else if c == '_' {
+        Ok(StartPattern::Anything(id))
+    } else {
+        Err(Error::ExpectedTypeConstructorOrTypeVarOrAnythingInPattern { received: id })
+    }
+}
+
 // TODO: This needs a refactor.
 //       For type annotation it doesn't consume the `#` symbol,
 //       but for fold/match/let/apply/fn it does consume the keyword (we're taking advantage of
