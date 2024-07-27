@@ -181,6 +181,7 @@ pub struct PatternBranch {
 pub enum Pattern {
     Constructor(ConstructorName, Vec<Pattern>),
     Variable(Variable),
+    Int(i32),
     Anything(Identifier),
 }
 
@@ -426,6 +427,7 @@ impl Env {
             Variable(var) => {
                 self.extend_var(var)
             },
+            Int(_) => {},
             Anything(_) => {},
         }
     }
@@ -509,6 +511,32 @@ fn free_variables(env: &mut Env, term: &Term) {
             free_variables(env, body);
             env.close();
         },
+    }
+}
+
+impl Pattern {
+    // Collect all the variables in the pattern
+    pub fn variables(&self) -> Vec<Variable> {
+        let mut vars: Vec<Variable> = vec![];
+
+        fn pattern_loop(pattern: &Pattern, vars: &mut Vec<Variable>) {
+            use Pattern::*;
+            match pattern {
+                Constructor(_, patterns) => {
+                    for pattern in patterns {
+                        pattern_loop(pattern, vars)
+                    }
+                },
+                Variable(variable) => {
+                    vars.push(variable.clone())
+                },
+                Int(_) => {},
+                Anything(_) => {},
+            }
+        }
+        pattern_loop(self, &mut vars);
+
+        vars
     }
 }
 

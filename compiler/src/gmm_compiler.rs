@@ -135,7 +135,7 @@ fn import_runtime(module: &mut Module) -> Runtime {
     let get_variant = import(module, "get_variant", fn_type(vec![], vec![TYPE_I32]), &mut number_of_runtime_functions);
     let make_env = import(module, "make_env", fn_type(vec![TYPE_I32], vec![]), &mut number_of_runtime_functions);
     let make_env_from = import(module, "make_env_from", fn_type(vec![TYPE_I32, TYPE_I32], vec![]), &mut number_of_runtime_functions);
-    let copy_and_extend_env = import(module, "extend_env", fn_type(vec![TYPE_I32], vec![]), &mut number_of_runtime_functions);
+    let copy_and_extend_env = import(module, "copy_and_extend_env", fn_type(vec![TYPE_I32], vec![]), &mut number_of_runtime_functions);
     let extend_env = import(module, "extend_env", fn_type(vec![TYPE_I32], vec![]), &mut number_of_runtime_functions);
     let var = import(module, "var", fn_type(vec![TYPE_I32], vec![]), &mut number_of_runtime_functions);
     let drop_env = import(module, "drop_env", fn_type(vec![], vec![]), &mut number_of_runtime_functions);

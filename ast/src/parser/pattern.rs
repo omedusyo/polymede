@@ -1,36 +1,14 @@
 use crate::base::{Pattern, PatternBranch};
 use crate::identifier;
-use crate::identifier::{Variable, ConstructorName, Identifier};
+use crate::identifier::Identifier;
 use crate::parser::lex::lexer::Request;
 use crate::parser::{
     base::{State, Result, Error},
-    identifier::{identifier, variable},
+    identifier::variable,
     term::term,
-    special::{comma, or_separator},
+    special::{StartPattern, comma, or_separator, start_pattern},
     combinator::{delimited_nonempty_sequence_to_vector, delimited_possibly_empty_sequence_to_vector},
 };
-
-enum PatternIdentifier {
-    Variable(Variable),
-    ConstructorName(ConstructorName),
-    Anything(Identifier),
-}
-
-fn pattern_identifier(state: &mut State) -> Result<PatternIdentifier> {
-    let id = identifier(state)?;
-    let c = id.first_char(state.interner());
-    if c.is_ascii_uppercase() {
-        // constructor
-        Ok(PatternIdentifier::ConstructorName(id))
-    } else if c.is_ascii_lowercase() {
-        // variable
-        Ok(PatternIdentifier::Variable(id))
-    } else if c == '_' {
-        Ok(PatternIdentifier::Anything(id))
-    } else {
-        Err(Error::ExpectedTypeConstructorOrTypeVarOrAnythingInPattern { received: id })
-    }
-}
 
 // Parses a non-empty sequence of identifiers separated by comma
 //   x1, x2, x3
@@ -52,31 +30,6 @@ pub fn parameter_possibly_empty_sequence(state: &mut State) -> Result<Vec<Identi
         Ok(ids)
     } else {
         Err(Error::DuplicateVariableNames { duplicates: duplicate_ids })
-    }
-}
-
-impl Pattern {
-    // Collect all the variables in the pattern
-    fn variables(&self) -> Vec<Variable> {
-        let mut vars: Vec<Variable> = vec![];
-
-        fn pattern_loop(pattern: &Pattern, vars: &mut Vec<Variable>) {
-            use Pattern::*;
-            match pattern {
-                Constructor(_, patterns) => {
-                    for pattern in patterns {
-                        pattern_loop(pattern, vars)
-                    }
-                },
-                Variable(variable) => {
-                    vars.push(variable.clone())
-                },
-                Anything(_) => {},
-            }
-        }
-        pattern_loop(self, &mut vars);
-
-        vars
     }
 }
 
@@ -106,23 +59,17 @@ fn pattern_sequence(state: &mut State) -> Result<Vec<Pattern>> {
 
 fn pattern(state: &mut State) -> Result<Pattern> {
     fn parser(state: &mut State) -> Result<Pattern> {
-        match pattern_identifier(state)? {
-            PatternIdentifier::Variable(variable) => Ok(Pattern::Variable(variable)),
-            PatternIdentifier::ConstructorName(constructor_name) => {
-                if state.is_next_token_open_paren()? {
-                    // A constructor with multiple parameters.
-                    state.request_token(Request::OpenParen)?;
-                    let pattern_parameters = pattern_sequence(state)?;
-                    state.request_token(Request::CloseParen)?;
-                    Ok(Pattern::Constructor(constructor_name, pattern_parameters))
-                } else {
-                    // A constant
-                    Ok(Pattern::Constructor(constructor_name, vec![]))
-                }
+        match start_pattern(state)? {
+            StartPattern::Variable(variable) => Ok(Pattern::Variable(variable)),
+            StartPattern::ConstructorConstant(constructor_name) => Ok(Pattern::Constructor(constructor_name, vec![])),
+            StartPattern::ConstructorApplication(constructor_name) => {
+                state.request_token(Request::OpenParen)?;
+                let pattern_parameters = pattern_sequence(state)?;
+                state.request_token(Request::CloseParen)?;
+                Ok(Pattern::Constructor(constructor_name, pattern_parameters))
             },
-            PatternIdentifier::Anything(id) => {
-                Ok(Pattern::Anything(id))
-            }
+            StartPattern::Int(x) => Ok(Pattern::Int(x)),
+            StartPattern::Anything(id) => Ok(Pattern::Anything(id)),
         }
     }
     let pattern = parser(state)?;

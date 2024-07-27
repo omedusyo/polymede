@@ -37,6 +37,13 @@ fn i32_add : I32, I32 -> I32
 
 fn i32_test = # I32 -> Pair(I32, I32) : { x . Pair(-002147483648, x) }
 
+fn is_zero = # I32 -> Bool : { x .
+  match x {
+  | 0 . T
+  | _ . F
+  }
+}
+
 fn id_bool = # Bool -> Bool : { x . x }
 
 fn not = # Bool -> Bool : { x .

@@ -317,16 +317,26 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
         },
         Match(arg, branches) => {
             let arg_type = type_infer(env, arg)?;
-            let Type::TypeApplication(type_name, type_args) = arg_type else { return Err(Error::AttemptToMatchNonEnumerableType { received_type: arg_type }) };
-            for branch in branches {
-                check_pattern_branch(env, MatchOrFold::Match, branch, &type_name, &type_args, &expected_type)?;
+            match arg_type {
+                Type::TypeApplication(type_name, type_args) => {
+                    for branch in branches {
+                        check_pattern_branch(env, MatchOrFold::Match, branch, &type_name, &type_args, &expected_type)?;
+                    }
+                    Ok(())
+                },
+                Type::I32 => {
+                    for branch in branches {
+                        type_check(env, &branch.body, expected_type)?;
+                    }
+                    Ok(())
+                },
+                _ => Err(Error::AttemptToMatchNonEnumerableType { received_type: arg_type }),
             }
-            Ok(())
         },
         Fold(arg, branches) => {
             let arg_type = type_infer(env, arg)?;
             let arg_type_copy = arg_type.clone(); // TODO: Can I get rid of this clone?
-            let Type::TypeApplication(type_name, type_args) = arg_type else { return Err(Error::AttemptToMatchNonEnumerableType { received_type: arg_type }) };
+            let Type::TypeApplication(type_name, type_args) = arg_type else { return Err(Error::AttemptToFoldNonIndType { received_type: arg_type }) };
             if env.is_ind_type_declaration(&type_name) {
                 for branch in branches {
                     check_pattern_branch(env, MatchOrFold::Fold, branch, &type_name, &type_args, &expected_type)?;
@@ -420,8 +430,7 @@ fn check_and_extend_pattern(env: &mut Environment, match_or_fold: MatchOrFold, p
             env.extend(var, expected_pattern_type);
             Ok(())
         },
-        Pattern::Anything(_) => {
-            Ok(())
-        },
+        Pattern::Int(_) => Ok(()),
+        Pattern::Anything(_) => Ok(()),
     }
 }

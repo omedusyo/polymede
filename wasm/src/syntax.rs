@@ -264,7 +264,7 @@ impl Module {
         self.function_table = function_table
     }
 
-    pub fn binary_format(mut self) -> sections::Module {
+    pub fn binary_format(self) -> sections::Module {
         let mut bin_module = sections::Module::empty();
 
         bin_module.type_section = Some(TypeSection { function_types: self.function_types });
@@ -277,20 +277,29 @@ impl Module {
             Some(FunctionSection { type_indices: function_types_map })
         };
 
+        bin_module.table_section = {
+            let number_of_closures = self.function_table.len() as u32;
+            let table_type = TableType {
+                reftype: RefType::FuncRef,
+                limit: Limit::MinMax { min: number_of_closures, max: number_of_closures },
+            };
+            Some(TableSection { table_types: vec![table_type] })
+        };
+
         bin_module.import_section = {
             // TODO: Can this be done without cloning of strings?
-            let mut imports: Vec<Import> = self.functions.iter().filter_map(|fn_| match fn_ {
+            let imports: Vec<Import> = self.functions.iter().filter_map(|fn_| match fn_ {
                 FunctionOrImport::Import(fn_import) => Some(Import { module_name: fn_import.module_name.clone(), name: fn_import.name.clone(), import_description: ImportDescription::FunctionTypeIndex(fn_import.type_index) }),
                 FunctionOrImport::Fn(_) => None,
             }).collect();
 
-            imports.push(Import {
-                module_name: "env".to_string(), name: "closure_table".to_string(),
-                import_description: {
-                    let number_of_closures = self.function_table.len() as u32;
-                    ImportDescription::TableType(RefType::FuncRef, Limit::MinMax { min: number_of_closures, max: number_of_closures })
-                }
-            });
+            //imports.push(Import {
+            //    module_name: "env".to_string(), name: "closure_table".to_string(),
+            //    import_description: {
+            //        let number_of_closures = self.function_table.len() as u32;
+            //        ImportDescription::TableType(RefType::FuncRef, Limit::MinMax { min: number_of_closures, max: number_of_closures })
+            //    }
+            //});
 
             Some(ImportSection { imports })
         };
