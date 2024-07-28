@@ -239,9 +239,9 @@ fn type_infer(env: &mut Environment, term: &Term) -> Result<Type> {
                 }
             }
             let command_type = type_infer(env, body)?;
-            let Type::Command(type_) = command_type else { return Err(Error::ReturnNonCommandInDoExpression { received: command_type.clone() }) };
+            let Type::Command(_) = &command_type else { return Err(Error::ReturnNonCommandInDoExpression { received: command_type.clone() }) };
             env.close_env();
-            Ok(*type_)
+            Ok(command_type)
         }
     }
 }
