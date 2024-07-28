@@ -171,6 +171,7 @@ pub enum Term {
     LambdaApplication(Box<Term>, Vec<Term>),
     Let(Vec<(Variable, Term)>, Box<Term>),
     Pure(Box<Term>),
+    Do(Vec<DoBinding>, Box<Term>),
 }
 
 #[derive(Debug, Clone)]
@@ -185,6 +186,12 @@ pub enum Pattern {
     Variable(Variable),
     Int(i32),
     Anything(Identifier),
+}
+
+#[derive(Debug, Clone)]
+pub enum DoBinding {
+    ExecuteThenBind(Variable, Term),
+    Bind(Variable, Term),
 }
 
 impl TypeDeclaration {
@@ -514,6 +521,24 @@ fn free_variables(env: &mut Env, term: &Term) {
             env.close();
         },
         Pure(term) => free_variables(env, term),
+        Do(bindings, body) => {
+            env.open();
+            for binding in bindings {
+                match binding {
+                    DoBinding::ExecuteThenBind(var, term) => {
+                        env.extend_var(var);
+                        free_variables(env, term);
+                    },
+                    DoBinding::Bind(var, term) => {
+                        env.extend_var(var);
+                        free_variables(env, term);
+                    },
+                }
+
+            }
+            free_variables(env, body);
+            env.close();
+        },
     }
 }
 
