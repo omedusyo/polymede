@@ -163,7 +163,7 @@ pub enum Term {
     TypedTerm(Box<TypedTerm>),
     Int(i32),
     VariableUse(Variable),
-    FunctionApplication(Variable, Vec<Type>, Vec<Term>),
+    FunctionApplication(FunctionName, Vec<Type>, Vec<Term>),
     ConstructorUse(ConstructorName, Vec<Term>),
     Match(Box<Term>, Vec<PatternBranch>),
     Fold(Box<Term>, Vec<PatternBranch>),

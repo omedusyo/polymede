@@ -318,13 +318,46 @@ fn compile_term(state: &mut State, term: &polymede::Term) -> gmm::Term {
             state.close_env();
             gmm::Term::Let(gmm_args, Box::new(gmm_body))
         },
-        Pure(term) => {
-            todo!()
-        },
+        Pure(term) => gmm::Term::Pure(Box::new(compile_term(state, term))),
         Do(bindings, body) => {
+            state.open_env();
+            for binding in bindings {
+                match binding {
+                    polymede::DoBinding::ExecuteThenBind(var, term) => {
+                        todo!()
+                    },
+                    polymede::DoBinding::Bind(var, term) => {
+                        todo!()
+                    },
+                }
+                todo!()
+            }
+            state.close_env();
             todo!()
         },
     }
+}
+
+fn compile_do_assignment(state: &mut State, var: Variable, arg_command: &polymede::Term, rest_of_the_bindings: &[polymede::DoBinding], body: &polymede::Term) -> gmm::Term {
+    // Somehow I need to create a Continuation (FunctionIndex)
+    let compiled_arg = compile_term(state, arg_command);
+
+    let free_vars: Vec<Variable> = todo!();
+    // TODO: How to create the function?
+    let gmm_function = {
+
+        let gmm_function = gmm::Function {
+            number_of_parameters: 1,
+            body: todo!(),
+        };
+        gmm_function
+    };
+
+    let function_index = state.add_anonymous_function(gmm_function);
+
+    let free_args = todo!();
+    let continuation = gmm::Term::PartialApply(function_index, free_args);
+    gmm::Term::CommandAndThen(Box::new(compiled_arg), Box::new(gmm::Continuation { body: continuation }))
 }
 
 fn pattern_to_indices(pattern: &polymede::Pattern, indices: &mut Vec<(Variable, VariableIndex)>, depth: Vec<u8>, var_index: usize) {
