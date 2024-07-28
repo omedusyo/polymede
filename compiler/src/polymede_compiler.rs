@@ -318,6 +318,12 @@ fn compile_term(state: &mut State, term: &polymede::Term) -> gmm::Term {
             state.close_env();
             gmm::Term::Let(gmm_args, Box::new(gmm_body))
         },
+        Pure(term) => {
+            todo!()
+        },
+        Do(bindings, body) => {
+            todo!()
+        },
     }
 }
 

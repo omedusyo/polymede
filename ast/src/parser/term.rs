@@ -1,11 +1,11 @@
-use crate::base::{Term, TypedTerm, Type};
+use crate::base::{Term, TypedTerm, Type, DoBinding};
 use crate::identifier::Variable;
 use crate::parser::lex::{
     token::Keyword,
     lexer::Request,
 };
 use crate::parser::{
-    base::{State, Result},
+    base::{State, Result, Error},
     identifier::variable,
     types::{type_annotation, type_nonempty_sequence},
     pattern::pattern_branches,
@@ -76,6 +76,20 @@ pub fn term(state: &mut State) -> Result<Term> {
             state.request_token(Request::CloseParen)?;
             Ok(Term::LambdaApplication(Box::new(function), args))
         },
+        StartTerm::Pure => {
+            state.request_token(Request::OpenParen)?;
+            let arg = term(state)?;
+            state.request_token(Request::CloseParen)?;
+            Ok(Term::Pure(Box::new(arg)))
+        },
+        StartTerm::Do => {
+            state.request_token(Request::OpenCurly)?;
+            let bindings = nonempty_do_binding_sequence(state)?;
+            state.request_token(Request::BindingSeparator)?;
+            let body = term(state)?;
+            state.request_token(Request::CloseCurly)?;
+            Ok(Term::Do(bindings, Box::new(body)))
+        },
     }
 }
 
@@ -93,9 +107,29 @@ fn var_binding(state: &mut State) -> Result<(Variable, Term)> {
     Ok((var, term))
 }
 
+fn do_binding(state: &mut State) -> Result<DoBinding> {
+    let var = variable(state)?;
+    if state.is_next_token_open_angle()? {
+        state.request_keyword(Keyword::Assign)?;
+        let term = term(state)?;
+        Ok(DoBinding::ExecuteThenBind(var, term))
+    } else if state.is_next_token_eq()? {
+        state.request_keyword(Keyword::Eq)?;
+        let term = term(state)?;
+        Ok(DoBinding::Bind(var, term))
+    } else {
+        Err(Error::ExpectedEqualsOrAssignmentSymbol)
+    }
+}
+
 fn nonempty_var_binding_sequence(state: &mut State) -> Result<Vec<(Variable, Term)>> {
     state.consume_optional_comma()?;
     delimited_nonempty_sequence_to_vector(state, var_binding, comma)
+}
+
+fn nonempty_do_binding_sequence(state: &mut State) -> Result<Vec<DoBinding>> {
+    state.consume_optional_comma()?;
+    delimited_nonempty_sequence_to_vector(state, do_binding, comma)
 }
 
 fn possibly_empty_term_sequence(state: &mut State) -> Result<Vec<Term>> {

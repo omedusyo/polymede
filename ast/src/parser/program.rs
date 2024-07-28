@@ -75,10 +75,10 @@ fn constructor_declaration_sequence(state: &mut State) -> Result<Vec<Constructor
     delimited_possibly_empty_sequence_to_vector( state, constructor_declaration, or_separator)
 }
 
-static FORBIDDEN_CONSTRUCTOR_NAMES:[&str;3] = ["Fn", "I32", "String"];
+static FORBIDDEN_TYPE_NAMES:[&str; 4] = ["Fn", "I32", "String", "Cmd"];
 
 fn is_type_name_forbidden(name: &str) -> bool { 
-    for forbidden_name in FORBIDDEN_CONSTRUCTOR_NAMES {
+    for forbidden_name in FORBIDDEN_TYPE_NAMES {
         if forbidden_name == name { return true }
     }
     return false

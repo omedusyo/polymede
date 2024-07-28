@@ -23,6 +23,7 @@ pub enum Keyword {
     Fn,
     Foreign,
     Eq,
+    Assign,
     Arrow,
     Type_,
     Enum,
@@ -59,6 +60,7 @@ impl Keyword {
     pub const FN: &'static str = "fn";
     pub const FOREIGN: &'static str = "foreign";
     pub const EQ: &'static str = "=";
+    pub const ASSIGN: &'static str = "<-";
     pub const ARROW: &'static str = "->";
     pub const ENUM: &'static str = "enum";
     pub const IND: &'static str = "ind";
@@ -81,6 +83,7 @@ impl Keyword {
             Fn => Self::FN,
             Foreign => Self::FOREIGN,
             Eq => Self::EQ,
+            Assign => Self::ASSIGN,
             Arrow => Self::ARROW,
             Enum => Self::ENUM,
             Ind => Self::IND,
