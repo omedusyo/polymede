@@ -170,6 +170,7 @@ pub enum Term {
     Lambda(Box<Function>),
     LambdaApplication(Box<Term>, Vec<Term>),
     Let(Vec<(Variable, Term)>, Box<Term>),
+    Pure(Box<Term>),
 }
 
 #[derive(Debug, Clone)]
@@ -512,6 +513,7 @@ fn free_variables(env: &mut Env, term: &Term) {
             free_variables(env, body);
             env.close();
         },
+        Pure(term) => free_variables(env, term),
     }
 }
 

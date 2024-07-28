@@ -1,4 +1,4 @@
-use crate::base::{Program, TypeDeclaration, Type, FunctionDeclaration, UserFunctionDeclaration, RunDeclaration, Term, Pattern, PatternBranch};
+use crate::base::{Program, TypeDeclaration, Type, FunctionDeclaration, RunDeclaration, Term, Pattern, PatternBranch};
 use crate::identifier::{Variable, FunctionName, ConstructorName};
 use crate::validation:: {
     base::{Result, Error, ErrorWithLocation},
@@ -60,7 +60,7 @@ fn check_function_declaration(program: &Program, decl: &FunctionDeclaration) -> 
             type_check(&mut env, &decl.function.function.body, &function_type.output_type)?;
             Ok(())
         },
-        FunctionDeclaration::Foreign(decl) => {
+        FunctionDeclaration::Foreign(_decl) => {
             Ok(())
         },
     }
@@ -218,6 +218,10 @@ fn type_infer(env: &mut Environment, term: &Term) -> Result<Type> {
             let type_ = type_infer(env, body)?;
             env.close_env();
             Ok(type_)
+        },
+        Pure(term) => {
+            let type_ = type_infer(env, term)?;
+            Ok(Type::Command(Box::new(type_)))
         },
     }
 }
@@ -380,6 +384,10 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
             type_check(env, body, expected_type)?;
             env.close_env();
             Ok(())
+        },
+        Pure(term) => {
+            let Type::Command(expected_type) = expected_type else { return Err(Error::TermIsPureButExpectedTypeIsNotCommandType { expected_type: expected_type.clone() }) };
+            type_check(env, term, expected_type)
         },
     }
 }
