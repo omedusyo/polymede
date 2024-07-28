@@ -3,6 +3,7 @@
 
 (module
   (import "env" "memory" (memory 0))
+  (import "primitives" "perform_primitive_command" (func $perform_primitive_command (param i32)))
 
   (; Linear Stack := Linear Memory Stack ;)
   (global $stack_start (mut i32) (i32.const 0))
@@ -41,7 +42,6 @@
 
   (global $GC_TAG_LIVE i32 (i32.const 0))
   (global $GC_TAG_MOVED i32 (i32.const 1))
-
 
   (func $inc_stack (param $count i32)
     (global.set $STACK (i32.add (global.get $STACK) (local.get $count)))
@@ -381,5 +381,42 @@
     (local.get $fn_pointer)
   )
   (export "make_env_from_closure" (func $make_env_from_closure))
-)
 
+  ;; Pushes the contents at $raw_pointer onto the linear stack in the reverse order.
+  (func $unpack_in_reverse (param $raw_pointer i32) (param $count i32)
+    (if (i32.eq (local.get $count) (i32.const 0))
+      (then nop)
+      (else
+        (memory.copy
+          (global.get $STACK)
+          (i32.add (local.get $raw_pointer) (i32.mul (global.get $TAGGED_POINTER_BYTE_SIZE) (i32.sub (local.get $count) (i32.const 1))))
+          (global.get $TAGGED_POINTER_BYTE_SIZE))
+        (call $inc_stack (global.get $TAGGED_POINTER_BYTE_SIZE))
+        (call $unpack_in_reverse (local.get $raw_pointer) (i32.sub (local.get $count) (i32.const 1)))))
+  )
+  (export "unpack_in_reverse" (func $unpack_in_reverse))
+
+  (func $copy_value_to_stack (param $raw_pointer i32)
+    (memory.copy
+      (global.get $STACK)
+      (local.get $raw_pointer)
+      (global.get $TAGGED_POINTER_BYTE_SIZE))
+    (call $inc_stack (global.get $TAGGED_POINTER_BYTE_SIZE))
+  )
+  (export "copy_value_to_stack" (func $copy_value_to_stack))
+
+  (func $pure
+    ;; a -> Cmd(a)
+    ;; op-code for pure is 0
+    (call $tuple (i32.const 0) (i32.const 1))
+  )
+  (export "pure" (func $pure))
+
+  ;; Assumes linear stack [..., closure_pointer, command]
+  (func $and_then
+    ;; Cmd(a), (a -> Cmd(b)) -> Cmd(b)
+    ;; op-code for and_then is 1
+    (call $tuple (i32.const 1) (i32.const 2))
+  )
+  (export "and_then" (func $and_then))
+)

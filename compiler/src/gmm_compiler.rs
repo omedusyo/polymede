@@ -1,9 +1,10 @@
 use crate::graph_memory_machine as gmm;
+use crate::runtime::Runtime;
 use wasm::{
-    syntax::{Module, TypedFunctionImport, TypedFunction, fn_type, TYPE_I32, Expression, call, call_indirect, i32_const, i32_add, local_get, i32_eq, seq},
+    syntax::{Module, TypedFunctionImport, TypedFunction, fn_type, Expression, call, call_indirect, i32_const, i32_eq, seq},
     base::{
         indices::{FunctionIndex, TableIndex, TypeIndex},
-        types::{FunctionType, BlockType, ValueType, NumType},
+        types::{FunctionType, BlockType},
         export::{Export, ExportDescription},
     },
 };
@@ -41,27 +42,6 @@ struct FunctionInfo {
 enum FunctionKind {
     UserDefined,
     Primitive,
-}
-
-#[derive(Debug)]
-struct Runtime {
-    number_of_runtime_functions: usize,
-    const_: FunctionIndex,
-    get_const: FunctionIndex,
-    tuple: FunctionIndex,
-    get_tuple_pointer: FunctionIndex,
-    get_tuple_variant: FunctionIndex,
-    tuple_project: FunctionIndex,
-    read_tag: FunctionIndex,
-    get_variant: FunctionIndex,
-    make_env: FunctionIndex,
-    make_env_from: FunctionIndex,
-    copy_and_extend_env: FunctionIndex,
-    extend_env: FunctionIndex,
-    var: FunctionIndex,
-    drop_env: FunctionIndex,
-    partial_apply: FunctionIndex,
-    make_env_from_closure: FunctionIndex,
 }
 
 impl State {
@@ -108,7 +88,7 @@ impl State {
 }
 
 // ===Imports===
-fn import_runtime_function(module: &mut Module, fn_name: &str, type_: FunctionType) -> FunctionIndex {
+pub fn import_runtime_function(module: &mut Module, fn_name: &str, type_: FunctionType) -> FunctionIndex {
     module.add_typed_function_import(TypedFunctionImport { module_name: "runtime".to_string(), name: fn_name.to_string(), type_ })
 }
 
@@ -116,57 +96,10 @@ fn import_primitive_function(module: &mut Module, external_name: String) -> Func
     let type_ = FunctionType { domain: vec![], codomain: vec![] };
     module.add_typed_function_import(TypedFunctionImport { module_name: "primitives".to_string(), name: external_name, type_ })
 }
-
-fn import_runtime(module: &mut Module) -> Runtime {
-    let mut number_of_runtime_functions = 0;
-    fn import(module: &mut Module, fn_name: &str, type_: FunctionType, number_of_runtime_functions: &mut usize) -> FunctionIndex {
-        let fn_index = import_runtime_function(module, fn_name, type_);
-        *number_of_runtime_functions += 1;
-        fn_index
-    }
-
-    let const_= import(module, "const", fn_type(vec![TYPE_I32], vec![]), &mut number_of_runtime_functions);
-    let get_const = import(module, "get_const", fn_type(vec![], vec![TYPE_I32]) , &mut number_of_runtime_functions);
-    let tuple = import(module, "tuple", fn_type(vec![TYPE_I32, TYPE_I32], vec![]), &mut number_of_runtime_functions);
-    let get_tuple_pointer = import(module, "get_tuple_pointer", fn_type(vec![], vec![TYPE_I32]), &mut number_of_runtime_functions);
-    let get_tuple_variant = import(module, "get_tuple_variant", fn_type(vec![], vec![TYPE_I32]), &mut number_of_runtime_functions);
-    let tuple_project = import(module, "tuple_project", fn_type(vec![TYPE_I32], vec![]), &mut number_of_runtime_functions);
-    let read_tag = import(module, "read_tag", fn_type(vec![], vec![TYPE_I32]), &mut number_of_runtime_functions);
-    let get_variant = import(module, "get_variant", fn_type(vec![], vec![TYPE_I32]), &mut number_of_runtime_functions);
-    let make_env = import(module, "make_env", fn_type(vec![TYPE_I32], vec![]), &mut number_of_runtime_functions);
-    let make_env_from = import(module, "make_env_from", fn_type(vec![TYPE_I32, TYPE_I32], vec![]), &mut number_of_runtime_functions);
-    let copy_and_extend_env = import(module, "copy_and_extend_env", fn_type(vec![TYPE_I32], vec![]), &mut number_of_runtime_functions);
-    let extend_env = import(module, "extend_env", fn_type(vec![TYPE_I32], vec![]), &mut number_of_runtime_functions);
-    let var = import(module, "var", fn_type(vec![TYPE_I32], vec![]), &mut number_of_runtime_functions);
-    let drop_env = import(module, "drop_env", fn_type(vec![], vec![]), &mut number_of_runtime_functions);
-    let partial_apply = import(module, "partial_apply", fn_type(vec![TYPE_I32, TYPE_I32], vec![]), &mut number_of_runtime_functions);
-    let make_env_from_closure = import(module, "make_env_from_closure", fn_type(vec![TYPE_I32], vec![TYPE_I32]), &mut number_of_runtime_functions);
-
-    Runtime {
-        number_of_runtime_functions,
-        const_,
-        get_const,
-        tuple,
-        get_tuple_pointer,
-        get_tuple_variant,
-        tuple_project,
-        read_tag,
-        get_variant,
-        make_env,
-        make_env_from,
-        copy_and_extend_env,
-        extend_env,
-        var,
-        drop_env,
-        partial_apply,
-        make_env_from_closure,
-    }
-}
-
 // ===Compilation===
 pub fn compile(program: gmm::Program) -> Result<Module> {
     let mut module = Module::empty();
-    let runtime = import_runtime(&mut module);
+    let runtime = Runtime::import(&mut module);
     let mut state = State::new(&mut module, runtime);
 
     // ===Split program.functions into two separate vectors of primitive imports and user-defined functions===
@@ -209,6 +142,7 @@ pub fn compile(program: gmm::Program) -> Result<Module> {
     // Compile main.
     let main = module.add_typed_function(compile_function(&mut state, 0, &program.main)?);
     module.add_export(Export { name: "main".to_string(), export_description: ExportDescription::Function(main) });
+    module.add_export(Export { name: "function_table".to_string(), export_description: ExportDescription::Table(TableIndex(0)) });
 
     module.register_function_table(state.function_table);
 
@@ -320,6 +254,21 @@ fn compile_term(state: &mut State, number_of_parameters: usize, term: &gmm::Term
         gmm::Term::Seq(terms) => {
             // TODO: I think I need to introduce am explicit pop instruction for the stack.
             todo!()
+        },
+        gmm::Term::CommandAndThen(cmd_term, continuation_term) => {
+            let code = vec![
+                // WARNING: When changing this, take a look at perform_command.js
+                compile_term(state, number_of_parameters, &continuation_term.body)?,
+                compile_term(state, number_of_parameters, cmd_term)?,
+                call(state.runtime.and_then, vec![]),
+            ];
+            Ok(seq(code))
+        },
+        gmm::Term::Pure(term) => {
+            let mut code = vec![];
+            code.push(compile_term(state, number_of_parameters, term)?);
+            code.push(call(state.runtime.pure, vec![]));
+            Ok(seq(code))
         },
     }
 }

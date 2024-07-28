@@ -2,6 +2,7 @@ mod graph_memory_machine;
 mod interpreter;
 mod polymede_compiler;
 mod gmm_compiler;
+mod runtime;
 mod show;
 
 use std::io;

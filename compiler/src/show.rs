@@ -206,5 +206,21 @@ pub fn show_term(term: &Term, next_parameter: usize) -> PrettyString {
         Seq(terms) => {
             todo!()
         },
+        CommandAndThen(cmd_term, continuation_term) => {
+            seq(vec![
+                str("do "),
+                ignore_indentation(show_term(cmd_term, next_parameter)),
+                str(" then {"),
+                ignore_indentation(show_term(&continuation_term.body, next_parameter + 1)),
+                str("}"),
+            ])
+        },
+        Pure(term) => {
+            seq(vec![
+                str("pure("),
+                ignore_indentation(show_term(term, next_parameter)),
+                str(")"),
+            ])
+        },
     }
 }

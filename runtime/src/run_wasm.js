@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const { showValue, showValueWithAddress, showStack, showStackWithAddress, deepReadRawPointer, readRawPointer, readTuple, readStack, deepReadStack } = require("./memory_inspect.js");
+const { perform } = require("./perform_command.js");
 
 function run(bytes) {
   const memory = new WebAssembly.Memory({ initial: 2, maximum: 10 });
@@ -7,6 +8,14 @@ function run(bytes) {
   const config = {
     env: {
       memory,
+    },
+    console: {
+      log_int(x) {
+        console.log(x);
+      },
+      log_two_ints(x, y) {
+        console.log("Logging two ints", x, y);
+      },
     },
   };
 
@@ -26,9 +35,10 @@ function run(bytes) {
   }
 
   WebAssembly.instantiate(bytes, config).then(({ instance }) => {
-    const { main, init, stack_start, stack, env, heap, free, frame } = instance.exports;
+    const { main, init, stack_start, stack, env, heap, free, frame, function_table } = instance.exports;
+    const { make_env, make_env_from, make_env_from_closure, drop_env, tuple, partial_apply, get_tuple_pointer, perform_primitive_command, unpack_in_reverse, copy_value_to_stack } = instance.exports;
 
-    const { make_env, make_env_from, make_env_from_closure, drop_env, tuple, partial_apply } = instance.exports;
+    
     const const_ = instance.exports["const"];
     const var_ = instance.exports["var"];
 
@@ -38,8 +48,9 @@ function run(bytes) {
     GLOBAL.HEAP = heap;
     GLOBAL.FREE = free;
     GLOBAL.FRAME = frame;
+    GLOBAL.TABLE = function_table;
 
-    console.log("Instantiated succesfully.");
+    console.log("> Instantiated succesfully.");
 
     console.log(main);
     // TODO
@@ -50,9 +61,15 @@ function run(bytes) {
     make_env(0);
     main();
     drop_env();
-    console.log("Main executed succesfully.");
-    console.log(showStack(deepReadStack(view, GLOBAL.STACK_START.valueOf(), GLOBAL.STACK.valueOf())));
 
+    console.log("> Main executed succesfully.");
+    console.log(showStackWithAddress(deepReadStack(view, GLOBAL.STACK_START.valueOf(), GLOBAL.STACK.valueOf())));
+    console.log("> Performing command...");
+
+    perform(view, { get_tuple_pointer, perform_primitive_command, unpack_in_reverse, copy_value_to_stack, make_env_from_closure, drop_env  }, GLOBAL.TABLE, true);
+    console.log(showStackWithAddress(deepReadStack(view, GLOBAL.STACK_START.valueOf(), GLOBAL.STACK.valueOf())));
+
+    console.log("> Exiting.");
     // printRawStack();
 
     //=====
