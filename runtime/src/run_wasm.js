@@ -64,9 +64,17 @@ function run(bytes) {
 
     console.log("> Main executed succesfully.");
     console.log(showStackWithAddress(deepReadStack(view, GLOBAL.STACK_START.valueOf(), GLOBAL.STACK.valueOf())));
+
+
     console.log("> Performing command...");
 
-    perform(view, { get_tuple_pointer, perform_primitive_command, unpack_in_reverse, copy_value_to_stack, make_env_from_closure, drop_env  }, GLOBAL.TABLE, true);
+    perform(
+      view,
+      { get_tuple_pointer, perform_primitive_command, unpack_in_reverse, copy_value_to_stack, make_env_from_closure, drop_env  },
+      GLOBAL.TABLE,
+      true,
+      GLOBAL.STACK_START, GLOBAL.STACK,
+    );
     console.log(showStackWithAddress(deepReadStack(view, GLOBAL.STACK_START.valueOf(), GLOBAL.STACK.valueOf())));
 
     console.log("> Exiting.");

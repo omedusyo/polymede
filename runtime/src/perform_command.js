@@ -6,7 +6,7 @@ const variant_offset = 1;
 const count_offset = variant_offset + 4;
 const components_offset = count_offset + 1;
 
-function perform(view, operators, TABLE, is_tracing_enabled, trace) {
+function perform(view, operators, TABLE, is_tracing_enabled, trace, STACK_START, STACK) {
   // TODO: Add a flag for tracinga.
 
   const { get_tuple_pointer, perform_primitive_command, unpack_in_reverse, copy_value_to_stack, make_env_from_closure, drop_env } = operators;
@@ -15,7 +15,9 @@ function perform(view, operators, TABLE, is_tracing_enabled, trace) {
 
   function execute_top_continuation() {
     // stack = [..., k, value]
+    console.log("EXECUTING TOP CONTINUATION");
     const fn_pointer = make_env_from_closure(1);
+    console.log("CONTINUATION", fn_pointer);
     TABLE.get(fn_pointer)();
     drop_env();
     number_of_continuations_left -= 1;
