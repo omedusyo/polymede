@@ -141,6 +141,7 @@ pub enum Type {
     TypeApplication(ConstructorName, Vec<Type>),
     Arrow(Box<FunctionType>),
     I32,
+    Command(Box<Type>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -572,6 +573,7 @@ pub fn type_apply(type_parameters: &[Variable], type_body: &Type, type_arguments
                 Arrow(Box::new(FunctionType { input_types: applied_input_types, output_type: applied_output_type }))
             },
             I32 => I32,
+            Command(type_body) => Command(Box::new(traverse(position_map, type_body, type_arguments))),
         }
     }
 

@@ -111,6 +111,7 @@ impl <'show>Show<'show> {
                 format!("Fn({fn_type_str})")
             },
             I32 => "I32".to_string(),
+            Command(type_) => format!("Cmd({})", self.show_type(type_))
         }
     }
 
