@@ -6,6 +6,8 @@
   (import "env" "stack_size" (global $STACK_SIZE i32))
   (import "env" "heap_size" (global $HEAP_SIZE i32))
   (import "env" "on_stack_overflow" (func $on_stack_overflow))
+  (import "env" "on_garbage_collection" (func $on_garbage_collection))
+  (import "env" "on_out_of_memory" (func $on_out_of_memory))
 
   (import "primitives" "perform_primitive_command" (func $perform_primitive_command (param i32)))
 
@@ -37,7 +39,8 @@
   (global $ENV_COUNTER_OFFSET i32 (i32.const -4))
   (global $ENV_HEADER_START_OFFSET i32 (i32.const -9))
 
-  (global $TUPLE_HEADER_OFFSET i32 (i32.const 6)) ;; 6 bytes, 1 byte for GC bit, 4 bytes for variant, 1 byte for count
+  (global $TUPLE_HEADER_BYTE_SIZE i32 (i32.const 6)) ;; 6 bytes, 1 byte for GC bit, 4 bytes for variant, 1 byte for count
+  (global $TUPLE_HEADER_OFFSET i32 (i32.const 6))
   (global $TUPLE_VARIANT_OFFSET i32 (i32.const 1))
   (global $TUPLE_COUNT_OFFSET i32 (i32.const 5))
 
@@ -46,7 +49,7 @@
   (global $GC_TAG_MOVED i32 (i32.const 1))
 
   (func $inc_stack (param $count i32)
-    (if (i32.le_u (i32.add (global.get $STACK) (local.get $count)) (global.get $STACK_SIZE))
+    (if (i32.lt_u (i32.add (global.get $STACK) (local.get $count)) (global.get $STACK_SIZE))
       (then
         (global.set $STACK (i32.add (global.get $STACK) (local.get $count))))
       (else
@@ -91,6 +94,10 @@
     (local $component_byte_size i32)
     (local $tuple_pointer i32)
 
+    (; ==check if we have enough space on the heap== ;)
+    (local.set $component_byte_size (i32.mul (local.get $count) (global.get $TAGGED_POINTER_BYTE_SIZE)))
+    (call $gc_if_out_of_space (i32.add (global.get $TUPLE_HEADER_BYTE_SIZE) (local.get $component_byte_size)))
+
     (local.set $tuple_pointer (global.get $FREE))
     (; ==header== ;)
     (; 1 bit (takes the whole byte ofcourse) for garbage collection. ;)
@@ -105,7 +112,6 @@
     
     (; ==payload== ;)
     (; go back to the start of the component on the stack ;)
-    (local.set $component_byte_size (i32.mul (local.get $count) (global.get $TAGGED_POINTER_BYTE_SIZE)))
     (call $dec_stack (local.get $component_byte_size))
 
     (memory.copy (global.get $FREE) (global.get $STACK) (local.get $component_byte_size))
@@ -425,4 +431,27 @@
     (call $tuple (i32.const 1) (i32.const 2))
   )
   (export "and_then" (func $and_then))
+
+
+  (; =====Garbage Collector===== ;)
+  (func $gc_if_out_of_space (param $allocation_request_byte_size i32)
+    (if (i32.lt_u
+          (i32.add (global.get $FREE) (local.get $allocation_request_byte_size))
+          (i32.add (global.get $HEAP) (global.get $HEAP_SIZE)))
+      (then)
+      (else
+        (call $gc)
+        ;; Checking that gc helped.
+        (if (i32.lt_u
+              (i32.add (global.get $FREE) (local.get $allocation_request_byte_size))
+              (i32.add (global.get $HEAP) (global.get $HEAP_SIZE)))
+          (then)
+          (else (call $on_out_of_memory)))))
+  )
+
+  (func $gc
+    (call $on_garbage_collection)
+
+    ;; TODO: gc
+  )
 )

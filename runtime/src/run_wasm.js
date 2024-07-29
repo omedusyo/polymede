@@ -4,7 +4,9 @@ const { perform } = require("./perform_command.js");
 
 function run(bytes) {
   const stack_pages = 16;
-  const heap_pages = 256;
+  // TODO: Once GC is implemented, don't forget to increase the memory
+  // const heap_pages = 256;
+  const heap_pages = 1;
   const total_pages = stack_pages + 2*heap_pages;
 
   const page_byte_size = 2**16; // 65 KB
@@ -22,6 +24,12 @@ function run(bytes) {
       on_stack_overflow: () => {
         throw Error("Linear Stack Overflow!");
       },
+      on_garbage_collection: () => {
+        console.log("========Performing GC===========");
+      },
+      on_out_of_memory: () => {
+        throw Error("Out of heap memory!");
+      },
     },
     console: {
       log_int(x) {
@@ -34,19 +42,6 @@ function run(bytes) {
   };
 
   const GLOBAL = {};
-
-  function printRawStack() {
-    const array = new Uint8Array(memory.buffer);
-    const start = GLOBAL.STACK_START.valueOf();
-    const end = GLOBAL.STACK.valueOf();
-
-
-    const values = array.slice(start, end);
-    values.forEach(v => {
-      console.log(v);
-    });
-    console.log(`STACK[${start} to ${end}]`, values);
-  }
 
   WebAssembly.instantiate(bytes, config).then(({ instance }) => {
     const { main, init, stack_start, stack, env, heap, free, function_table } = instance.exports;
@@ -88,6 +83,7 @@ function run(bytes) {
       GLOBAL.STACK_START,
       GLOBAL.STACK,
     );
+    // log_stack("");
 
     // const TAGGED_POINTER_BYTE_SIZE = 5;
     //
@@ -107,7 +103,6 @@ function run(bytes) {
     // log_stack(5);
 
     console.log("> Exiting.");
-    // printRawStack();
 
     //=====
     // let tagged_pointer = readRawPointer(view, start);
@@ -163,10 +158,8 @@ function run(bytes) {
 function main() {
   const wasm_path = process.argv[2];
   const wasm_buffer = fs.readFileSync(wasm_path);
-  // console.log(wasm_buffer);
 
   run(wasm_buffer);
 }
 
 main();
-
