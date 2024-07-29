@@ -26,24 +26,24 @@ pub fn pre_program(state: &mut State) -> Result<PreProgram> {
 }
 
 fn check_program_names_uniqueness(program: &PreProgram) -> Result<()> {
+    let type_duplicates = identifier::duplicates(&program.type_names());
+    let constructor_duplicates = identifier::duplicates(&program.constructor_names());
+    let function_duplicates = identifier::duplicates(&program.function_names());
+    if !(type_duplicates.is_empty() && constructor_duplicates.is_empty() && function_duplicates.is_empty()) {
+        return Err(Error::DuplicateNames {
+            type_duplicates,
+            constructor_duplicates,
+            function_duplicates,
+        })
+    }
+
     match program.run_declarations.len() {
         0 => return Err(Error::RunDeclarationNotFound),
         1 => {},
         _ => return Err(Error::MoreThanOneRunDeclaration),
     }
 
-    let type_duplicates = identifier::duplicates(&program.type_names());
-    let constructor_duplicates = identifier::duplicates(&program.constructor_names());
-    let function_duplicates = identifier::duplicates(&program.function_names());
-    if !(type_duplicates.is_empty() && constructor_duplicates.is_empty() && function_duplicates.is_empty()) {
-        Err(Error::DuplicateNames {
-            type_duplicates,
-            constructor_duplicates,
-            function_duplicates,
-        })
-    } else {
-        Ok(())
-    }
+    Ok(())
 }
 
 fn program_declaration(state: &mut State) -> Result<Declaration> {
