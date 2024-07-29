@@ -1,4 +1,5 @@
 use ast::base as polymede;
+use ast::desugared_base as desugared_polymede;
 use ast::identifier::{FunctionName, ConstructorName, Variable};
 use crate::graph_memory_machine as gmm;
 
@@ -72,7 +73,7 @@ impl Env {
         }
     }
 
-    fn extend_pattern(&mut self, pattern: &polymede::Pattern) {
+    fn extend_pattern(&mut self, pattern: &desugared_polymede::Pattern) {
         match self.scopes.last_mut() {
             Some(scope) => {
                 let mut indices = vec![];
@@ -150,7 +151,7 @@ impl State {
         self.env.extend_var(var)
     }
 
-    fn extend_pattern(&mut self, pattern: &polymede::Pattern) {
+    fn extend_pattern(&mut self, pattern: &desugared_polymede::Pattern) {
         self.env.extend_pattern(pattern)
     }
 
@@ -186,7 +187,7 @@ pub fn compile(program: &polymede::Program) -> gmm::Program {
     
     // ===Main===
     let Some(run) = &program.run_declaration else { unreachable!() };
-    let main = compile_typed_term(&mut state, &run.body);
+    let main = compile_typed_term(&mut state, &desugared_polymede::desugar_typed_term(&run.body));
 
 
     // ===Functions===
@@ -194,7 +195,7 @@ pub fn compile(program: &polymede::Program) -> gmm::Program {
     for decl in program.function_declarations_in_source_ordering() { 
         match decl {
             polymede::FunctionDeclaration::User(decl) => {
-                functions.push(gmm::FunctionOrImport::Fn(compile_function(&mut state, &decl.function.function)));
+                functions.push(gmm::FunctionOrImport::Fn(compile_function(&mut state, &desugared_polymede::desugar_function(&decl.function.function))));
             },
             polymede::FunctionDeclaration::Foreign(decl) => {
                 let gmm_import = gmm::FunctionImport {
@@ -216,7 +217,7 @@ pub fn compile(program: &polymede::Program) -> gmm::Program {
     }
 }
 
-fn compile_function(state: &mut State, function: &polymede::Function) -> gmm::Function {
+fn compile_function(state: &mut State, function: &desugared_polymede::Function) -> gmm::Function {
     state.open_env();
     state.extend_vars(function.parameters.clone());
     let gmm_function = gmm::Function {
@@ -232,12 +233,12 @@ fn compile_var(state: &State, var: &Variable) -> gmm::Term {
     var_index.compile()
 }
 
-fn compile_typed_term(state: &mut State, typed_term: &polymede::TypedTerm) -> gmm::Term {
+fn compile_typed_term(state: &mut State, typed_term: &desugared_polymede::TypedTerm) -> gmm::Term {
     compile_term(state, &typed_term.term)
 }
 
-fn compile_term(state: &mut State, term: &polymede::Term) -> gmm::Term {
-    use polymede::Term::*;
+fn compile_term(state: &mut State, term: &desugared_polymede::Term) -> gmm::Term {
+    use desugared_polymede::Term::*;
     match term {
         TypedTerm(typed_term) => compile_typed_term(state, &typed_term),
         VariableUse(var) => compile_var(state, var),
@@ -255,14 +256,12 @@ fn compile_term(state: &mut State, term: &polymede::Term) -> gmm::Term {
             }
         },
         Match(arg, branches) => {
-            // TODO: This will have to be replaced by proper
-            //       compilation of nested patterns.
             let gmm_arg = compile_term(state, arg);
             let mut gmm_branches = vec![];
             for branch in branches {
                 state.open_env();
                 state.extend_pattern(&branch.pattern);
-                use polymede::Pattern::*;
+                use desugared_polymede::Pattern::*;
                 let gmm_pattern = match &branch.pattern {
                     Constructor(constructor_name, _) => {
                         let Some(constructor_index) = state.get_constructor_index(constructor_name) else { unreachable!() };
@@ -277,30 +276,8 @@ fn compile_term(state: &mut State, term: &polymede::Term) -> gmm::Term {
             }
             gmm::Term::Match(Box::new(gmm_arg), gmm_branches)
         },
-        Fold(arg, pattern_branch) => {
-            // TODO: Replace fold with a call to anonymous function whose body is match that uses
-            // recursion. 
-            todo!()
-        },
         Lambda(function) => {
-            // 1. Compile anonymous lambda into a new global function with extended parameters.
-            // 2. Afterwards partially apply said global function with values of free variables.
-            let free_vars: Vec<Variable> = function.free_variables();
-            let gmm_function = {
-                let mut function_with_extended_parameters = *function.clone();
-                let mut new_parameters = free_vars.clone();
-                new_parameters.append(&mut function_with_extended_parameters.parameters);
-                function_with_extended_parameters.parameters = new_parameters;
-
-                let old_env = state.reset_env();
-                let gmm_function = compile_function(state, &function_with_extended_parameters);
-                state.restore_env(old_env);
-                gmm_function
-            };
-            let function_index = state.add_anonymous_function(gmm_function);
-
-            let free_args = free_vars.iter().map(|var| compile_var(state, var)).collect();
-            gmm::Term::PartialApply(function_index, free_args)
+            compile_closure(state, function)
         },
         LambdaApplication(fn_term, args) => {
             let gmm_fn_term = compile_term(state, fn_term);
@@ -318,42 +295,43 @@ fn compile_term(state: &mut State, term: &polymede::Term) -> gmm::Term {
             state.close_env();
             gmm::Term::Let(gmm_args, Box::new(gmm_body))
         },
+        Pure(term) => gmm::Term::Pure(Box::new(compile_term(state, term))),
+        AndThen(cmd_term, continuation) => {
+            gmm::Term::CommandAndThen(
+                Box::new(compile_term(state, cmd_term)),
+                Box::new(gmm::Continuation { body : compile_closure(state, continuation) })
+            )
+        },
     }
 }
 
-fn pattern_to_indices(pattern: &polymede::Pattern, indices: &mut Vec<(Variable, VariableIndex)>, depth: Vec<u8>, var_index: usize) {
-    use polymede::Pattern::*;
-    match pattern {
-        Constructor(_, patterns) => {
-            for (i, pattern) in patterns.iter().enumerate() {
-                let mut depth = depth.clone();
-                depth.push(i as u8);
-                pattern_to_indices(pattern, indices, depth, var_index)
-            }
-        },
-        Variable(var) => {
-            indices.push((var.clone(), VariableIndex { index: var_index, projections: depth }))
-        },
-        Int(_) => {},
-        Anything(_) => {},
-    }
+fn compile_closure(state: &mut State, function: &desugared_polymede::Function) -> gmm::Term {
+    // 1. Compile anonymous lambda into a new global function with extended parameters.
+    // 2. Afterwards partially apply said global function with values of free variables.
+    let free_vars: Vec<Variable> = function.free_variables();
+    let gmm_function = {
+        let mut function_with_extended_parameters = function.clone();
+        let mut new_parameters = free_vars.clone();
+        new_parameters.append(&mut function_with_extended_parameters.parameters);
+        function_with_extended_parameters.parameters = new_parameters;
+
+        let old_env = state.reset_env();
+        let gmm_function = compile_function(state, &function_with_extended_parameters);
+        state.restore_env(old_env);
+        gmm_function
+    };
+    let function_index = state.add_anonymous_function(gmm_function);
+
+    let free_args = free_vars.iter().map(|var| compile_var(state, var)).collect();
+    gmm::Term::PartialApply(function_index, free_args)
 }
 
-// TODO: This function is used instead of `pattern_to_indices` so that we crash on nested patterns.
-//       Nested patterns are not yet supported.
-fn pattern_to_indices_simple(pattern: &polymede::Pattern, indices: &mut Vec<(Variable, VariableIndex)>, var_index: usize) {
-    use polymede::Pattern::*;
+fn pattern_to_indices_simple(pattern: &desugared_polymede::Pattern, indices: &mut Vec<(Variable, VariableIndex)>, var_index: usize) {
+    use desugared_polymede::Pattern::*;
     match pattern {
         Constructor(_, patterns) => {
-            for (i, pattern) in patterns.iter().enumerate() {
-                match pattern {
-                    Constructor(_, _) => todo!("We don't yet support nested patterns during compilation."),
-                    Int(_) => todo!("We don't yet support nested patterns during compilation."),
-                    Variable(var) => {
-                        indices.push((var.clone(), VariableIndex { index: var_index, projections: vec![i as u8] }))
-                    }
-                    Anything(_) => {}
-                }
+            for (i, var) in patterns.iter().enumerate() {
+                indices.push((var.clone(), VariableIndex { index: var_index, projections: vec![i as u8] }))
             }
         },
         Variable(var) => {

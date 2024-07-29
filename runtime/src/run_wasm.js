@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const { showValue, showValueWithAddress, showStack, showStackWithAddress, deepReadRawPointer, readRawPointer, readTuple, readStack, deepReadStack } = require("./memory_inspect.js");
+const { perform } = require("./perform_command.js");
 
 function run(bytes) {
   const memory = new WebAssembly.Memory({ initial: 2, maximum: 10 });
@@ -7,6 +8,14 @@ function run(bytes) {
   const config = {
     env: {
       memory,
+    },
+    console: {
+      log_int(x) {
+        console.log(x);
+      },
+      log_two_ints(x, y) {
+        console.log("Logging two ints", x, y);
+      },
     },
   };
 
@@ -26,9 +35,10 @@ function run(bytes) {
   }
 
   WebAssembly.instantiate(bytes, config).then(({ instance }) => {
-    const { main, init, stack_start, stack, env, heap, free, frame } = instance.exports;
+    const { main, init, stack_start, stack, env, heap, free, frame, function_table } = instance.exports;
+    const { make_env, make_env_from, make_env_from_closure, drop_env, tuple, partial_apply, get_tuple_pointer, perform_primitive_command, unpack_in_reverse, copy_value_to_stack } = instance.exports;
 
-    const { make_env, make_env_from, make_env_from_closure, drop_env, tuple, partial_apply } = instance.exports;
+    
     const const_ = instance.exports["const"];
     const var_ = instance.exports["var"];
 
@@ -38,21 +48,52 @@ function run(bytes) {
     GLOBAL.HEAP = heap;
     GLOBAL.FREE = free;
     GLOBAL.FRAME = frame;
+    GLOBAL.TABLE = function_table;
 
-    console.log("Instantiated succesfully.");
+    function log_stack(s) {
+      console.log(s, showStackWithAddress(deepReadStack(view, GLOBAL.STACK_START.valueOf(), GLOBAL.STACK.valueOf())));
+    }
 
-    console.log(main);
-    // TODO
-    // console.log("MAIN IS NOT RUNNING!");
+    console.log("> Instantiated succesfully.");
+
+    // console.log(main);
     const view = new DataView(memory.buffer);
-    console.log(showStack(deepReadStack(view, GLOBAL.STACK_START.valueOf(), GLOBAL.STACK.valueOf())));
 
     make_env(0);
     main();
     drop_env();
-    console.log("Main executed succesfully.");
-    console.log(showStack(deepReadStack(view, GLOBAL.STACK_START.valueOf(), GLOBAL.STACK.valueOf())));
 
+    console.log("> Main executed succesfully.");
+    // log_stack("");
+    console.log("> Performing command...");
+
+    perform(
+      view,
+      { get_tuple_pointer, perform_primitive_command, unpack_in_reverse, copy_value_to_stack, make_env_from_closure, drop_env  },
+      GLOBAL.TABLE,
+      true, // tracing
+      GLOBAL.STACK_START,
+      GLOBAL.STACK,
+    );
+
+    // const TAGGED_POINTER_BYTE_SIZE = 5;
+    //
+    // const variant_offset = 1;
+    // const count_offset = variant_offset + 4;
+    // const components_offset = count_offset + 1;
+    // log_stack(0);
+    // let raw_pointer = get_tuple_pointer();
+    // log_stack(1);
+    // copy_value_to_stack(raw_pointer + components_offset);
+    // log_stack(2);
+    // copy_value_to_stack(raw_pointer + components_offset + TAGGED_POINTER_BYTE_SIZE);
+    // log_stack(3);
+    // const fn_pointer = make_env_from_closure(1);
+    // log_stack(4);
+    // GLOBAL.TABLE.get(fn_pointer)();
+    // log_stack(5);
+
+    console.log("> Exiting.");
     // printRawStack();
 
     //=====
@@ -63,7 +104,6 @@ function run(bytes) {
     // let tuple1 = readTuple(view, tuple0.components[1]);
     // console.log(tuple1);
 
-    console.log("+===================+");
     // const val = deepReadRawPointer(view, GLOBAL.STACK_START.valueOf());
     // console.log(showValue(val))
 
@@ -110,7 +150,7 @@ function run(bytes) {
 function main() {
   const wasm_path = process.argv[2];
   const wasm_buffer = fs.readFileSync(wasm_path);
-  console.log(wasm_buffer);
+  // console.log(wasm_buffer);
 
   run(wasm_buffer);
 }

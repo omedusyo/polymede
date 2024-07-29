@@ -1,6 +1,7 @@
 mod parser;
 mod validation;
 mod base;
+mod desugared_base;
 mod identifier;
 
 use std::io;

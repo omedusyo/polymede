@@ -24,6 +24,13 @@ pub enum Term {
     // that will be accessible in the bodies.
     Match(Box<Term>, Vec<(Pattern, Term)>),
     Seq(Vec<Term>),
+    Pure(Box<Term>),
+    CommandAndThen(Box<Term>, Box<Continuation>),
+}
+
+#[derive(Debug)]
+pub struct Continuation {
+    pub body: Term,
 }
 
 #[derive(Debug)]

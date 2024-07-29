@@ -20,21 +20,28 @@ pub fn type_(state: &mut State) -> Result<Type> {
             if state.is_next_token_open_paren()? {
                 // A type constructor with multiple parameters.
                 state.request_token(Request::OpenParen)?;
-                if constructor_name.str(state.interner()) == "Fn" {
-                    let fn_type = function_type(state)?;
-                    state.request_token(Request::CloseParen)?;
-                    Ok(Type::Arrow(Box::new(fn_type)))
-                } else {
-                    let type_args = type_nonempty_sequence(state)?;
-                    state.request_token(Request::CloseParen)?;
-                    Ok(Type::TypeApplication(constructor_name, type_args))
+                match constructor_name.str(state.interner()) {
+                    "Fn" => {
+                        let fn_type = function_type(state)?;
+                        state.request_token(Request::CloseParen)?;
+                        Ok(Type::Arrow(Box::new(fn_type)))
+                    },
+                    "Cmd" => {
+                        let type_ = type_(state)?;
+                        state.request_token(Request::CloseParen)?;
+                        Ok(Type::Command(Box::new(type_)))
+                    },
+                    _ => {
+                        let type_args = type_nonempty_sequence(state)?;
+                        state.request_token(Request::CloseParen)?;
+                        Ok(Type::TypeApplication(constructor_name, type_args))
+                    }
                 }
             } else {
                 // A type constant
-                if constructor_name.str(state.interner()) == "I32" {
-                    Ok(Type::I32)
-                } else {
-                    Ok(Type::TypeApplication(constructor_name, vec![]))
+                match constructor_name.str(state.interner()) {
+                    "I32" => Ok(Type::I32),
+                    _ => Ok(Type::TypeApplication(constructor_name, vec![])),
                 }
             }
         }
@@ -44,8 +51,15 @@ pub fn type_(state: &mut State) -> Result<Type> {
 pub fn primitive_type(state: &mut State) -> Result<Type> {
     let type_ = type_(state)?;
     use Type::*;
+    let t = type_.clone();
     match type_ {
-        I32 => Ok(I32),
+        I32 => Ok(t),
+        Command(x) =>  {
+            match *x {
+                I32 => Ok(t),
+                _ => Err(Error::ExpectedPrimitiveType { received: t }),
+            }
+        },
         _ => Err(Error::ExpectedPrimitiveType { received: type_ }),
     }
 }

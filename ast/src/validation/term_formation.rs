@@ -1,4 +1,4 @@
-use crate::base::{Program, TypeDeclaration, Type, FunctionDeclaration, UserFunctionDeclaration, RunDeclaration, Term, Pattern, PatternBranch};
+use crate::base::{Program, TypeDeclaration, Type, FunctionDeclaration, RunDeclaration, Term, Pattern, PatternBranch, DoBinding};
 use crate::identifier::{Variable, FunctionName, ConstructorName};
 use crate::validation:: {
     base::{Result, Error, ErrorWithLocation},
@@ -60,7 +60,7 @@ fn check_function_declaration(program: &Program, decl: &FunctionDeclaration) -> 
             type_check(&mut env, &decl.function.function.body, &function_type.output_type)?;
             Ok(())
         },
-        FunctionDeclaration::Foreign(decl) => {
+        FunctionDeclaration::Foreign(_decl) => {
             Ok(())
         },
     }
@@ -219,6 +219,30 @@ fn type_infer(env: &mut Environment, term: &Term) -> Result<Type> {
             env.close_env();
             Ok(type_)
         },
+        Pure(term) => {
+            let type_ = type_infer(env, term)?;
+            Ok(Type::Command(Box::new(type_)))
+        },
+        Do(bindings, body) => {
+            env.open_env();
+            for binding in bindings {
+                match binding {
+                    DoBinding::ExecuteThenBind(var, term) => {
+                        let command_type = type_infer(env, term)?;
+                        let Type::Command(type_) = command_type else { return Err(Error::AttemptToExecuteNonCommand { received: command_type.clone() }) };
+                        env.extend(var, &type_);
+                    },
+                    DoBinding::Bind(var, term) => {
+                        let type_ = type_infer(env, term)?;
+                        env.extend(var, &type_);
+                    },
+                }
+            }
+            let command_type = type_infer(env, body)?;
+            let Type::Command(_) = &command_type else { return Err(Error::ReturnNonCommandInDoExpression { received: command_type.clone() }) };
+            env.close_env();
+            Ok(command_type)
+        }
     }
 }
 
@@ -376,6 +400,30 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
             for (var, term) in bindings {
                 let type_ = type_infer(env, term)?;
                 env.extend(var, &type_);
+            }
+            type_check(env, body, expected_type)?;
+            env.close_env();
+            Ok(())
+        },
+        Pure(term) => {
+            let Type::Command(expected_type) = expected_type else { return Err(Error::TermIsCommandButExpectedTypeIsNotCommandType { expected_type: expected_type.clone() }) };
+            type_check(env, term, expected_type)
+        },
+        Do(bindings, body) => {
+            let Type::Command(_) = expected_type else { return Err(Error::TermIsCommandButExpectedTypeIsNotCommandType { expected_type: expected_type.clone() }) };
+            env.open_env();
+            for binding in bindings {
+                match binding {
+                    DoBinding::ExecuteThenBind(var, term) => {
+                        let command_type = type_infer(env, term)?;
+                        let Type::Command(type_) = command_type else { return Err(Error::AttemptToExecuteNonCommand { received: command_type.clone() }) };
+                        env.extend(var, &type_);
+                    },
+                    DoBinding::Bind(var, term) => {
+                        let type_ = type_infer(env, term)?;
+                        env.extend(var, &type_);
+                    },
+                }
             }
             type_check(env, body, expected_type)?;
             env.close_env();

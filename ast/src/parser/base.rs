@@ -24,6 +24,7 @@ pub enum Error {
     ExpectedTypeConstructor { received: Identifier },
     ExpectedPrimitiveType { received: Type },
     DuplicateVariableNames { duplicates: Vec<Identifier> },
+    ExpectedEqualsOrAssignmentSymbol,
     // Atleast one vector is non-empty.
     DuplicateNames {
         type_duplicates: Vec<Identifier>,
@@ -190,6 +191,10 @@ impl <'lex_state, 'interner> State<'lex_state, 'interner> {
 
     pub fn is_next_token_open_angle(&mut self) -> Result<bool> {
         self.lexer_state.is_next_token_open_angle().map_err(Error::LexError)
+    }
+
+    pub fn is_next_token_eq(&mut self) -> Result<bool> {
+        self.lexer_state.is_next_token_eq().map_err(Error::LexError)
     }
 
     pub fn is_next_token_start_type_annotation(&mut self) -> Result<bool> {

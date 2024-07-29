@@ -1,4 +1,4 @@
-use crate::base::indices::{GlobalIndex, FunctionIndex, MemoryIndex};
+use crate::base::indices::{GlobalIndex, FunctionIndex, TableIndex, MemoryIndex};
 
 #[derive(Debug)]
 pub struct Export {
@@ -9,6 +9,7 @@ pub struct Export {
 #[derive(Debug)]
 pub enum ExportDescription {
     Function(FunctionIndex),
+    Table(TableIndex),
     Memory(MemoryIndex),
     Global(GlobalIndex),
 }

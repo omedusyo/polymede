@@ -1,4 +1,5 @@
-====Add String/i32 types====
+====Add String types====
+====Implement proper command tracing at runtime====
 ====Human Readable Error messages====
 
 ====In runtime environments use Display instead of copying everything====

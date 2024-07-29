@@ -14,6 +14,7 @@ impl Encoder for Export {
 
 impl ExportDescription {
     const FUNCTION_PREFIX: u8 = 0x00;
+    const TABLE_PREFIX: u8 = 0x01;
     const MEMORY_PREFIX: u8 = 0x02;
     const GLOBAL_PREFIX: u8 = 0x03;
 }
@@ -25,6 +26,7 @@ impl Encoder for ExportDescription {
         use ExportDescription::*;
         match self {
             Function(index) => byte(Self::FUNCTION_PREFIX).seq(index.emit()),
+            Table(index) => byte(Self::TABLE_PREFIX).seq(index.emit()),
             Memory(index) => byte(Self::MEMORY_PREFIX).seq(index.emit()),
             Global(index) => byte(Self::GLOBAL_PREFIX).seq(index.emit()),
         }

@@ -11,11 +11,14 @@ pub enum Error {
     UndefinedTypeVaraible { variable: Variable },
     NegativeOccuranceOfRecursiveTypeVariableInInductiveDeclaration { variable: Variable },
 
+    RunExpressionDoesntHaveExpectedCommandType { received: Type },
+
     VariableOutOfScope { variable: Variable },
     VariableDoesntHaveExpectedType { variable: Variable, expected_type: Type, received_type: Type },
     TypeAnnotationDoesntMatchExpectedType { expected_type: Type, received_type: Type },
     TermIsConstructorButExpectedTypeIsNot { expected_type: Type },
     TermIsLambdaButExpectedTypeIsNotArrowType { expected_type: Type },
+    TermIsCommandButExpectedTypeIsNotCommandType { expected_type: Type },
     ConstructorDoesntBelongToExpectedTypeDeclaration { constructor_name: ConstructorName, type_name: Variable },
     ConstructorDoesntExist { constructor_name: ConstructorName },
     ConstructorIsAppliedToWrongNumberOfArguments { constructor_name: ConstructorName, expected: usize, received: usize },
@@ -30,6 +33,8 @@ pub enum Error {
     ApplyingWrongNumberOfTypeArgumentsToFunction { function_name: FunctionName, expected: usize, received: usize },
     FunctionOutputTypeDoesntMatchExpectedType { function_name: FunctionName, expected_type: Type, received_type: Type },
     TermDoesntHaveExpectedArrowType { received: Type },
+    AttemptToExecuteNonCommand { received: Type },
+    ReturnNonCommandInDoExpression { received: Type },
 
     UnableToInferTypeOfMatch,
     UnableToInferTypeOfFold,
@@ -53,11 +58,14 @@ impl Error {
             UndefinedTypeVaraible { variable } => format!("Undefined type variable '{}'.", sh.show_identifier(variable)),
             NegativeOccuranceOfRecursiveTypeVariableInInductiveDeclaration { variable } => format!("Negative occurance of self type variable {} in inductive type declaration.", sh.show_identifier(variable)),
 
+            RunExpressionDoesntHaveExpectedCommandType { received } => format!("Run expression is supposed to be a command but has type {}", sh.show_type(received)),
+
             VariableOutOfScope { variable } => format!("Variable '{}' is out of scope.", sh.show_identifier(variable)),
             VariableDoesntHaveExpectedType { variable, expected_type, received_type } => format!("Variable '{}' has type {} but is expected to be {}.", sh.show_identifier(variable), sh.show_type(received_type), sh.show_type(expected_type)),
             TypeAnnotationDoesntMatchExpectedType { expected_type, received_type } => format!("Type annotation is {} but is expected to be {}.", sh.show_type(received_type), sh.show_type(expected_type)),
             TermIsConstructorButExpectedTypeIsNot { expected_type } => format!("Term is a constructor, but its expected type is {}.", sh.show_type(expected_type)),
             TermIsLambdaButExpectedTypeIsNotArrowType { expected_type } => format!("Term is a lambda, but its expected type is {}.", sh.show_type(expected_type)),
+            TermIsCommandButExpectedTypeIsNotCommandType { expected_type } => format!("Term is a command, but its expected type is {}.", sh.show_type(expected_type)),
             ConstructorDoesntBelongToExpectedTypeDeclaration { constructor_name, type_name } => format!("Constructor '{}' doesn't belong to type declaration '{}'.", sh.show_identifier(constructor_name), sh.show_identifier(type_name)),
             ConstructorDoesntExist { constructor_name } => format!("Constructor '{}' doesn't exist.", sh.show_identifier(constructor_name)),
             ConstructorIsAppliedToWrongNumberOfArguments { constructor_name, expected, received } => format!("Constructor '{}' is applied to {} arguments but expects {}.", sh.show_identifier(constructor_name), received, expected),
@@ -72,6 +80,8 @@ impl Error {
             ApplyingWrongNumberOfTypeArgumentsToFunction { function_name, expected, received } => format!("Applying function '{}' to {} type arguments but it has {} type-parameters.", sh.show_identifier(function_name), received, expected),
             FunctionOutputTypeDoesntMatchExpectedType { function_name, expected_type, received_type } => format!("Function's '{}' output type is {} but is expected to be {}.", sh.show_identifier(function_name), sh.show_type(received_type), sh.show_type(expected_type)),
             TermDoesntHaveExpectedArrowType { received } => format!("Term has type {}, but is expected to be an Arrow type.", sh.show_type(received)),
+            AttemptToExecuteNonCommand { received } => format!("Term is supposed to be a command but has type {}", sh.show_type(received)),
+            ReturnNonCommandInDoExpression { received } => format!("Can't return term of type {} in a do expression", sh.show_type(received)),
 
             UnableToInferTypeOfMatch => format!("Unable to infer type of match expression."),
             UnableToInferTypeOfFold => format!("Unable to infer type of fold expression."),

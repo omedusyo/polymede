@@ -316,6 +316,10 @@ impl <'state> State<'state> {
         self.is_next_char('<')
     }
 
+    pub fn is_next_token_eq(&mut self) -> Result<bool> {
+        self.is_next_char('=')
+    }
+
     pub fn is_next_token_start_type_annotation(&mut self) -> Result<bool> {
         self.is_next_char('#')
     }
