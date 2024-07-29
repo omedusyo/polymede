@@ -99,14 +99,13 @@ function run(bytes, on_instance) {
   };
 
   WebAssembly.instantiate(bytes, config).then(({ instance }) => {
-    const { init, stack_start, stack, env, heap, free, frame } = instance.exports;
+    const { init, stack_start, stack, env, heap, free } = instance.exports;
 
     GLOBAL.STACK_START = stack_start;
     GLOBAL.STACK = stack;
     GLOBAL.ENV = env;
     GLOBAL.HEAP = heap;
     GLOBAL.FREE = free;
-    GLOBAL.FRAME = frame;
 
     on_instance(instance, { GLOBAL, LOG, buffer, config });
   });

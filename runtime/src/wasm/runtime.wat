@@ -3,21 +3,23 @@
 
 (module
   (import "env" "memory" (memory 0))
+  (import "env" "stack_size" (global $STACK_SIZE i32))
+  (import "env" "heap_size" (global $HEAP_SIZE i32))
+  (import "env" "on_stack_overflow" (func $on_stack_overflow))
+
   (import "primitives" "perform_primitive_command" (func $perform_primitive_command (param i32)))
 
   (; Linear Stack := Linear Memory Stack ;)
-  (global $stack_start (mut i32) (i32.const 0))
-  (export "stack_start" (global $stack_start))
+  (global $STACK_START (mut i32) (i32.const 0))
+  (export "stack_start" (global $STACK_START))
   (global $STACK (mut i32) (i32.const 0))
   (export "stack" (global $STACK))
-  (global $frame (mut i32) (i32.const 0))
-  (export "frame" (global $frame))
   (global $ENV (mut i32) (i32.const 0))
   (export "env" (global $ENV))
 
-  (global $heap (mut i32) (i32.const 2048)) ;; start of the heap
-  (export "heap" (global $heap))
-  (global $FREE (mut i32) (i32.const 2048)) ;; pointer to the next free cell on the heap
+  (global $HEAP (mut i32) (global.get $STACK_SIZE)) ;; start of the heap
+  (export "heap" (global $HEAP))
+  (global $FREE (mut i32) (global.get $STACK_SIZE)) ;; pointer to the next free cell on the heap
   (export "free" (global $FREE))
 
   (; ===Global Constants=== ;)
@@ -44,7 +46,11 @@
   (global $GC_TAG_MOVED i32 (i32.const 1))
 
   (func $inc_stack (param $count i32)
-    (global.set $STACK (i32.add (global.get $STACK) (local.get $count)))
+    (if (i32.le_u (i32.add (global.get $STACK) (local.get $count)) (global.get $STACK_SIZE))
+      (then
+        (global.set $STACK (i32.add (global.get $STACK) (local.get $count))))
+      (else
+        (call $on_stack_overflow)))
   )
 
   (func $dec_stack (param $count i32)

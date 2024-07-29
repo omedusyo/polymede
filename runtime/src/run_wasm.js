@@ -3,11 +3,25 @@ const { showValue, showValueWithAddress, showStack, showStackWithAddress, deepRe
 const { perform } = require("./perform_command.js");
 
 function run(bytes) {
-  const memory = new WebAssembly.Memory({ initial: 2, maximum: 10 });
+  const stack_pages = 16;
+  const heap_pages = 256;
+  const total_pages = stack_pages + 2*heap_pages;
+
+  const page_byte_size = 2**16; // 65 KB
+  const stack_byte_size = page_byte_size * stack_pages; // 1 MB. Note that this is Linear Stack in Linear Memory, not the wasm's stack.
+  const heap_byte_size = page_byte_size * heap_pages; // 16 MB
+  const total_byte_size = page_byte_size * total_pages; // (1 + 2*16) MB == 33 MB
+
+  const memory = new WebAssembly.Memory({ initial: total_pages, maximum: total_pages }); // 37 MB
 
   const config = {
     env: {
       memory,
+      stack_size: new WebAssembly.Global({ value: "i32", mutable: false }, stack_byte_size),
+      heap_size: new WebAssembly.Global({ value: "i32", mutable: false }, heap_byte_size),
+      on_stack_overflow: () => {
+        throw Error("Linear Stack Overflow!");
+      },
     },
     console: {
       log_int(x) {
@@ -35,7 +49,7 @@ function run(bytes) {
   }
 
   WebAssembly.instantiate(bytes, config).then(({ instance }) => {
-    const { main, init, stack_start, stack, env, heap, free, frame, function_table } = instance.exports;
+    const { main, init, stack_start, stack, env, heap, free, function_table } = instance.exports;
     const { make_env, make_env_from, make_env_from_closure, drop_env, tuple, partial_apply, get_tuple_pointer, perform_primitive_command, unpack_in_reverse, copy_value_to_stack } = instance.exports;
 
     
@@ -47,7 +61,6 @@ function run(bytes) {
     GLOBAL.ENV = env;
     GLOBAL.HEAP = heap;
     GLOBAL.FREE = free;
-    GLOBAL.FRAME = frame;
     GLOBAL.TABLE = function_table;
 
     function log_stack(s) {
