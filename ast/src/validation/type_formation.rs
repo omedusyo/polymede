@@ -22,11 +22,15 @@ pub fn check_program(program: &Program) -> core::result::Result<(), Vec<ErrorWit
     for decl in &program.run_declaration {
         match check_types_in_run_declaration(program, decl) {
             Ok(_) => {},
-            Err(e) => errors.push(ErrorWithLocation::RunDeclaration(e)),
+            Err(e) => { errors.push(ErrorWithLocation::RunDeclaration(e)) },
         }
     }
 
-    Ok(())
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
 }
 
 fn check_type_declaration(program: &Program, decl: &TypeDeclaration) -> Result<()> {
@@ -76,6 +80,7 @@ fn check_types_in_function_declaration(program: &Program, decl: &FunctionDeclara
 
 fn check_types_in_run_declaration(program: &Program, decl: &RunDeclaration) -> Result<()> {
     let type_env: TypeScope = TypeScope::new(&vec![]);
+    let Type::Command(_) = &decl.body.type_ else { return Err(Error::RunExpressionDoesntHaveExpectedCommandType { received: decl.body.type_.clone() }) };
     check_type(program, &type_env, &decl.body.type_)
 }
 

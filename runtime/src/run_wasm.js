@@ -64,8 +64,7 @@ function run(bytes) {
     drop_env();
 
     console.log("> Main executed succesfully.");
-    console.log(showStackWithAddress(deepReadStack(view, GLOBAL.STACK_START.valueOf(), GLOBAL.STACK.valueOf())));
-
+    // log_stack("");
     console.log("> Performing command...");
 
     perform(
@@ -92,7 +91,7 @@ function run(bytes) {
     // const fn_pointer = make_env_from_closure(1);
     // log_stack(4);
     // GLOBAL.TABLE.get(fn_pointer)();
-    log_stack(5);
+    // log_stack(5);
 
     console.log("> Exiting.");
     // printRawStack();
@@ -105,7 +104,6 @@ function run(bytes) {
     // let tuple1 = readTuple(view, tuple0.components[1]);
     // console.log(tuple1);
 
-    console.log("+===================+");
     // const val = deepReadRawPointer(view, GLOBAL.STACK_START.valueOf());
     // console.log(showValue(val))
 
@@ -152,7 +150,7 @@ function run(bytes) {
 function main() {
   const wasm_path = process.argv[2];
   const wasm_buffer = fs.readFileSync(wasm_path);
-  console.log(wasm_buffer);
+  // console.log(wasm_buffer);
 
   run(wasm_buffer);
 }

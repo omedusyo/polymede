@@ -11,6 +11,8 @@ pub enum Error {
     UndefinedTypeVaraible { variable: Variable },
     NegativeOccuranceOfRecursiveTypeVariableInInductiveDeclaration { variable: Variable },
 
+    RunExpressionDoesntHaveExpectedCommandType { received: Type },
+
     VariableOutOfScope { variable: Variable },
     VariableDoesntHaveExpectedType { variable: Variable, expected_type: Type, received_type: Type },
     TypeAnnotationDoesntMatchExpectedType { expected_type: Type, received_type: Type },
@@ -55,6 +57,8 @@ impl Error {
             TypeConstructorIsApplliedToWrongNumberOfArguments { expected, received } => format!("Type Constructor is applied to {} arguments but expects {}.", received, expected),
             UndefinedTypeVaraible { variable } => format!("Undefined type variable '{}'.", sh.show_identifier(variable)),
             NegativeOccuranceOfRecursiveTypeVariableInInductiveDeclaration { variable } => format!("Negative occurance of self type variable {} in inductive type declaration.", sh.show_identifier(variable)),
+
+            RunExpressionDoesntHaveExpectedCommandType { received } => format!("Run expression is supposed to be a command but has type {}", sh.show_type(received)),
 
             VariableOutOfScope { variable } => format!("Variable '{}' is out of scope.", sh.show_identifier(variable)),
             VariableDoesntHaveExpectedType { variable, expected_type, received_type } => format!("Variable '{}' has type {} but is expected to be {}.", sh.show_identifier(variable), sh.show_type(received_type), sh.show_type(expected_type)),

@@ -28,7 +28,6 @@ function perform(view, operators, TABLE, is_tracing_enabled, STACK_START, STACK)
     // stack = [...,]
     const op_code = view.getInt32(raw_pointer + variant_offset, true);
     if (op_code == 0) {
-      if (is_tracing_enabled) { console.log(`TRACE: Pure`); }
       // ===pure===
       copy_value_to_stack(raw_pointer + components_offset);
       if (number_of_continuations_left == 0) {
@@ -37,7 +36,6 @@ function perform(view, operators, TABLE, is_tracing_enabled, STACK_START, STACK)
         execute_top_continuation()
       }
     } else if (op_code == 1) {
-      if (is_tracing_enabled) { console.log(`TRACE: AND_THEN`); }
       // ===and_then===
       copy_value_to_stack(raw_pointer + components_offset);
       // push continuation to the stack
