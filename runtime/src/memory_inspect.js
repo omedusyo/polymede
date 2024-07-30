@@ -21,6 +21,11 @@ function Tuple(variant, components, address) {
   return { type: "Tuple",  variant, components, address };
 }
 
+// TODO: May be useful during GC inspection.
+function Moved(pointer) {
+  return { type: "Moved", pointer };
+}
+
 function Array(byte_count, bytes, address) {
   return { type: "Array",  byte_count, bytes, address };
 }

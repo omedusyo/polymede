@@ -2,6 +2,15 @@
 ====Implement proper command tracing at runtime====
 ====Human Readable Error messages====
 
+====Check if variable is used at compile time====
+This is actually important for GC. We can have live heap objects referenced in current environment
+that won't be used in further computation, yet GC will think that they are live so won't collect them
+and you can get unnecessary out of memory crash.
+
+====Tail Calls====
+You can use wat2wasm ... --enable-tail-calls.
+Then use instructions `return_call` and `return_call_indirect`. Won't work on Safari right now, but hey, whatever.
+
 ====In runtime environments use Display instead of copying everything====
 
 ====Make semantically different identifier types into different types (wrap them in structs)====

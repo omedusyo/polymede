@@ -3,26 +3,27 @@
 
 (module
   (import "env" "memory" (memory 0))
-  (import "env" "stack_size" (global $STACK_SIZE i32))
-  (import "env" "heap_size" (global $HEAP_SIZE i32))
+  (import "env" "STACK_SIZE" (global $STACK_SIZE i32))
+  (import "env" "HEAP_SIZE" (global $HEAP_SIZE i32))
+  (import "env" "STACK_START" (global $STACK_START i32))
+  (import "env" "A_HEAP_START" (global $A_HEAP_START (mut i32)))
+  (import "env" "B_HEAP_START" (global $B_HEAP_START (mut i32)))
+  (import "env" "FREE" (global $FREE (mut i32))) ;; pointer to the next free cell on the heap
+
   (import "env" "on_stack_overflow" (func $on_stack_overflow))
   (import "env" "on_garbage_collection" (func $on_garbage_collection))
   (import "env" "on_out_of_memory" (func $on_out_of_memory))
 
+  (import "env" "debug" (func $debug))
+  (import "env" "debug_int" (func $debug_int (param i32)))
+  (import "env" "show_stack" (func $show_stack (param i32)))
+
   (import "primitives" "perform_primitive_command" (func $perform_primitive_command (param i32)))
 
-  (; Linear Stack := Linear Memory Stack ;)
-  (global $STACK_START (mut i32) (i32.const 0))
-  (export "stack_start" (global $STACK_START))
   (global $STACK (mut i32) (i32.const 0))
   (export "stack" (global $STACK))
   (global $ENV (mut i32) (i32.const 0))
   (export "env" (global $ENV))
-
-  (global $HEAP (mut i32) (global.get $STACK_SIZE)) ;; start of the heap
-  (export "heap" (global $HEAP))
-  (global $FREE (mut i32) (global.get $STACK_SIZE)) ;; pointer to the next free cell on the heap
-  (export "free" (global $FREE))
 
   (; ===Global Constants=== ;)
   (global $TAGGED_POINTER_BYTE_SIZE i32 (i32.const 5))
@@ -43,7 +44,6 @@
   (global $TUPLE_HEADER_OFFSET i32 (i32.const 6))
   (global $TUPLE_VARIANT_OFFSET i32 (i32.const 1))
   (global $TUPLE_COUNT_OFFSET i32 (i32.const 5))
-
 
   (global $GC_TAG_LIVE i32 (i32.const 0))
   (global $GC_TAG_MOVED i32 (i32.const 1))
@@ -89,7 +89,7 @@
 
   (; ===Tuple=== ;)
   (; Consumes $count many tagged pointers on the stack, and moves them onto the heap ;)
-  (; 1 <= $count <= 255 ;)
+  (; 0 <= $count <= 255 ;)
   (func $tuple (param $variant i32) (param $count i32)
     (local $component_byte_size i32)
     (local $tuple_pointer i32)
@@ -437,21 +437,173 @@
   (func $gc_if_out_of_space (param $allocation_request_byte_size i32)
     (if (i32.lt_u
           (i32.add (global.get $FREE) (local.get $allocation_request_byte_size))
-          (i32.add (global.get $HEAP) (global.get $HEAP_SIZE)))
+          (i32.add (global.get $A_HEAP_START) (global.get $HEAP_SIZE)))
       (then)
       (else
         (call $gc)
         ;; Checking that gc helped.
         (if (i32.lt_u
               (i32.add (global.get $FREE) (local.get $allocation_request_byte_size))
-              (i32.add (global.get $HEAP) (global.get $HEAP_SIZE)))
+              (i32.add (global.get $A_HEAP_START) (global.get $HEAP_SIZE)))
           (then)
           (else (call $on_out_of_memory)))))
   )
 
+  ;; A := To Space
+  ;; B := From Space
+  ;; p a raw pointer to somewhere in A
+  ;; q a raw pointer to somewhere in B
   (func $gc
+    (local $tmp i32)
+
     (call $on_garbage_collection)
 
-    ;; TODO: gc
+    (global.set $FREE (global.get $B_HEAP_START))
+    (call $gc_walk_stack)
+    (call $gc_traverse_grey)
+
+    
+    ;; swapping heaps
+    (local.set $tmp (global.get $A_HEAP_START))
+    (global.set $A_HEAP_START (global.get $B_HEAP_START))
+    (global.set $B_HEAP_START (local.get $tmp))
   )
+  (export "gc" (func $gc))
+
+  (func $gc_walk_stack
+    (local $current_element i32)
+    (local $tag i32)
+    (local $moved_to i32) ;; TODO: delete this
+
+    (local.set $current_element (global.get $STACK_START))
+
+    (block $end_loop
+    (loop $main_loop
+      (i32.eq (local.get $current_element) (global.get $STACK))
+      (br_if $end_loop)
+
+      (local.set $tag (i32.load8_u (local.get $current_element)))
+      (if (i32.eq (local.get $tag) (global.get $CONST_TAG))
+      (then
+        ;; ==const==
+        ;; skip
+        (local.set $current_element (i32.add (local.get $current_element) (global.get $TAGGED_POINTER_BYTE_SIZE)))
+      )
+      (else (if (i32.eq (local.get $tag) (global.get $TUPLE_TAG))
+      (then
+        ;; ==tuple pointer==
+        ;; move the tuple to B, and update the current tagged pointer in the stack
+        (local.set $moved_to (call $gc_move_tuple (i32.load (i32.add (local.get $current_element) (i32.const 1)))))
+        (i32.store
+          (i32.add (local.get $current_element) (i32.const 1))
+          (local.get $moved_to))
+
+        (local.set $current_element (i32.add (local.get $current_element) (global.get $TAGGED_POINTER_BYTE_SIZE)))
+      )
+      (else (if (i32.eq (local.get $tag) (global.get $ENV_TAG))
+      (then
+        ;; ==env==
+        ;; skip header
+        (local.set $current_element (i32.add (local.get $current_element) (global.get $ENV_HEADER_BYTE_SIZE)))
+      )
+      (else
+        ;; unknown tag
+        unreachable))))))
+      (br $main_loop)))
+
+  )
+  (export "gc_walk_stack" (func $gc_walk_stack))
+
+  (func $gc_traverse_grey
+    (local $current_grey i32)
+    (local $next_grey i32)
+    (local $tuple_components_count i32)
+    (local $component_tag i32)
+
+    (local.set $current_grey (global.get $B_HEAP_START))
+
+    (block $end_loop
+    (loop $main_loop
+      (i32.eq (local.get $current_grey) (global.get $FREE))
+      (br_if $end_loop)
+
+      ;; WARNING: If you have other things than tuples on the heap,
+      ;;          you will have to introduce a $tag for heap objects,
+      ;;          since without this information GC won't know what it is trying to move.
+
+      ;; skip the tuple header
+      (local.set $tuple_components_count (i32.load8_u (i32.add (local.get $current_grey) (global.get $TUPLE_COUNT_OFFSET))))
+      (local.set $current_grey (i32.add (local.get $current_grey) (global.get $TUPLE_HEADER_OFFSET)))
+      (local.set $next_grey
+        (i32.add
+          (local.get $current_grey)
+          (i32.mul (local.get $tuple_components_count) (global.get $TAGGED_POINTER_BYTE_SIZE))))
+
+      (block $end_components_loop
+      (loop $components_loop
+        (i32.eq (local.get $current_grey) (local.get $next_grey))
+        (br_if $end_components_loop)
+
+        (local.set $component_tag (i32.load8_u (local.get $current_grey)))
+        (if (i32.eq (local.get $component_tag) (global.get $CONST_TAG))
+        (then
+          ;; ==const==
+          ;; skip
+          (local.set $current_grey (i32.add (local.get $current_grey) (global.get $TAGGED_POINTER_BYTE_SIZE)))
+        )
+        (else (if (i32.eq (local.get $component_tag) (global.get $TUPLE_TAG))
+        (then
+          ;; ==tuple pointer==
+          ;; move the tuple to B, and update the current tagged pointer
+          (i32.store
+            (i32.add (local.get $current_grey) (i32.const 1))
+            ;; TODO: Do I need to i32.load the current_gray + 1? yep...
+            (call $gc_move_tuple (i32.load (i32.add (local.get $current_grey) (i32.const 1)))))
+          (local.set $current_grey (i32.add (local.get $current_grey) (global.get $TAGGED_POINTER_BYTE_SIZE)))
+        )
+        (else
+          ;; unknown tag
+          unreachable))))
+
+        (br $components_loop)
+      ))
+
+      (br $main_loop)
+    ))
+  )
+  (export "gc_traverse_grey" (func $gc_traverse_grey))
+
+  ;; p is a raw pointer that points to a start of a tuple in A_SPACE.
+  ;; q is a raw pointer that points to the new location of the tuple in B_SPACE
+  ;; returns q
+  (func $gc_move_tuple (param $p i32) (result i32)
+    (local $q i32)
+    (local $tuple_byte_size i32)
+
+    (if (i32.eq (i32.load8_u (local.get $p)) (global.get $GC_TAG_MOVED))
+      (then ;; moved
+        (local.set $q (i32.load (i32.add (local.get $p) (i32.const 1)))))
+      (else ;; live
+        (local.set $q (global.get $FREE))
+        ;; copy the tuple at p to q
+        (local.set $tuple_byte_size
+          (i32.add
+              (global.get $TUPLE_HEADER_BYTE_SIZE)
+              (i32.mul
+                (i32.load8_u (i32.add (local.get $p) (global.get $TUPLE_COUNT_OFFSET)))
+                (global.get $TAGGED_POINTER_BYTE_SIZE))))
+
+        (memory.copy (local.get $q) (local.get $p) (local.get $tuple_byte_size))
+
+        ;; update B_SPACE pointer
+        (global.set $FREE (i32.add (global.get $FREE) (local.get $tuple_byte_size)))
+
+        ;; put tombstone at p pointing to q
+        (i32.store8 (local.get $p) (global.get $GC_TAG_MOVED))
+        (i32.store (i32.add (local.get $p) (i32.const 1)) (local.get $q))
+      ))
+
+    (local.get $q)
+  )
+  (export "gc_move_tuple" (func $gc_move_tuple))
 )

@@ -39,6 +39,7 @@ function wasm2bytes(wasm_path, module) {
 module.exports.wasm2bytes = wasm2bytes;
 
 function run(bytes, on_instance) {
+  // TODO: This is completely outdated.
 
   function printRawStack(buffer) {
     const array = new Uint8Array(buffer);
@@ -99,7 +100,7 @@ function run(bytes, on_instance) {
   };
 
   WebAssembly.instantiate(bytes, config).then(({ instance }) => {
-    const { init, stack_start, stack, env, heap, free } = instance.exports;
+    const { stack_start, stack, env, heap, free } = instance.exports;
 
     GLOBAL.STACK_START = stack_start;
     GLOBAL.STACK = stack;
