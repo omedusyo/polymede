@@ -99,7 +99,7 @@ fn desugar_do_expression(bindings: &[base::DoBinding], body: &base::Term) -> Ter
 
     fn desugar_neighbouring_binds<'a>(mut bindings: &'a [base::DoBinding], let_bindings: &mut Vec<(Variable, Term)>) -> &'a [base::DoBinding] {
         use base::DoBinding::*;
-        while let Bind(var, term) = &bindings[0] {
+        while let Some(Bind(var, term)) = bindings.get(0) {
             let_bindings.push((var.clone(), desugar_term(term)));
             bindings = &bindings[1..];
         }
