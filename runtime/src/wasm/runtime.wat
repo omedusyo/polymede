@@ -473,7 +473,7 @@
   (func $gc_walk_stack
     (local $current_element i32)
     (local $tag i32)
-    (local $moved_to i32) ;; TODO: delete this
+    (local $moved_to i32)
 
     (local.set $current_element (global.get $STACK_START))
 
@@ -557,7 +557,6 @@
           ;; move the tuple to B, and update the current tagged pointer
           (i32.store
             (i32.add (local.get $current_grey) (i32.const 1))
-            ;; TODO: Do I need to i32.load the current_gray + 1? yep...
             (call $gc_move_tuple (i32.load (i32.add (local.get $current_grey) (i32.const 1)))))
           (local.set $current_grey (i32.add (local.get $current_grey) (global.get $TAGGED_POINTER_BYTE_SIZE)))
         )

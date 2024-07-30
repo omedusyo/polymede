@@ -3,12 +3,8 @@ const { showValue, showValueWithAddress, showStack, showStackWithAddress, deepRe
 const { perform } = require("./perform_command.js");
 
 function run(bytes) {
-  // TODO: Once GC is implemented, don't forget to increase the memory
   const stack_pages = 16;
-  // const heap_pages = 256;
-  // TODO: This is for debugging
-  // const stack_pages = 1;
-  const heap_pages = 1;
+  const heap_pages = 256;
   const total_pages = stack_pages + 2*heap_pages;
 
   const page_byte_size = 2**16; // 65 KB
@@ -30,10 +26,6 @@ function run(bytes) {
   const STACK_START  = new WebAssembly.Global({ value: "i32", mutable: false }, 0)
   const A_HEAP_START = new WebAssembly.Global({ value: "i32", mutable: true }, stack_byte_size);
   const B_HEAP_START = new WebAssembly.Global({ value: "i32", mutable: true }, stack_byte_size + heap_byte_size);
-  // TODO: Revert to the above!
-  // TODO: This is for debugging
-  // const A_HEAP_START = new WebAssembly.Global({ value: "i32", mutable: true }, 2**16 + 2**14);
-  // const B_HEAP_START = new WebAssembly.Global({ value: "i32", mutable: true }, 2**16 + 2**16);
 
   const FREE = new WebAssembly.Global({ value: "i32", mutable: true }, A_HEAP_START.valueOf());
 
@@ -107,14 +99,12 @@ function run(bytes) {
     console.log("> Instantiated succesfully.");
     log_heap_meta()
 
-    // console.log(main);
-
     make_env(0);
     main();
     drop_env();
 
     console.log("> Main executed succesfully.");
-    // log_stack("");
+    // log_stack(0);
     console.log("> Performing command...");
 
     perform(
@@ -125,112 +115,9 @@ function run(bytes) {
       GLOBAL.STACK_START,
       GLOBAL.STACK,
     );
-    // log_stack("");
-
-    // ============GC Debugging============
-    console.log("=======GC Debugging==========")
-    log_heap_meta();
-    // TODO: Just disable main() and perform()
-    //       and create custom stack and perform gc manually.
-
-    // const_(16);
-    // const_(32);
-    // const_(64);
-    // tuple(1234, 2);
-    // const_(128);
-    // tuple(1235, 2); 
-    // log_stack(0);
-
-    // ==manual stack walk==
-    // FREE.value = B_HEAP_START.value;
-    // console.log(readRawPointer(view, 5));
-    // var moved_to0 = gc_move_tuple(81936);
-    // console.log("Moved to", moved_to0);
-    // // I need to refresh the stack.
-    // view.setInt32(6, moved_to0, true);
-
-    // ==auto stack walk==
-    // FREE.value = B_HEAP_START.value;
-    // gc_walk_stack()
-
-
-
-    // Here the 1235 tuple is moved, and is grey (i.e. its first component points to A-space, so we need to move that too)
-    // gc();
-    // log_heap_meta();
     // log_stack(1);
-    // gc();
-    // log_heap_meta();
-    // log_stack(2);
-    // TODO: What is going wrong?
-
-    // const TAGGED_POINTER_BYTE_SIZE = 5;
-    //
-    // const variant_offset = 1;
-    // const count_offset = variant_offset + 4;
-    // const components_offset = count_offset + 1;
-    // log_stack(0);
-    // let raw_pointer = get_tuple_pointer();
-    // log_stack(1);
-    // copy_value_to_stack(raw_pointer + components_offset);
-    // log_stack(2);
-    // copy_value_to_stack(raw_pointer + components_offset + TAGGED_POINTER_BYTE_SIZE);
-    // log_stack(3);
-    // const fn_pointer = make_env_from_closure(1);
-    // log_stack(4);
-    // GLOBAL.TABLE.get(fn_pointer)();
-    // log_stack(5);
-
     console.log("> Exiting.");
 
-    //=====
-    // let tagged_pointer = readRawPointer(view, start);
-    // console.log(tagged_pointer);
-    // let tuple0 = readTuple(view, tagged_pointer);
-    // console.log(tuple0);
-    // let tuple1 = readTuple(view, tuple0.components[1]);
-    // console.log(tuple1);
-
-    // const val = deepReadRawPointer(view, GLOBAL.STACK_START.valueOf());
-    // console.log(showValue(val))
-
-    // const_(16);
-    // const_(250);
-    // make_env(2)
-
-    // const_(16);
-    // const_(250);
-    // partial_apply(888, 2)
-    //
-    // console.log(showStackWithAddress(deepReadStack(view, GLOBAL.STACK_START.valueOf(), GLOBAL.STACK.valueOf())));
-    //
-    // // console.log("What is this?", readRawPointer(view, 2079));
-    //
-    // const_(123);
-    // const_(124);
-    // const_(125);
-    // console.log(showStackWithAddress(deepReadStack(view, GLOBAL.STACK_START.valueOf(), GLOBAL.STACK.valueOf())));
-    // make_env_from_closure(3)
-    // console.log(showStackWithAddress(deepReadStack(view, GLOBAL.STACK_START.valueOf(), GLOBAL.STACK.valueOf())));
-    // console.log(showStackWithAddress(deepReadStack(view, GLOBAL.STACK_START.valueOf(), GLOBAL.STACK.valueOf())));
-    // console.log(readStack(view, GLOBAL.STACK_START.valueOf(), 5))
-
-
-    // ===Test===
-    // console.log(showStackWithAddress(deepReadStack(view, GLOBAL.STACK_START.valueOf(), GLOBAL.STACK.valueOf())));
-    // const_(50)
-    // const_(60)
-    // make_env(2)
-    // var_(1)
-    // var_(0)
-    // console.log(showStackWithAddress(deepReadStack(view, GLOBAL.STACK_START.valueOf(), GLOBAL.STACK.valueOf())));
-
-    // console.log("STACK_START == ", GLOBAL.STACK_START.valueOf());
-    // console.log("STACK == ", GLOBAL.STACK.valueOf());
-    // const stack_val = readStack(view, GLOBAL.STACK_START.valueOf(), GLOBAL.STACK.valueOf());
-    // const stack_val = deepReadStack(view, GLOBAL.STACK_START.valueOf(), GLOBAL.STACK.valueOf());
-    // console.log(showStack(stack_val));
-    //=====
   });
 }
 
