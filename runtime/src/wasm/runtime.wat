@@ -32,6 +32,7 @@
   (global $ARRAY_TAG i32 (i32.const 2))
   (global $TUPLE_TAG i32 (i32.const 3))
 
+  ;; | tag 1 byte | env pointer 4 bytes | count 4 bytes |  ... | sequence of tagged pointers/constants, 5 bytes each | ...
   (global $ENV_HEADER_BYTE_SIZE i32 (i32.const 9)) ;; 9 bytes, 1 byte for tag, 4 bytes for parent env pointer, 4 bytes for env count.
   (global $PARENT_ENV_POINTER_BYTE_SIZE i32 (i32.const 4))
   (global $ENV_COUNTER_BYTE_SIZE i32 (i32.const 4))
@@ -40,6 +41,7 @@
   (global $ENV_COUNTER_OFFSET i32 (i32.const -4))
   (global $ENV_HEADER_START_OFFSET i32 (i32.const -9))
 
+  ;; | gc 1 byte | variant 4 bytes | count 1 byte | ... | sequence of tagged pointers/constants, 5 bytes each | ...
   (global $TUPLE_HEADER_BYTE_SIZE i32 (i32.const 6)) ;; 6 bytes, 1 byte for GC bit, 4 bytes for variant, 1 byte for count
   (global $TUPLE_HEADER_OFFSET i32 (i32.const 6))
   (global $TUPLE_VARIANT_OFFSET i32 (i32.const 1))
@@ -331,6 +333,11 @@
   )
   (export "var" (func $var))
 
+  ;;   stack = [..., current_env, some_stuff0, some_stuff1, ret_value]
+  ;; ~>
+  ;;   stack = [..., ret_value]
+  ;; Note how some_stuff0, some_stuff1 is nuked from the stack.
+  ;; TODO: Rename to $drop_env_then_shift_top
   (func $drop_env
     (local $header_start i32)
     (local.set $header_start (i32.add (global.get $ENV) (global.get $ENV_HEADER_START_OFFSET)))
@@ -346,6 +353,31 @@
     (global.set $STACK (i32.add (local.get $header_start) (global.get $TAGGED_POINTER_BYTE_SIZE)))
   )
   (export "drop_env" (func $drop_env))
+
+  ;;   stack = [..., current_env, some_stuff0, some_stuff1, some_stuff1]
+  ;; ~>
+  ;;   stack = [..., some_stuff0, some_stuff1, some_stuff1]
+  ;; Useful for tail-calls.
+  (func $drop_env_then_shift
+    (local $header_start i32)
+    (local $after_env_start i32)
+    (local $stuff_after_env_in_bytes i32)
+
+    (local.set $header_start (i32.add (global.get $ENV) (global.get $ENV_HEADER_START_OFFSET)))
+    (local.set $after_env_start (i32.add (global.get $ENV) (i32.load (i32.mul (i32.add (global.get $ENV) (global.get $ENV_COUNTER_OFFSET)) (global.get $TAGGED_POINTER_BYTE_SIZE)))))
+    (local.set $stuff_after_env_in_bytes (i32.sub (global.get $STACK) (local.get $after_env_start)))
+
+    (; ==Reset env== ;)
+    (global.set $ENV (i32.load (i32.add (global.get $ENV) (global.get $PARENT_ENV_POINTER_OFFSET))))
+
+    (memory.copy
+      (local.get $header_start)
+      (local.get $after_env_start)
+      (local.get $stuff_after_env_in_bytes))
+
+    (global.set $STACK (i32.add (local.get $header_start) (local.get $stuff_after_env_in_bytes)))
+  )
+  (export "drop_env_then_shift" (func $drop_env_then_shift))
 
   (; Bundle a function pointer together with $arg_count many values (which are assummed to be on the linear stack) and put in on the heap. ;)
   (func $partial_apply (param $fn_index i32) (param $arg_count i32)
