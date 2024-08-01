@@ -99,9 +99,7 @@ function run(bytes) {
     console.log("> Instantiated succesfully.");
     log_heap_meta()
 
-    make_env(0);
     main();
-    drop_env();
 
     console.log("> Main executed succesfully.");
     // log_stack(0);
@@ -109,7 +107,7 @@ function run(bytes) {
 
     perform(
       view,
-      { get_tuple_pointer, perform_primitive_command, unpack_in_reverse, copy_value_to_stack, make_env_from_closure, drop_env  },
+      { get_tuple_pointer, perform_primitive_command, unpack_in_reverse, copy_value_to_stack, make_env_from_closure  },
       GLOBAL.TABLE,
       true, // tracing
       GLOBAL.STACK_START,

@@ -9,7 +9,7 @@ const components_offset = count_offset + 1;
 function perform(view, operators, TABLE, is_tracing_enabled, STACK_START, STACK) {
   // TODO: Add a flag for tracing.
 
-  const { get_tuple_pointer, perform_primitive_command, unpack_in_reverse, copy_value_to_stack, make_env_from_closure, drop_env } = operators;
+  const { get_tuple_pointer, perform_primitive_command, unpack_in_reverse, copy_value_to_stack, make_env_from_closure } = operators;
   let raw_pointer 
   let number_of_continuations_left = 0; // Counts number of continuations to be done on the stack.
 
@@ -17,7 +17,6 @@ function perform(view, operators, TABLE, is_tracing_enabled, STACK_START, STACK)
     // stack = [..., k, value]
     const fn_pointer = make_env_from_closure(1);
     TABLE.get(fn_pointer)();
-    drop_env();
     number_of_continuations_left -= 1;
     // stack = [..., new_command]
   }

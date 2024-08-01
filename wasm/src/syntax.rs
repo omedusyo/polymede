@@ -73,7 +73,9 @@ pub enum Expression {
     IfThenElse { type_: BlockType, test: Box<Expression>, then_body: Box<Expression>, else_body: Box<Expression> },
     Br(LabelIndex),
     Call(FunctionIndex, Vec<Expression>),
+    ReturnCall(FunctionIndex, Vec<Expression>),
     CallIndirect(TypeIndex, TableIndex, Vec<Expression>),
+    ReturnCallIndirect(TypeIndex, TableIndex, Vec<Expression>),
     Return(Box<Expression>),
 
     // ===Variable Instructions===
@@ -402,11 +404,23 @@ impl Expression {
                     }
                     instructions.push(instructions::Instruction::Call(index))
                 },
+                Expression::ReturnCall(index, args) => {
+                    for arg in args {
+                        binary_format_instructions(arg, instructions);
+                    }
+                    instructions.push(instructions::Instruction::ReturnCall(index))
+                },
                 Expression::CallIndirect(type_index, table_index, args) => {
                     for arg in args {
                         binary_format_instructions(arg, instructions);
                     }
                     instructions.push(instructions::Instruction::CallIndirect(type_index, table_index))
+                },
+                Expression::ReturnCallIndirect(type_index, table_index, args) => {
+                    for arg in args {
+                        binary_format_instructions(arg, instructions);
+                    }
+                    instructions.push(instructions::Instruction::ReturnCallIndirect(type_index, table_index))
                 },
                 Expression::Return(expr) => {
                     binary_format_instructions(*expr, instructions);
@@ -554,8 +568,16 @@ pub fn call(fn_index: FunctionIndex, args: Vec<Expression>) -> Expression {
     Expression::Call(fn_index, args)
 }
 
+pub fn return_call(fn_index: FunctionIndex, args: Vec<Expression>) -> Expression {
+    Expression::ReturnCall(fn_index, args)
+}
+
 pub fn call_indirect(type_index: TypeIndex, table_index: TableIndex, args: Vec<Expression>) -> Expression {
     Expression::CallIndirect(type_index, table_index, args)
+}
+
+pub fn return_call_indirect(type_index: TypeIndex, table_index: TableIndex, args: Vec<Expression>) -> Expression {
+    Expression::ReturnCallIndirect(type_index, table_index, args)
 }
 
 pub fn i32_memory_get(address: Expression) -> Expression {

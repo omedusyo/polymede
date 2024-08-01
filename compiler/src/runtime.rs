@@ -24,6 +24,7 @@ pub struct Runtime {
     pub extend_env: FunctionIndex,
     pub var: FunctionIndex,
     pub drop_env: FunctionIndex,
+    pub drop_env_then_shift: FunctionIndex,
     pub partial_apply: FunctionIndex,
     pub make_env_from_closure: FunctionIndex,
     pub pure: FunctionIndex,
@@ -53,6 +54,7 @@ impl Runtime {
         let extend_env = import(module, "extend_env", fn_type(vec![TYPE_I32], vec![]), &mut number_of_runtime_functions);
         let var = import(module, "var", fn_type(vec![TYPE_I32], vec![]), &mut number_of_runtime_functions);
         let drop_env = import(module, "drop_env", fn_type(vec![], vec![]), &mut number_of_runtime_functions);
+        let drop_env_then_shift = import(module, "drop_env_then_shift", fn_type(vec![], vec![]), &mut number_of_runtime_functions);
         let partial_apply = import(module, "partial_apply", fn_type(vec![TYPE_I32, TYPE_I32], vec![]), &mut number_of_runtime_functions);
         let make_env_from_closure = import(module, "make_env_from_closure", fn_type(vec![TYPE_I32], vec![TYPE_I32]), &mut number_of_runtime_functions);
         let pure = import(module, "pure", fn_type(vec![], vec![]), &mut number_of_runtime_functions);
@@ -74,6 +76,7 @@ impl Runtime {
             extend_env,
             var,
             drop_env,
+            drop_env_then_shift,
             partial_apply,
             make_env_from_closure,
             pure,
