@@ -1,7 +1,7 @@
 use crate::graph_memory_machine as gmm;
 use crate::runtime::Runtime;
 use wasm::{
-    syntax::{Module, TypedFunctionImport, TypedFunction, fn_type, Expression, call, call_indirect, i32_const, i32_eq, seq},
+    syntax::{Module, TypedFunctionImport, TypedFunction, fn_type, Expression, call, return_call, call_indirect, return_call_indirect, i32_const, i32_eq, seq},
     base::{
         indices::{FunctionIndex, TableIndex, TypeIndex},
         types::{FunctionType, BlockType},
@@ -140,7 +140,7 @@ pub fn compile(program: gmm::Program) -> Result<Module> {
     }
 
     // Compile main.
-    let main = module.add_typed_function(compile_function(&mut state, 0, &program.main)?);
+    let main = module.add_typed_function(compile_main(&mut state, &program.main)?);
     module.add_export(Export { name: "main".to_string(), export_description: ExportDescription::Function(main) });
     module.add_export(Export { name: "function_table".to_string(), export_description: ExportDescription::Table(TableIndex(0)) });
 
@@ -149,80 +149,109 @@ pub fn compile(program: gmm::Program) -> Result<Module> {
     Ok(module)
 }
 
+fn compile_main(state: &mut State, body: &gmm::Term) -> Result<TypedFunction> {
+    Ok(TypedFunction {
+        type_: fn_type(vec![], vec![]),
+        locals: vec![],
+        body: {
+            seq(vec![
+                call(state.runtime.make_env, vec![i32_const(0)]),
+                compile_term(state, 0, body, true)?
+            ])
+        },
+    })
+}
+
 fn compile_function(state: &mut State, number_of_parameters: usize, body: &gmm::Term) -> Result<TypedFunction> {
     Ok(TypedFunction {
         type_: fn_type(vec![], vec![]),
         locals: vec![],
-        body: compile_term(state, number_of_parameters, body)?,
+        body: compile_term(state, number_of_parameters, body, true)?,
     })
 }
 
 fn compile_terms(state: &mut State, number_of_parameters: usize, terms: &[gmm::Term]) -> Result<Vec<Expression>> {
     let mut args: Vec<Expression> = Vec::with_capacity(terms.len());
     for term in terms {
-        let expression = compile_term(state, number_of_parameters, term)?;
+        let expression = compile_term(state, number_of_parameters, term, false)?;
         args.push(expression);
     }
     Ok(args)
 }
 
-fn compile_term(state: &mut State, number_of_parameters: usize, term: &gmm::Term) -> Result<Expression> {
+fn compile_term(state: &mut State, number_of_parameters: usize, term: &gmm::Term, tail_position: bool) -> Result<Expression> {
     match term {
         gmm::Term::Const(variant) => {
-            Ok(call(state.runtime.const_, vec![i32_const(*variant)]))
+            let mut code = vec![];
+            code.push(call(state.runtime.const_, vec![i32_const(*variant)]));
+
+            if tail_position { code.push(call(state.runtime.drop_env, vec![])) }
+            Ok(seq(code))
         },
-        gmm::Term::ByteArray(bytes) => {
+        gmm::Term::ByteArray(_bytes) => {
             todo!()
         },
         gmm::Term::Tuple(variant, terms) => {
-            let mut args: Vec<Expression> = compile_terms(state, number_of_parameters, terms)?;
-            // (call $tuple $variant $number_of_components)
-            args.push(call(state.runtime.tuple, vec![i32_const(*variant), i32_const(terms.len() as i32)]));
-            Ok(seq(args))
+            let mut code: Vec<Expression> = compile_terms(state, number_of_parameters, terms)?;
+            code.push(call(state.runtime.tuple, vec![i32_const(*variant), i32_const(terms.len() as i32)]));
+
+            if tail_position { code.push(call(state.runtime.drop_env, vec![])) }
+            Ok(seq(code))
         },
         gmm::Term::ProjectComponent(term, component_index) => {
-            Ok(seq(
-                vec![compile_term(state, number_of_parameters, term)?,
-                call(state.runtime.tuple_project, vec![i32_const(*component_index as i32)]),
-            ]))
+            let mut code = vec![compile_term(state, number_of_parameters, term, false)?];
+            code.push(call(state.runtime.tuple_project, vec![i32_const(*component_index as i32)]));
+
+            if tail_position { code.push(call(state.runtime.drop_env, vec![])) }
+            Ok(seq(code))
         },
         gmm::Term::Call(fn_name, terms) => {
             let FunctionInfo { function_index, kind } = state.function_info(*fn_name)?;
-            let mut args: Vec<Expression> = compile_terms(state, number_of_parameters, terms)?;
+            let mut code: Vec<Expression> = compile_terms(state, number_of_parameters, terms)?;
             match kind {
                 FunctionKind::Primitive => {
-                    args.push(call(function_index, vec![]));
-                    Ok(seq(args))
+                    code.push(call(function_index, vec![]));
+                    if tail_position { code.push(call(state.runtime.drop_env, vec![])) }
                 },
                 FunctionKind::UserDefined => {
-                    // (call $make_env (i32.const $number_of_arguments))
-                    // (call $fn_name)
-                    // (call $drop_env)
-                    args.push(call(state.runtime.make_env, vec![i32_const(terms.len() as i32)]));
-                    args.push(call(function_index, vec![]));
-                    args.push(call(state.runtime.drop_env, vec![]));
-                    Ok(seq(args))
+                    if tail_position {
+                        code.push(call(state.runtime.drop_env_then_shift, vec![]));
+                        code.push(call(state.runtime.make_env, vec![i32_const(terms.len() as i32)]));
+                        code.push(return_call(function_index, vec![]));
+                    } else {
+                        code.push(call(state.runtime.make_env, vec![i32_const(terms.len() as i32)]));
+                        code.push(call(function_index, vec![]));
+                    }
                 },
-            }
+            };
+            Ok(seq(code))
         },
         gmm::Term::PartialApply(fn_name, terms) => {
             let mut code: Vec<Expression> = compile_terms(state, number_of_parameters, terms)?;
             let fn_table_index: FunctionTableIndex = state.register_function_in_function_table(*fn_name)?;
             code.push(call(state.runtime.partial_apply, vec![i32_const(fn_table_index), i32_const(terms.len() as i32)]));
+
+            if tail_position { code.push(call(state.runtime.drop_env, vec![])) }
             Ok(seq(code))
         },
         gmm::Term::CallClosure(closure_term, terms) => {
-            let mut code: Vec<Expression> = vec![compile_term(state, number_of_parameters, closure_term)?];
+            let mut code: Vec<Expression> = vec![compile_term(state, number_of_parameters, closure_term, false)?];
             for compiled_term in compile_terms(state, number_of_parameters, terms)? {
                 code.push(compiled_term)
             }
-            code.push(call_indirect(state.function_type_for_call_indirect, TableIndex(0), vec![call(state.runtime.make_env_from_closure, vec![i32_const(terms.len() as i32)])]));
-            code.push(call(state.runtime.drop_env, vec![]));
+            if tail_position {
+                code.push(call(state.runtime.drop_env_then_shift, vec![]));
+                code.push(call_indirect(state.function_type_for_call_indirect, TableIndex(0), vec![call(state.runtime.make_env_from_closure, vec![i32_const(terms.len() as i32)])]));
+            } else {
+                code.push(call_indirect(state.function_type_for_call_indirect, TableIndex(0), vec![call(state.runtime.make_env_from_closure, vec![i32_const(terms.len() as i32)])]));
+            }
             Ok(seq(code))
         },
         gmm::Term::VarUse(var_name) => {
             if *var_name < number_of_parameters {
-                Ok(call(state.runtime.var, vec![i32_const(*var_name as i32)]))
+                let mut code: Vec<Expression> = vec![call(state.runtime.var, vec![i32_const(*var_name as i32)])];
+                if tail_position { code.push(call(state.runtime.drop_env, vec![])) }
+                Ok(seq(code))
             } else {
                 Err(CompilationError::VariableOutOfBounds { var_index_received: *var_name, number_of_parameters })
             }
@@ -230,52 +259,78 @@ fn compile_term(state: &mut State, number_of_parameters: usize, term: &gmm::Term
         gmm::Term::Let(terms, body_term) => {
             let mut code = vec![];
             let mut number_of_parameters = number_of_parameters;
-            code.push(call(state.runtime.copy_and_extend_env, vec![i32_const(0)]));
-            for term in terms {
-                code.push(compile_term(state, number_of_parameters, term)?);
-                number_of_parameters += 1;
-                code.push(call(state.runtime.extend_env, vec![i32_const(1)]));
+            if tail_position {
+                // Note we're not calling copy_and_extend_env - we're just extending current
+                // environment which is currently on top of the stack.
+                for term in terms {
+                    code.push(compile_term(state, number_of_parameters, term, false)?);
+                    number_of_parameters += 1;
+                    code.push(call(state.runtime.extend_env, vec![i32_const(1)]));
+                }
+                // This is responsible for eventually generating drop_env, which will close the
+                // current function's/let's env.
+                code.push(compile_term(state, number_of_parameters, body_term, true)?);
+            } else {
+                code.push(call(state.runtime.copy_and_extend_env, vec![i32_const(0)]));
+                for term in terms {
+                    code.push(compile_term(state, number_of_parameters, term, false)?);
+                    number_of_parameters += 1;
+                    code.push(call(state.runtime.extend_env, vec![i32_const(1)]));
+                }
+                code.push(compile_term(state, number_of_parameters, body_term, false)?);
+                code.push(call(state.runtime.drop_env, vec![])); // Closes the let's environment.
+                // And since this is not a tail position, we do not close current function's env.
             }
-            code.push(compile_term(state, number_of_parameters, body_term)?);
-            code.push(call(state.runtime.drop_env, vec![]));
             Ok(seq(code))
         },
         gmm::Term::Match(arg_term, branches) => {
             let mut code = vec![];
-            code.push(compile_term(state, number_of_parameters, arg_term)?);
-            code.push(call(state.runtime.copy_and_extend_env, vec![i32_const(1)]));
-            let arg_index = number_of_parameters;
-            // TODO: We extend the environment with the argument, which currently is extremely
-            // inefficient.
-            code.push(compile_branches(state, number_of_parameters + 1, arg_index as i32, branches)?);
-            code.push(call(state.runtime.drop_env, vec![]));
+            code.push(compile_term(state, number_of_parameters, arg_term, false)?);
+            if tail_position {
+                code.push(call(state.runtime.extend_env, vec![i32_const(1)]));
+                let arg_index = number_of_parameters;
+                code.push(compile_branches(state, number_of_parameters + 1, arg_index as i32, branches, true)?);
+            } else {
+                code.push(call(state.runtime.copy_and_extend_env, vec![i32_const(1)]));
+                let arg_index = number_of_parameters;
+                // TODO: We extend the environment with the argument, which currently is extremely
+                // inefficient.
+                code.push(compile_branches(state, number_of_parameters + 1, arg_index as i32, branches, false)?);
+                code.push(call(state.runtime.drop_env, vec![])); // closes the match's env.
+            }
             Ok(seq(code))
         },
-        gmm::Term::Seq(terms) => {
+        gmm::Term::Seq(_terms) => {
             // TODO: I think I need to introduce am explicit pop instruction for the stack.
             todo!()
         },
         gmm::Term::CommandAndThen(cmd_term, continuation_term) => {
-            let code = vec![
+            let mut code = vec![
                 // WARNING: When changing this, take a look at perform_command.js
-                compile_term(state, number_of_parameters, &continuation_term.body)?,
-                compile_term(state, number_of_parameters, cmd_term)?,
+                compile_term(state, number_of_parameters, &continuation_term.body, false)?,
+                compile_term(state, number_of_parameters, cmd_term, false)?,
                 call(state.runtime.and_then, vec![]),
             ];
+            if tail_position { code.push(call(state.runtime.drop_env, vec![])) }
             Ok(seq(code))
         },
         gmm::Term::Pure(term) => {
             let mut code = vec![];
-            code.push(compile_term(state, number_of_parameters, term)?);
+            code.push(compile_term(state, number_of_parameters, term, false)?);
             code.push(call(state.runtime.pure, vec![]));
+            if tail_position { code.push(call(state.runtime.drop_env, vec![])) }
             Ok(seq(code))
         },
     }
 }
 
-fn compile_branches(state: &mut State, number_of_parameters: usize, arg_index: i32, branches: &[(gmm::Pattern, gmm::Term)]) -> Result<Expression> {
+fn compile_branches(state: &mut State, number_of_parameters: usize, arg_index: i32, branches: &[(gmm::Pattern, gmm::Term)], tail_position: bool) -> Result<Expression> {
     if branches.is_empty() {
-        Ok(Expression::Unreachable)
+        let mut code = vec![];
+        code.push(Expression::Unreachable);
+
+        if tail_position { code.push(call(state.runtime.drop_env, vec![])) }
+        Ok(seq(code))
     } else {
         let (pattern, body) = &branches[0];
         match pattern {
@@ -286,13 +341,11 @@ fn compile_branches(state: &mut State, number_of_parameters: usize, arg_index: i
                             call(state.runtime.var, vec![i32_const(arg_index)]),
                             i32_eq(call(state.runtime.get_variant, vec![]), i32_const(*variant)),
                     ])),
-                    then_body: Box::new(compile_term(state, number_of_parameters, body)?),
-                    else_body: Box::new(compile_branches(state, number_of_parameters, arg_index, &branches[1..])?),
+                    then_body: Box::new(compile_term(state, number_of_parameters, body, tail_position)?),
+                    else_body: Box::new(compile_branches(state, number_of_parameters, arg_index, &branches[1..], tail_position)?),
                 })
             },
-            gmm::Pattern::Always => {
-                compile_term(state, number_of_parameters, body)
-            }
+            gmm::Pattern::Always => compile_term(state, number_of_parameters, body, tail_position),
         }
     }
 }

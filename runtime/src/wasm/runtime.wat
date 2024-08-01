@@ -364,7 +364,7 @@
     (local $stuff_after_env_in_bytes i32)
 
     (local.set $header_start (i32.add (global.get $ENV) (global.get $ENV_HEADER_START_OFFSET)))
-    (local.set $after_env_start (i32.add (global.get $ENV) (i32.load (i32.mul (i32.add (global.get $ENV) (global.get $ENV_COUNTER_OFFSET)) (global.get $TAGGED_POINTER_BYTE_SIZE)))))
+    (local.set $after_env_start (i32.add (global.get $ENV) (i32.mul (i32.load (i32.add (global.get $ENV) (global.get $ENV_COUNTER_OFFSET))) (global.get $TAGGED_POINTER_BYTE_SIZE))))
     (local.set $stuff_after_env_in_bytes (i32.sub (global.get $STACK) (local.get $after_env_start)))
 
     (; ==Reset env== ;)

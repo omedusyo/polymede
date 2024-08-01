@@ -18,7 +18,9 @@ pub enum Instruction {
     Br(LabelIndex),
     BrIf(LabelIndex),
     Call(FunctionIndex),
+    ReturnCall(FunctionIndex),
     CallIndirect(TypeIndex, TableIndex),
+    ReturnCallIndirect(TypeIndex, TableIndex),
 
     Return,
 

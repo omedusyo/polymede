@@ -24,6 +24,8 @@ impl Instruction {
     pub const RETURN: u8 = 0x0f;
     pub const CALL: u8 = 0x10;
     pub const CALL_INDIRECT: u8 = 0x11;
+    pub const RETURN_CALL: u8 = 0x12;
+    pub const RETURN_CALL_INDIRECT: u8 = 0x13;
 
     pub const END: u8 = 0x0B;
 
@@ -205,7 +207,9 @@ impl Encoder for Instruction {
             Br(i) => InstructionStream::simple_with_index(Self::BR, *i),
             BrIf(i) => InstructionStream::simple_with_index(Self::BR_IF, *i),
             Call(i) => InstructionStream::simple_with_index(Self::CALL, *i),
+            ReturnCall(i) => InstructionStream::simple_with_index(Self::RETURN_CALL, *i),
             CallIndirect(type_i, table_i) => InstructionStream::simple_with_double_index(Self::CALL_INDIRECT, *type_i, *table_i),
+            ReturnCallIndirect(type_i, table_i) => InstructionStream::simple_with_double_index(Self::RETURN_CALL_INDIRECT, *type_i, *table_i),
             Return => InstructionStream::simple(Self::RETURN),
 
             // ===Variables Instructions===
