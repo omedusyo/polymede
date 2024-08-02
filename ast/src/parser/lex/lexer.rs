@@ -8,7 +8,7 @@ type Result<A> = std::result::Result<A, Error>;
 
 #[derive(Debug)]
 pub struct State<'a> {
-    tokens: &'a str,
+    code_points: Chars<'a>,
     position: Position
 }
 
@@ -24,6 +24,16 @@ pub enum Error {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Position { pub column: usize, pub line : usize }
+
+impl Position {
+    pub fn new_line(self) -> Self {
+        Position { column: 1, line: self.line + 1 }
+    }
+
+    pub fn move_column_by(self, n: usize) -> Self {
+        Position { column: self.column + n, line: self.line }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct LocatedToken {
@@ -71,7 +81,7 @@ impl <'state> State<'state> {
     // 'a lives atleast as long as 'state ('a contains 'state)
     pub fn new<'a: 'state>(str: &'a str) -> Self {
         Self {
-            tokens: str,
+            code_points: str.chars(),
             position: Position { column: 1, line: 1 },
         }
     }
@@ -81,91 +91,76 @@ impl <'state> State<'state> {
         self.position
     }
 
-    #[inline]
-    pub fn tokens(&self) -> &str {
-        &self.tokens
-    }
-
     pub fn clone(&self) -> Self {
         Self {
-            tokens: self.tokens,
+            code_points: self.code_points.clone(),
             position: self.position,
         }
     }
 
-    pub fn new_line(&mut self) {
-        self.position.column = 1;
-        self.position.line += 1;
-    }
-
-    pub fn move_column_by(&mut self, n: usize) {
-        self.position.column += n;
-    }
-
-    pub fn consume_next(&mut self) {
-        self.tokens = &self.tokens[1..]
-    }
-
     pub fn consume_whitespace(&mut self) {
-        fn consume(state: &mut State, ws_state: &mut WhitespaceState) {
-            for c in state.tokens.chars() {
-                use WhitespaceState::*;
-                match ws_state {
-                    ConsumeWhitespace => match c {
-                        '\n' => {
-                            state.new_line();
-                            state.consume_next();
-                        },
-                        ' ' | '\t' => {
-                            state.move_column_by(1);
-                            state.consume_next();
-                        },
-                        '/' => {
-                            state.move_column_by(1);
-                            state.consume_next();
-                            *ws_state = ConsumeAllUntilNewline;
-                        },
-                        _ => {
-                            return
-                        }
-                    },
-                    ConsumeAllUntilNewline => match c {
-                        '\n' => {
-                            state.move_column_by(1);
-                            state.consume_next();
-                            *ws_state = ConsumeWhitespace;
-                        }
-                        _ => {
-                            state.move_column_by(1);
-                            state.consume_next();
-                        }
-                    },
-                }
-            }
-            
-        }
+        use WhitespaceState::*;
+        let mut ws_state = ConsumeWhitespace;
 
-        consume(self, &mut WhitespaceState::ConsumeWhitespace)
+        loop {
+            let tokens_backup = self.code_points.clone();
+            let char = self.code_points.next(); 
+            match ws_state {
+                ConsumeWhitespace => {
+                    match char {
+                    Some('\n') => {
+                        self.position = self.position.new_line();
+                    },
+                    Some(' ') | Some('\t') => {
+                        self.position = self.position.move_column_by(1);
+                    },
+                    Some('/') => {
+                        self.position = self.position.move_column_by(1);
+                        ws_state = ConsumeAllUntilNewline;
+                    },
+                    Some(_) => {
+                        self.code_points = tokens_backup; // backtrack
+                        break
+                    },
+                    None => break,
+                }
+                },
+                ConsumeAllUntilNewline => {
+                    match char {
+                    Some('\n') => {
+                        self.position = self.position.new_line();
+                        ws_state = ConsumeWhitespace;
+                    },
+                    Some(_) => {
+                        self.position = self.position.move_column_by(1);
+                    },
+                    None => break,
+                    }
+                },
+            }
+        }
     }
 
     // Note that this returns the position BEFORE the advancement.
     pub fn advance(&mut self) -> Position {
         let previous_position = self.position;
-        self.move_column_by(1);
-        self.consume_next();
+        self.position = self.position.move_column_by(1);
+        self.code_points.next();
         previous_position
     }
 
     pub fn consume_whitespace_or_fail_when_end(&mut self) -> Result<()> {
         self.consume_whitespace();
-        match self.tokens.chars().next() {
-            Some(_) => Ok(()),
+        match self.code_points.clone().next() {
+            Some(_) => {
+                Ok(())
+            },
             None => Err(Error::UnexpectedEnd)
         }
     }
 
-    pub fn read_char_or_fail_when_end(&self) -> Result<char> {
-        match self.tokens.chars().next() {
+    pub fn read_char_or_fail_when_end(&mut self) -> Result<char> {
+        match self.code_points.clone().next() {
             Some(c) => Ok(c),
             None => Err(Error::UnexpectedEnd) 
         }
@@ -268,7 +263,7 @@ impl <'state> State<'state> {
                 self.match_string(token::BINDING_SEPARATOR, request, Token::BindingSeparator)
             },
             Request::End => {
-                if self.tokens.is_empty() {
+                if self.code_points.next().is_some() {
                     Ok(LocatedToken::new(Token::End, self.position))
                 } else {
                     Err(Error::UnexpectedEnd) 
