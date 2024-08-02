@@ -243,6 +243,7 @@ fn compile_term(state: &mut State, term: &desugared_polymede::Term) -> gmm::Term
         TypedTerm(typed_term) => compile_typed_term(state, &typed_term),
         VariableUse(var) => compile_var(state, var),
         Int(x) => gmm::Term::Const(*x) ,
+        StringLiteral(s) => todo!(),
         FunctionApplication(function_name, _, args) => {
             let Some(fn_index) = state.get_function_index(function_name) else { unreachable!() };
             gmm::Term::Call(fn_index, args.iter().map(|arg| compile_term(state, arg)).collect())

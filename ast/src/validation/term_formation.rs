@@ -145,6 +145,7 @@ fn type_infer(env: &mut Environment, term: &Term) -> Result<Type> {
             Ok(type_.clone())
         },
         Int(_) => Ok(Type::I32),
+        StringLiteral(_) => Ok(Type::String),
         VariableUse(var) => {
             match env.get_type(var) {
                 Some(type_) => Ok(type_.clone()),
@@ -264,6 +265,13 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
                 Ok(())
             } else {
                 Err(Error::TypeAnnotationDoesntMatchExpectedType { expected_type: expected_type.clone(), received_type: Type::I32 })
+            }
+        },
+        StringLiteral(_) => {
+            if eq_type(expected_type, &Type::String) {
+                Ok(())
+            } else {
+                Err(Error::TypeAnnotationDoesntMatchExpectedType { expected_type: expected_type.clone(), received_type: Type::String })
             }
         },
         VariableUse(var) => {
