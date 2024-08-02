@@ -2,6 +2,7 @@ use crate::parser::lex::{
     token,
     token::{Token, SeparatorSymbol}
 };
+use std::str::Chars;
 
 type Result<A> = std::result::Result<A, Error>;
 
@@ -101,8 +102,8 @@ impl <'state> State<'state> {
         self.position.column += n;
     }
 
-    pub fn consume_by(&mut self, n: usize) {
-        self.tokens = &self.tokens[n..]
+    pub fn consume_next(&mut self) {
+        self.tokens = &self.tokens[1..]
     }
 
     pub fn consume_whitespace(&mut self) {
@@ -113,15 +114,15 @@ impl <'state> State<'state> {
                     ConsumeWhitespace => match c {
                         '\n' => {
                             state.new_line();
-                            state.consume_by(1);
+                            state.consume_next();
                         },
                         ' ' | '\t' => {
                             state.move_column_by(1);
-                            state.consume_by(1);
+                            state.consume_next();
                         },
                         '/' => {
                             state.move_column_by(1);
-                            state.consume_by(1);
+                            state.consume_next();
                             *ws_state = ConsumeAllUntilNewline;
                         },
                         _ => {
@@ -131,12 +132,12 @@ impl <'state> State<'state> {
                     ConsumeAllUntilNewline => match c {
                         '\n' => {
                             state.move_column_by(1);
-                            state.consume_by(1);
+                            state.consume_next();
                             *ws_state = ConsumeWhitespace;
                         }
                         _ => {
                             state.move_column_by(1);
-                            state.consume_by(1);
+                            state.consume_next();
                         }
                     },
                 }
@@ -151,7 +152,7 @@ impl <'state> State<'state> {
     pub fn advance(&mut self) -> Position {
         let previous_position = self.position;
         self.move_column_by(1);
-        self.consume_by(1);
+        self.consume_next();
         previous_position
     }
 
