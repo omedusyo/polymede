@@ -8,7 +8,7 @@ type Result<A> = std::result::Result<A, Error>;
 
 #[derive(Debug)]
 pub struct State<'a> {
-    code_points: Chars<'a>,
+    chars: Chars<'a>, // UTF code-points iterator
     position: Position
 }
 
@@ -17,6 +17,10 @@ pub enum Error {
     UnexpectedEnd,
     Expected { requested: Request, found: String },
     ExpectedI32 { found: String },
+    ExpectedValidCharacterAfterEscapeSequenceInStringLiteral { found: String },
+    ExpectedValidUnicodeSequenceInStringLiteral { found: String },
+    ExpectedOpeningBraceForUnicodeSequenceInStringLiteral { found: String },
+    ExpectedClosingBraceForUnicodeSequenceInStringLiteral { found: String },
     ExpectedDeclarationKeyword,
     ExpectedTypeDeclarationKeyword,
     Int32LiteralOutOfBounds,
@@ -81,7 +85,7 @@ impl <'state> State<'state> {
     // 'a lives atleast as long as 'state ('a contains 'state)
     pub fn new<'a: 'state>(str: &'a str) -> Self {
         Self {
-            code_points: str.chars(),
+            chars: str.chars(),
             position: Position { column: 1, line: 1 },
         }
     }
@@ -91,9 +95,14 @@ impl <'state> State<'state> {
         self.position
     }
 
+    #[inline]
+    pub fn chars(&'state mut self) -> &mut Chars<'state> {
+        &mut self.chars
+    }
+
     pub fn clone(&self) -> Self {
         Self {
-            code_points: self.code_points.clone(),
+            chars: self.chars.clone(),
             position: self.position,
         }
     }
@@ -103,8 +112,8 @@ impl <'state> State<'state> {
         let mut ws_state = ConsumeWhitespace;
 
         loop {
-            let tokens_backup = self.code_points.clone();
-            let char = self.code_points.next(); 
+            let tokens_backup = self.chars.clone();
+            let char = self.chars.next(); 
             match ws_state {
                 ConsumeWhitespace => {
                     match char {
@@ -119,7 +128,7 @@ impl <'state> State<'state> {
                         ws_state = ConsumeAllUntilNewline;
                     },
                     Some(_) => {
-                        self.code_points = tokens_backup; // backtrack
+                        self.chars = tokens_backup; // backtrack
                         break
                     },
                     None => break,
@@ -145,13 +154,13 @@ impl <'state> State<'state> {
     pub fn advance(&mut self) -> Position {
         let previous_position = self.position;
         self.position = self.position.move_column_by(1);
-        self.code_points.next();
+        self.chars.next();
         previous_position
     }
 
     pub fn consume_whitespace_or_fail_when_end(&mut self) -> Result<()> {
         self.consume_whitespace();
-        match self.code_points.clone().next() {
+        match self.chars.clone().next() {
             Some(_) => {
                 Ok(())
             },
@@ -160,7 +169,14 @@ impl <'state> State<'state> {
     }
 
     pub fn read_char_or_fail_when_end(&mut self) -> Result<char> {
-        match self.code_points.clone().next() {
+        match self.chars.clone().next() {
+            Some(c) => Ok(c),
+            None => Err(Error::UnexpectedEnd) 
+        }
+    }
+
+    pub fn consume_char_or_fail_when_end(&mut self) -> Result<char> {
+        match self.chars.next() {
             Some(c) => Ok(c),
             None => Err(Error::UnexpectedEnd) 
         }
@@ -263,7 +279,7 @@ impl <'state> State<'state> {
                 self.match_string(token::BINDING_SEPARATOR, request, Token::BindingSeparator)
             },
             Request::End => {
-                if self.code_points.next().is_some() {
+                if self.chars.next().is_some() {
                     Ok(LocatedToken::new(Token::End, self.position))
                 } else {
                     Err(Error::UnexpectedEnd) 
@@ -435,5 +451,113 @@ impl <'state> State<'state> {
         }
             
         Ok(Some(sum))
+    }
+
+    pub fn commit_if_next_token_string_literal(&mut self) -> Result<Option<String>> {
+        self.consume_whitespace();
+
+        if self.read_char_or_fail_when_end()? != '"' { return Ok(None) }
+        self.advance();
+
+        let mut chars: Vec<char> = vec![];
+        loop { match self.consume_char_or_fail_when_end()? {
+            '\\' => { match self.consume_char_or_fail_when_end()? {
+                'n' => chars.push('\n'),
+                '\\' => chars.push('\\'),
+                '"' => chars.push('"'),
+                '\'' => chars.push('\''),
+                't' => chars.push('\t'),
+                'u' => {
+                    let open_brace = self.consume_char_or_fail_when_end()?;
+                    if open_brace != '{' { return Err(Error::ExpectedOpeningBraceForUnicodeSequenceInStringLiteral { found: format!("\\u{}", open_brace) }) };
+
+                    let x = self.hex_int()?;
+
+                    let close_brace = self.consume_char_or_fail_when_end()?;
+                    if close_brace != '}' { return Err(Error::ExpectedClosingBraceForUnicodeSequenceInStringLiteral { found: format!("\\u{{{:x}{}", x, close_brace) }) };
+
+                    match char::from_u32(x) {
+                        Some(c) => chars.push(c),
+                        None => return Err(Error::ExpectedValidUnicodeSequenceInStringLiteral { found: format!("\\u{{{:x}}}", x) })
+                    }
+
+                },
+                c => return Err(Error::ExpectedValidCharacterAfterEscapeSequenceInStringLiteral { found: format!("\\{}", c) }),
+            }},
+            '"' => break,
+            c => chars.push(c),
+        }}
+        Ok(Some(chars.into_iter().collect()))
+    }
+
+
+    // Note that it doesn't consume whitespace.
+    fn hex_int(&mut self) -> Result<u32> {
+        fn hex(c: char) -> Option<u32> {
+            match c.to_ascii_lowercase() {
+                '0' => Some(0),
+                '1' => Some(1),
+                '2' => Some(2),
+                '3' => Some(3),
+                '4' => Some(4),
+                '5' => Some(5),
+                '6' => Some(6),
+                '7' => Some(7),
+                '8' => Some(8),
+                '9' => Some(9),
+                'a' => Some(10),
+                'b' => Some(11),
+                'c' => Some(12),
+                'd' => Some(13),
+                'e' => Some(14),
+                'f' => Some(15),
+                _ => None,
+            }
+        }
+
+        let c = self.consume_char_or_fail_when_end()?;
+        let mut sum: u32 = match hex(c) {
+            Some(d) => d,
+            None => return Err(Error::ExpectedValidUnicodeSequenceInStringLiteral { found: format!("\\u{}", c.to_string()) })
+        };
+
+        // Ignore all zeroes.
+        if sum == 0 {
+            loop {
+                match self.read_char_or_fail_when_end() {
+                    Ok('0') => {
+                        self.advance();
+                    },
+                    Ok(_) => break,
+                    Err(_) => return Ok(0)
+                }
+            }
+        }
+
+        // Consume the rest of the consecutive digits, and
+        // construct the actual number.
+        while let Ok(c) = self.read_char_or_fail_when_end() {
+            match hex(c) {
+                Some(d) => {
+                    self.advance();
+
+                    // Watch out for 32 bit overflow.
+                    match sum.checked_mul(16) {
+                        Some(mul_16_sum) => {
+                            match mul_16_sum.checked_add(d) {
+                                Some(new_sum) => {
+                                    sum = new_sum
+                                },
+                                None => return Err(Error::ExpectedValidUnicodeSequenceInStringLiteral { found: format!("\\u{:x}{:x}", sum, d) })
+                            }
+                        },
+                        None => return Err(Error::ExpectedValidUnicodeSequenceInStringLiteral { found: format!("\\u{:x}{:x}", sum, d) })
+                    }
+                },
+                None => break,
+            }
+        }
+            
+        Ok(sum)
     }
 }

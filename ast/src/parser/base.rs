@@ -6,6 +6,7 @@ use crate::parser::lex::{
     token::Keyword,
 };
 use crate::parser::program::pre_program;
+use std::str::Chars;
 
 pub type Result<A> = std::result::Result<A, Error>;
 
@@ -205,6 +206,10 @@ impl <'lex_state, 'interner> State<'lex_state, 'interner> {
         self.lexer_state.commit_if_next_token_int().map_err(Error::LexError)
     }
 
+    pub fn commit_if_next_token_string_literal(&mut self) -> Result<Option<String>> {
+        self.lexer_state.commit_if_next_token_string_literal().map_err(Error::LexError)
+    }
+
     pub fn commit_if_next_token_forall(&mut self) -> Result<bool> {
         self.lexer_state.commit_if_next_token_forall().map_err(Error::LexError)
     }
@@ -215,6 +220,14 @@ impl <'lex_state, 'interner> State<'lex_state, 'interner> {
 
     pub fn clone(&self) -> lexer::State<'lex_state> {
         self.lexer_state.clone()
+    }
+
+    pub fn read_char_or_fail_when_end(&mut self) -> Result<char> {
+        self.lexer_state.read_char_or_fail_when_end().map_err(Error::LexError)
+    }
+
+    pub fn consume_char_or_fail_when_end(&mut self) -> Result<char> {
+        self.lexer_state.consume_char_or_fail_when_end().map_err(Error::LexError)
     }
 
     pub fn restore(&mut self, lexer_state: lexer::State<'lex_state>) {
