@@ -1,4 +1,4 @@
-use crate::binary_format::primitives::byte_stream::{ByteStream, UTF8, string, Response, Enclose, EVec, evector, bytes4, byte, Byte, Bytes4, Bytes, bytes, CVec, cvector, Seq, U32ToFixed40LEB128};
+use crate::binary_format::primitives::byte_stream::{ByteStream, UTF8, string, Response, Enclose, EVec, evector, bytes4, byte, Byte, Bytes4, Bytes, bytes, Vector, vector, CVec, cvector, Seq, U32ToFixed40LEB128};
 use crate::binary_format::primitives::encoder::Encoder;
 use crate::binary_format::indices::IndexStream;
 
@@ -398,31 +398,31 @@ impl Encoder for DataCountSection {
 // ====== Module =======
 #[derive(Debug)]
 pub struct Module {
-    pub custom_section_before_type_section: Option<CustomSection>,
+    pub custom_section_before_type_section: Vec<CustomSection>,
     pub type_section: Option<TypeSection>,
-    pub custom_section_before_import_section: Option<CustomSection>,
+    pub custom_section_before_import_section: Vec<CustomSection>,
     pub import_section: Option<ImportSection>,
-    pub custom_section_before_function_section: Option<CustomSection>,
+    pub custom_section_before_function_section: Vec<CustomSection>,
     pub function_section: Option<FunctionSection>,
-    pub custom_section_before_table_section: Option<CustomSection>,
+    pub custom_section_before_table_section: Vec<CustomSection>,
     pub table_section: Option<TableSection>,
-    pub custom_section_before_memory_section: Option<CustomSection>,
+    pub custom_section_before_memory_section: Vec<CustomSection>,
     pub memory_section: Option<MemorySection>,
-    pub custom_section_before_globals_section: Option<CustomSection>,
+    pub custom_section_before_globals_section: Vec<CustomSection>,
     pub globals_section: Option<GlobalsSection>,
-    pub custom_section_before_export_section: Option<CustomSection>,
+    pub custom_section_before_export_section: Vec<CustomSection>,
     pub export_section: Option<ExportSection>,
-    pub custom_section_before_start_section: Option<CustomSection>,
+    pub custom_section_before_start_section: Vec<CustomSection>,
     pub start_section: Option<StartSection>,
-    pub custom_section_before_data_count_section: Option<CustomSection>,
+    pub custom_section_before_data_count_section: Vec<CustomSection>,
     pub data_count_section: Option<DataCountSection>,
-    pub custom_section_before_element_section: Option<CustomSection>,
+    pub custom_section_before_element_section: Vec<CustomSection>,
     pub element_section: Option<ElementSection>,
-    pub custom_section_before_code_section: Option<CustomSection>,
+    pub custom_section_before_code_section: Vec<CustomSection>,
     pub code_section: Option<CodeSection>,
-    pub custom_section_before_data_section: Option<CustomSection>,
+    pub custom_section_before_data_section: Vec<CustomSection>,
     pub data_section: Option<DataSection>,
-    pub custom_section_at_the_end: Option<CustomSection>,
+    pub custom_section_at_the_end: Vec<CustomSection>,
 }
 
 impl Module {
@@ -431,31 +431,31 @@ impl Module {
 
     pub fn empty() -> Self {
         Self {
-            custom_section_before_type_section: None,
+            custom_section_before_type_section: vec![],
             type_section: None,
-            custom_section_before_import_section: None,
+            custom_section_before_import_section: vec![],
             import_section: None,
-            custom_section_before_function_section: None,
+            custom_section_before_function_section: vec![],
             function_section: None,
-            custom_section_before_table_section: None,
+            custom_section_before_table_section: vec![],
             table_section: None,
-            custom_section_before_memory_section: None,
+            custom_section_before_memory_section: vec![],
             memory_section: None,
-            custom_section_before_globals_section: None,
+            custom_section_before_globals_section: vec![],
             globals_section: None,
-            custom_section_before_export_section: None,
+            custom_section_before_export_section: vec![],
             export_section: None,
-            custom_section_before_start_section: None,
+            custom_section_before_start_section: vec![],
             start_section: None,
-            custom_section_before_data_count_section: None,
+            custom_section_before_data_count_section: vec![],
             data_count_section: None,
-            custom_section_before_element_section: None,
+            custom_section_before_element_section: vec![],
             element_section: None,
-            custom_section_before_code_section: None,
+            custom_section_before_code_section: vec![],
             code_section: None,
-            custom_section_before_data_section: None,
+            custom_section_before_data_section: vec![],
             data_section: None,
-            custom_section_at_the_end: None,
+            custom_section_at_the_end: vec![],
         }
     }
 
@@ -467,160 +467,134 @@ impl Encoder for Module {
     type S =
         Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<
             HeaderBytes,
-            Option<<CustomSection as Encoder>::S>
+            Vector<<CustomSection as Encoder>::S>
         >,  Option<<TypeSection as Encoder>::S>
-        >,  Option<<CustomSection as Encoder>::S>
+        >,  Vector<<CustomSection as Encoder>::S>
         >,  Option<<ImportSection as Encoder>::S>
-        >,  Option<<CustomSection as Encoder>::S>
+        >,  Vector<<CustomSection as Encoder>::S>
         >,  Option<<FunctionSection as Encoder>::S>,
-        >,  Option<<CustomSection as Encoder>::S>
+        >,  Vector<<CustomSection as Encoder>::S>
         >,  Option<<TableSection as Encoder>::S>,
-        >,  Option<<CustomSection as Encoder>::S>
+        >,  Vector<<CustomSection as Encoder>::S>
         >,  Option<<MemorySection as Encoder>::S>,
-        >,  Option<<CustomSection as Encoder>::S>
+        >,  Vector<<CustomSection as Encoder>::S>
         >,  Option<<GlobalsSection as Encoder>::S>,
-        >,  Option<<CustomSection as Encoder>::S>
+        >,  Vector<<CustomSection as Encoder>::S>
         >,  Option<<ExportSection as Encoder>::S>,
-        >,  Option<<CustomSection as Encoder>::S>
+        >,  Vector<<CustomSection as Encoder>::S>
         >,  Option<<StartSection as Encoder>::S>,
-        >,  Option<<CustomSection as Encoder>::S>
+        >,  Vector<<CustomSection as Encoder>::S>
         >,  Option<<ElementSection as Encoder>::S>,
-        >,  Option<<CustomSection as Encoder>::S>
+        >,  Vector<<CustomSection as Encoder>::S>
         >,  Option<<DataCountSection as Encoder>::S>,
-        >,  Option<<CustomSection as Encoder>::S>
+        >,  Vector<<CustomSection as Encoder>::S>
         >,  Option<<CodeSection as Encoder>::S>,
-        >,  Option<<CustomSection as Encoder>::S>
+        >,  Vector<<CustomSection as Encoder>::S>
         >,  Option<<DataSection as Encoder>::S>,
-        >,  Option<<CustomSection as Encoder>::S>
+        >,  Vector<<CustomSection as Encoder>::S>
         >;
 
     fn emit(&self) -> Self::S {
         let header = bytes4(Module::MAGIC).seq(bytes4(Module::VERSION));
 
-        let custom_section_before_type_section = match &self.custom_section_before_type_section {
-            Some(custom_section) => Some(custom_section.emit()),
-            None => None,
-        };
+        let custom_section_before_type_section =
+            vector(self.custom_section_before_type_section.iter().map(|custom_section| custom_section.emit()).collect());
 
         let type_section = match &self.type_section {
             Some(type_section) => Some(type_section.emit()),
             None => None,
         };
 
-        let custom_section_before_import_section = match &self.custom_section_before_import_section {
-            Some(custom_section) => Some(custom_section.emit()),
-            None => None,
-        };
+        let custom_section_before_import_section = 
+            vector(self.custom_section_before_import_section.iter().map(|custom_section| custom_section.emit()).collect());
 
         let import_section = match &self.import_section {
             Some(import_section) => Some(import_section.emit()),
             None => None,
         };
 
-        let custom_section_before_function_section = match &self.custom_section_before_function_section {
-            Some(custom_section) => Some(custom_section.emit()),
-            None => None,
-        };
+        let custom_section_before_function_section = 
+            vector(self.custom_section_before_function_section.iter().map(|custom_section| custom_section.emit()).collect());
 
         let function_section = match &self.function_section {
             Some(type_indices) => Some(type_indices.emit()),
             None => None,
         };
 
-        let custom_section_before_table_section = match &self.custom_section_before_table_section {
-            Some(custom_section) => Some(custom_section.emit()),
-            None => None,
-        };
+        let custom_section_before_table_section = 
+            vector(self.custom_section_before_table_section.iter().map(|custom_section| custom_section.emit()).collect());
 
         let table_section = match &self.table_section {
             Some(table_section) => Some(table_section.emit()),
             None => None,
         };
 
-        let custom_section_before_memory_section = match &self.custom_section_before_memory_section {
-            Some(custom_section) => Some(custom_section.emit()),
-            None => None,
-        };
+        let custom_section_before_memory_section = 
+            vector(self.custom_section_before_memory_section.iter().map(|custom_section| custom_section.emit()).collect());
 
         let memory_section = match &self.memory_section {
             Some(memory_section) => Some(memory_section.emit()),
             None => None,
         };
 
-        let custom_section_before_globals_section = match &self.custom_section_before_globals_section {
-            Some(custom_section) => Some(custom_section.emit()),
-            None => None,
-        };
+        let custom_section_before_globals_section = 
+            vector(self.custom_section_before_globals_section.iter().map(|custom_section| custom_section.emit()).collect());
 
         let globals_section = match &self.globals_section {
             Some(globals_section) => Some(globals_section.emit()),
             None => None,
         };
 
-        let custom_section_before_export_section = match &self.custom_section_before_export_section {
-            Some(custom_section) => Some(custom_section.emit()),
-            None => None,
-        };
+        let custom_section_before_export_section = 
+            vector(self.custom_section_before_export_section.iter().map(|custom_section| custom_section.emit()).collect());
 
         let export_section = match &self.export_section {
             Some(exports) => Some(exports.emit()),
             None => None,
         };
 
-        let custom_section_before_start_section = match &self.custom_section_before_start_section {
-            Some(custom_section) => Some(custom_section.emit()),
-            None => None,
-        };
+        let custom_section_before_start_section = 
+            vector(self.custom_section_before_start_section.iter().map(|custom_section| custom_section.emit()).collect());
 
         let start_section = match &self.start_section {
             Some(start_section) => Some(start_section.emit()),
             None => None,
         };
 
-        let custom_section_before_element_section = match &self.custom_section_before_element_section {
-            Some(custom_section) => Some(custom_section.emit()),
-            None => None,
-        };
+        let custom_section_before_element_section = 
+            vector(self.custom_section_before_element_section.iter().map(|custom_section| custom_section.emit()).collect());
 
         let element_section = match &self.element_section {
             Some(element) => Some(element.emit()),
             None => None,
         };
 
-        let custom_section_before_data_count_section = match &self.custom_section_before_data_count_section {
-            Some(custom_section) => Some(custom_section.emit()),
-            None => None,
-        };
+        let custom_section_before_data_count_section = 
+            vector(self.custom_section_before_data_count_section.iter().map(|custom_section| custom_section.emit()).collect());
 
         let data_count_section = match &self.data_count_section {
             Some(data_count_section) => Some(data_count_section.emit()),
             None => None,
         };
 
-        let custom_section_before_code_section = match &self.custom_section_before_code_section {
-            Some(custom_section) => Some(custom_section.emit()),
-            None => None,
-        };
+        let custom_section_before_code_section = 
+            vector(self.custom_section_before_code_section.iter().map(|custom_section| custom_section.emit()).collect());
 
         let code_section = match &self.code_section {
             Some(code) => Some(code.emit()),
             None => None,
         };
 
-        let custom_section_before_data_section = match &self.custom_section_before_data_section {
-            Some(custom_section) => Some(custom_section.emit()),
-            None => None,
-        };
+        let custom_section_before_data_section = 
+            vector(self.custom_section_before_data_section.iter().map(|custom_section| custom_section.emit()).collect());
 
         let data_section = match &self.data_section {
             Some(data_section) => Some(data_section.emit()),
             None => None,
         };
 
-        let custom_section_at_the_end = match &self.custom_section_at_the_end {
-            Some(custom_section) => Some(custom_section.emit()),
-            None => None,
-        };
+        let custom_section_at_the_end = 
+            vector(self.custom_section_at_the_end.iter().map(|custom_section| custom_section.emit()).collect());
 
         header
             .seq(custom_section_before_type_section)

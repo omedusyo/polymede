@@ -330,7 +330,7 @@ impl <S0: ByteStream, S1: ByteStream> ByteStream for Either<S0, S1> {
     }
 }
 
-// ====Maybe===
+// ====Option===
 impl <S: ByteStream> ByteStream for Option<S> {
     fn next(&mut self) -> Response {
         use Response::*;
@@ -339,6 +339,43 @@ impl <S: ByteStream> ByteStream for Option<S> {
                 s.next()
             },
             None => End,
+        }
+    }
+}
+
+// ===Vector===
+// This just sequences encoders one after the other (no prefixesa or postfixes follow).
+pub enum Vector<S> {
+    Do { index: usize, ss: Vec<S> },
+    Done,
+}
+
+pub fn vector<S: ByteStream>(ss: Vec<S>) -> Vector<S> {
+    Vector::Do { index:0, ss }
+}
+
+impl <S: ByteStream> ByteStream for Vector<S> {
+    fn next(&mut self) -> Response {
+        use Response::*;
+        use Vector::*;
+        match self {
+            Do { index, ss } => {
+                if *index < ss.len() {
+                    match ss[*index].next() {
+                        New(byte) => New(byte),
+                        PrepareForForwardPointer => PrepareForForwardPointer,
+                        Pointer(offset) => Pointer(offset),
+                        End => {
+                            *index += 1;
+                            self.next()
+                        },
+                    }
+                } else {
+                    *self = Done;
+                    End
+                }
+            },
+            Done => End,
         }
     }
 }
