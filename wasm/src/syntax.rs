@@ -17,9 +17,9 @@ pub struct Module {
     functions: Vec<FunctionOrImport>,
     function_table: Vec<FunctionIndex>,
     globals: Vec<Global>,
-    data_table: Vec<(i32, Vec<u8>)>, // TODO: I need the type of a pointer to memory...?
     exports: Vec<Export>,
     memories: Vec<MemoryOrImport>,
+    custom_section_at_the_end: Vec<CustomSection>,
 }
 
 enum FunctionOrImport {
@@ -76,6 +76,8 @@ pub struct Global {
     pub global_type: GlobalType,
     pub expression: Expression,
 }
+
+pub type CustomSection = sections::CustomSection;
 
 #[derive(Debug)]
 pub enum Expression {
@@ -236,7 +238,7 @@ enum FloatRel2 {
 
 impl Module {
     pub fn empty() -> Self {
-        Self { function_types: vec![], functions: vec![], exports: vec![], memories: vec![], function_table: vec![], data_table: vec![], globals: vec![], }
+        Self { function_types: vec![], functions: vec![], exports: vec![], memories: vec![], function_table: vec![], globals: vec![], custom_section_at_the_end: vec![] }
     }
 
     pub fn add_function_type(&mut self, fn_type: FunctionType) -> TypeIndex {
@@ -292,12 +294,12 @@ impl Module {
         self.add_function_import(FunctionImport { module_name: fn_import.module_name, name: fn_import.name, type_index })
     }
 
-    pub fn register_function_table(&mut self, function_table: Vec<FunctionIndex>) {
-        self.function_table = function_table
+    pub fn add_custom_section_at_the_end(&mut self, custom_section: CustomSection) {
+        self.custom_section_at_the_end.push(custom_section);
     }
 
-    pub fn register_data_table(&mut self, data_table: Vec<(i32, Vec<u8>)>) {
-        self.data_table = data_table
+    pub fn register_function_table(&mut self, function_table: Vec<FunctionIndex>) {
+        self.function_table = function_table
     }
 
     pub fn binary_format(self) -> sections::Module {
@@ -368,21 +370,6 @@ impl Module {
             Some(CodeSection { codes })
         };
 
-        bin_module.data_section = {
-            let data_items = self.data_table.into_iter().map(|(_address, initialize)|
-                // To use Active Data segment, I need to compute memory offset.
-                // Unfortunately that won't compile, because I don't have memory imported in
-                // generated segment.
-                // I could try to import memory, but it seems wasm-merge doesn't allow me to do that,
-                // it will try to generate final wasm file with multiple memories.
-                // So it seems I can't import memory that's used in runtime.
-                // So instead I have an Active Data segment s.t. I will have to initialize the
-                // memory manually when the wasm module executes.
-                DataItem::Passive { initialize, }
-            ).collect();
-            Some(DataSection { data_items })
-        };
-
         bin_module.globals_section = {
             let globals = self.globals.into_iter().map(|global| sections::Global {
                     global_type: global.global_type,
@@ -392,6 +379,8 @@ impl Module {
         };
 
         bin_module.export_section = Some(ExportSection { exports: self.exports });
+
+        bin_module.custom_section_at_the_end = self.custom_section_at_the_end;
 
         bin_module
     }

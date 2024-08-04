@@ -1,7 +1,7 @@
 use crate::graph_memory_machine as gmm;
 use crate::runtime::Runtime;
 use wasm::{
-    syntax::{Module, TypedFunctionImport, TypedFunction, Global, MemoryImport, fn_type, Expression, call, return_call, call_indirect, return_call_indirect, i32_const, i32_eq, seq},
+    syntax::{CustomSection, Module, TypedFunctionImport, TypedFunction, Global, MemoryImport, fn_type, Expression, call, return_call, call_indirect, return_call_indirect, i32_const, i32_eq, seq},
     base::{
         indices::{FunctionIndex, TableIndex, TypeIndex},
         types::{FunctionType, BlockType, GlobalType, ValueType, NumType, Mutability},
@@ -168,18 +168,19 @@ pub fn compile(program: gmm::Program) -> Result<Module> {
     module.register_function_table(state.function_table);
 
     {
-        let mut data_table = vec![];
-        for (pointer, bytes) in state.byte_array_store {
-            data_table.push((pointer, Runtime::encode_byte_array(&bytes)));
+        let mut polymede_static = vec![];
+        for (_, bytes) in state.byte_array_store {
+            polymede_static.extend(Runtime::encode_byte_array(&bytes));
         }
-        module.register_data_table(data_table);
 
         // Global variable that stores the size of the STATIC region in bytes.
         let static_size_global_index = module.add_global(Global {
             global_type: GlobalType { type_: ValueType::NumType(NumType::I32), mutability: Mutability::Const },
-            expression: i32_const(state.current_static_offset) 
+            expression: i32_const(polymede_static.len() as i32) 
         });
-        println!("STATIC_SIZE = {}", state.current_static_offset);
+        module.add_custom_section_at_the_end(CustomSection { name: "POLYMEDE_STATIC".to_string(), bytes: polymede_static });
+        // Note that I don't really need to export the global, since this information is contained
+        // in the size of the custom section.
         module.add_export(Export { name: "STATIC_SIZE".to_string(), export_description: ExportDescription::Global(static_size_global_index) });
     }
 

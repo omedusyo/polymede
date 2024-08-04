@@ -594,7 +594,7 @@ impl Encoder for Module {
         };
 
         let custom_section_at_the_end = 
-            vector(self.custom_section_at_the_end.iter().map(|custom_section| custom_section.emit()).collect());
+            vector(self.custom_section_at_the_end.iter().map(|custom_section| { custom_section.emit() }).collect());
 
         header
             .seq(custom_section_before_type_section)

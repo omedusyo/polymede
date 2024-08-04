@@ -62,6 +62,8 @@
   (global $GC_TAG_LIVE i32 (i32.const 0))
   (global $GC_TAG_MOVED i32 (i32.const 1))
 
+
+  (; ===Stack/Heap=== ;)
   (func $inc_stack (param $count i32)
     (if (i32.lt_u (i32.add (global.get $STACK) (local.get $count)) (global.get $STACK_SIZE))
       (then
