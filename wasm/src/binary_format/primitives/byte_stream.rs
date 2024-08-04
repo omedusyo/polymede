@@ -131,10 +131,6 @@ pub trait ByteStream {
     fn enclose(self) -> Enclose<Self> where Self: Sized {
         Enclose::new(self)
     }
-
-    fn vec(bytes: &[u8]) -> Bytes {
-        Bytes::new(bytes.to_vec())
-    }
 }
 
 // ===Sequence===

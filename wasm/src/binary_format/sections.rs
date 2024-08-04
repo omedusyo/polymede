@@ -1,4 +1,4 @@
-use crate::binary_format::primitives::byte_stream::{ByteStream, Response, Enclose, EVec, evector, bytes4, byte, Byte, Bytes4, CVec, cvector, Seq, U32ToFixed40LEB128};
+use crate::binary_format::primitives::byte_stream::{ByteStream, UTF8, string, Response, Enclose, EVec, evector, bytes4, byte, Byte, Bytes4, Bytes, bytes, CVec, cvector, Seq, U32ToFixed40LEB128};
 use crate::binary_format::primitives::encoder::Encoder;
 use crate::binary_format::indices::IndexStream;
 
@@ -12,6 +12,26 @@ use crate::base::{
 };
 
 type SectionId = u8;
+
+// === 0 Custom Section ===
+#[derive(Debug)]
+pub struct CustomSection {
+    pub name: String,
+    pub bytes: Vec<u8>
+}
+
+impl CustomSection {
+    pub const ID: SectionId = 0;
+}
+
+impl Encoder for CustomSection {
+    type S = Seq<Byte, Enclose<Seq<UTF8, Bytes>>>;
+    fn emit(&self) -> Self::S {
+        byte(Self::ID)
+            // TODO: Can we get rid of the cloning of bytes?
+            .seq((string(&self.name).seq(bytes(self.bytes.to_vec()))).enclose())
+    }
+}
 
 // === 1 Type Section ===
 #[derive(Debug)]
@@ -378,18 +398,31 @@ impl Encoder for DataCountSection {
 // ====== Module =======
 #[derive(Debug)]
 pub struct Module {
+    pub custom_section_before_type_section: Option<CustomSection>,
     pub type_section: Option<TypeSection>,
+    pub custom_section_before_import_section: Option<CustomSection>,
     pub import_section: Option<ImportSection>,
+    pub custom_section_before_function_section: Option<CustomSection>,
     pub function_section: Option<FunctionSection>,
+    pub custom_section_before_table_section: Option<CustomSection>,
     pub table_section: Option<TableSection>,
+    pub custom_section_before_memory_section: Option<CustomSection>,
     pub memory_section: Option<MemorySection>,
+    pub custom_section_before_globals_section: Option<CustomSection>,
     pub globals_section: Option<GlobalsSection>,
+    pub custom_section_before_export_section: Option<CustomSection>,
     pub export_section: Option<ExportSection>,
+    pub custom_section_before_start_section: Option<CustomSection>,
     pub start_section: Option<StartSection>,
+    pub custom_section_before_data_count_section: Option<CustomSection>,
     pub data_count_section: Option<DataCountSection>,
+    pub custom_section_before_element_section: Option<CustomSection>,
     pub element_section: Option<ElementSection>,
+    pub custom_section_before_code_section: Option<CustomSection>,
     pub code_section: Option<CodeSection>,
+    pub custom_section_before_data_section: Option<CustomSection>,
     pub data_section: Option<DataSection>,
+    pub custom_section_at_the_end: Option<CustomSection>,
 }
 
 impl Module {
@@ -398,18 +431,31 @@ impl Module {
 
     pub fn empty() -> Self {
         Self {
+            custom_section_before_type_section: None,
             type_section: None,
+            custom_section_before_import_section: None,
             import_section: None,
+            custom_section_before_function_section: None,
             function_section: None,
+            custom_section_before_table_section: None,
             table_section: None,
+            custom_section_before_memory_section: None,
             memory_section: None,
+            custom_section_before_globals_section: None,
             globals_section: None,
+            custom_section_before_export_section: None,
             export_section: None,
+            custom_section_before_start_section: None,
             start_section: None,
+            custom_section_before_data_count_section: None,
             data_count_section: None,
+            custom_section_before_element_section: None,
             element_section: None,
+            custom_section_before_code_section: None,
             code_section: None,
+            custom_section_before_data_section: None,
             data_section: None,
+            custom_section_at_the_end: None,
         }
     }
 
@@ -419,27 +465,50 @@ type HeaderBytes = Seq<Bytes4, Bytes4>;
 
 impl Encoder for Module {
     type S =
-        Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<
+        Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<Seq<
             HeaderBytes,
-            Option<<TypeSection as Encoder>::S>
+            Option<<CustomSection as Encoder>::S>
+        >,  Option<<TypeSection as Encoder>::S>
+        >,  Option<<CustomSection as Encoder>::S>
         >,  Option<<ImportSection as Encoder>::S>
+        >,  Option<<CustomSection as Encoder>::S>
         >,  Option<<FunctionSection as Encoder>::S>,
+        >,  Option<<CustomSection as Encoder>::S>
         >,  Option<<TableSection as Encoder>::S>,
+        >,  Option<<CustomSection as Encoder>::S>
         >,  Option<<MemorySection as Encoder>::S>,
+        >,  Option<<CustomSection as Encoder>::S>
         >,  Option<<GlobalsSection as Encoder>::S>,
+        >,  Option<<CustomSection as Encoder>::S>
         >,  Option<<ExportSection as Encoder>::S>,
+        >,  Option<<CustomSection as Encoder>::S>
         >,  Option<<StartSection as Encoder>::S>,
+        >,  Option<<CustomSection as Encoder>::S>
         >,  Option<<ElementSection as Encoder>::S>,
+        >,  Option<<CustomSection as Encoder>::S>
         >,  Option<<DataCountSection as Encoder>::S>,
+        >,  Option<<CustomSection as Encoder>::S>
         >,  Option<<CodeSection as Encoder>::S>,
+        >,  Option<<CustomSection as Encoder>::S>
         >,  Option<<DataSection as Encoder>::S>,
+        >,  Option<<CustomSection as Encoder>::S>
         >;
 
     fn emit(&self) -> Self::S {
         let header = bytes4(Module::MAGIC).seq(bytes4(Module::VERSION));
 
+        let custom_section_before_type_section = match &self.custom_section_before_type_section {
+            Some(custom_section) => Some(custom_section.emit()),
+            None => None,
+        };
+
         let type_section = match &self.type_section {
             Some(type_section) => Some(type_section.emit()),
+            None => None,
+        };
+
+        let custom_section_before_import_section = match &self.custom_section_before_import_section {
+            Some(custom_section) => Some(custom_section.emit()),
             None => None,
         };
 
@@ -448,8 +517,18 @@ impl Encoder for Module {
             None => None,
         };
 
+        let custom_section_before_function_section = match &self.custom_section_before_function_section {
+            Some(custom_section) => Some(custom_section.emit()),
+            None => None,
+        };
+
         let function_section = match &self.function_section {
             Some(type_indices) => Some(type_indices.emit()),
+            None => None,
+        };
+
+        let custom_section_before_table_section = match &self.custom_section_before_table_section {
+            Some(custom_section) => Some(custom_section.emit()),
             None => None,
         };
 
@@ -458,8 +537,18 @@ impl Encoder for Module {
             None => None,
         };
 
+        let custom_section_before_memory_section = match &self.custom_section_before_memory_section {
+            Some(custom_section) => Some(custom_section.emit()),
+            None => None,
+        };
+
         let memory_section = match &self.memory_section {
             Some(memory_section) => Some(memory_section.emit()),
+            None => None,
+        };
+
+        let custom_section_before_globals_section = match &self.custom_section_before_globals_section {
+            Some(custom_section) => Some(custom_section.emit()),
             None => None,
         };
 
@@ -468,8 +557,18 @@ impl Encoder for Module {
             None => None,
         };
 
+        let custom_section_before_export_section = match &self.custom_section_before_export_section {
+            Some(custom_section) => Some(custom_section.emit()),
+            None => None,
+        };
+
         let export_section = match &self.export_section {
             Some(exports) => Some(exports.emit()),
+            None => None,
+        };
+
+        let custom_section_before_start_section = match &self.custom_section_before_start_section {
+            Some(custom_section) => Some(custom_section.emit()),
             None => None,
         };
 
@@ -478,8 +577,18 @@ impl Encoder for Module {
             None => None,
         };
 
+        let custom_section_before_element_section = match &self.custom_section_before_element_section {
+            Some(custom_section) => Some(custom_section.emit()),
+            None => None,
+        };
+
         let element_section = match &self.element_section {
             Some(element) => Some(element.emit()),
+            None => None,
+        };
+
+        let custom_section_before_data_count_section = match &self.custom_section_before_data_count_section {
+            Some(custom_section) => Some(custom_section.emit()),
             None => None,
         };
 
@@ -488,8 +597,18 @@ impl Encoder for Module {
             None => None,
         };
 
+        let custom_section_before_code_section = match &self.custom_section_before_code_section {
+            Some(custom_section) => Some(custom_section.emit()),
+            None => None,
+        };
+
         let code_section = match &self.code_section {
             Some(code) => Some(code.emit()),
+            None => None,
+        };
+
+        let custom_section_before_data_section = match &self.custom_section_before_data_section {
+            Some(custom_section) => Some(custom_section.emit()),
             None => None,
         };
 
@@ -498,19 +617,37 @@ impl Encoder for Module {
             None => None,
         };
 
+        let custom_section_at_the_end = match &self.custom_section_at_the_end {
+            Some(custom_section) => Some(custom_section.emit()),
+            None => None,
+        };
+
         header
+            .seq(custom_section_before_type_section)
             .seq(type_section)
+            .seq(custom_section_before_import_section)
             .seq(import_section)
+            .seq(custom_section_before_function_section)
             .seq(function_section)
+            .seq(custom_section_before_table_section)
             .seq(table_section)
+            .seq(custom_section_before_memory_section)
             .seq(memory_section)
+            .seq(custom_section_before_globals_section)
             .seq(globals_section)
+            .seq(custom_section_before_export_section)
             .seq(export_section)
+            .seq(custom_section_before_start_section)
             .seq(start_section)
+            .seq(custom_section_before_element_section)
             .seq(element_section)
+            .seq(custom_section_before_data_count_section)
             .seq(data_count_section)
+            .seq(custom_section_before_code_section)
             .seq(code_section)
+            .seq(custom_section_before_data_section)
             .seq(data_section)
+            .seq(custom_section_at_the_end)
     }
 }
 #[cfg(test)]
