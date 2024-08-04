@@ -2,7 +2,8 @@
 ;;       Also introduce `read` functions that will just copy stuff from the linear stack to WASM stack without consumption.
 
 (module
-  (import "env" "memory" (memory 0))
+  (import "env" "memory" (memory $main_memory 0))
+  (import "env" "STATIC_SIZE" (global $STATIC_SIZE i32)) ;; TODO: recompute everything with respect to STATIC...? in js... You also need to export it from the compiler.
   (import "env" "STACK_SIZE" (global $STACK_SIZE i32))
   (import "env" "HEAP_SIZE" (global $HEAP_SIZE i32))
   (import "env" "STACK_START" (global $STACK_START i32))
@@ -20,6 +21,8 @@
 
   (import "primitives" "perform_primitive_command" (func $perform_primitive_command (param i32)))
 
+  (; (export  ;)
+
   (global $STACK (mut i32) (i32.const 0))
   (export "stack" (global $STACK))
   (global $ENV (mut i32) (i32.const 0))
@@ -29,7 +32,7 @@
   (global $TAGGED_POINTER_BYTE_SIZE i32 (i32.const 5))
   (global $ENV_TAG i32 (i32.const 0))
   (global $CONST_TAG i32 (i32.const 1))
-  (global $ARRAY_TAG i32 (i32.const 2))
+  (global $BYTE_ARRAY_TAG i32 (i32.const 2))
   (global $TUPLE_TAG i32 (i32.const 3))
 
   ;; | tag 1 byte | env pointer 4 bytes | count 4 bytes |  ... | sequence of tagged pointers/constants, 5 bytes each | ...
@@ -46,6 +49,15 @@
   (global $TUPLE_HEADER_OFFSET i32 (i32.const 6))
   (global $TUPLE_VARIANT_OFFSET i32 (i32.const 1))
   (global $TUPLE_COUNT_OFFSET i32 (i32.const 5))
+
+  ;; | gc 1 byte | tag 1 byte | count 4 byte | string contents |
+  (global $BYTE_ARRAY_HEADER_BYTE_SIZE i32 (i32.const 6))
+  (global $BYTE_ARRAY_COUNT_OFFSET i32 (i32.const 2))
+  ;; | gc 1 byte | tag 1 byte | 1st pointer 4 byte | 2nd pointer 4 byte | count 4 byte |
+  (global $SLICE_SIZE i32 (i32.const 14))
+  (global $SLICE_PARENT_POINTER_OFFSET i32 (i32.const 2))
+  (global $SLICE_POINTER_OFFSET i32 (i32.const 6))
+  (global $SLICE_COUNT_OFFSET i32 (i32.const 10))
 
   (global $GC_TAG_LIVE i32 (i32.const 0))
   (global $GC_TAG_MOVED i32 (i32.const 1))
@@ -463,6 +475,13 @@
     (call $tuple (i32.const 1) (i32.const 2))
   )
   (export "and_then" (func $and_then))
+
+  (; =====Byte Arrays====== ;)
+  (func $array_slice (param $parent_raw_pointer i32) (param $raw_pointer i32) (param $count i32)
+    ;; Create an array slice on the heap, then push a tagged pointer to it to the stack.
+    ;; TODO
+  )
+  (export "array_slice" (func $array_slice))
 
 
   (; =====Garbage Collector===== ;)

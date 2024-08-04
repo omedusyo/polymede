@@ -1,9 +1,9 @@
 use crate::binary_format::sections;
-use crate::binary_format::sections::{TypeSection, FunctionSection, ExportSection, ImportSection, CodeSection, TableSection, MemorySection, TableType, ElementSection, Element};
+use crate::binary_format::sections::{TypeSection, FunctionSection, GlobalsSection, ExportSection, ImportSection, CodeSection, TableSection, MemorySection, TableType, ElementSection, Element, DataSection, DataItem};
 use crate::{Encoder, ByteStream};
 use crate::base::{
     indices::{TypeIndex, LocalIndex, GlobalIndex, LabelIndex, FunctionIndex, TableIndex, MemoryIndex},
-    types::{FunctionType, ValueType, BlockType, NumType, RefType},
+    types::{FunctionType, ValueType, BlockType, NumType, RefType, GlobalType},
     export::{Export, ExportDescription},
     import::{Import, ImportDescription},
     instructions,
@@ -16,8 +16,10 @@ pub struct Module {
     // performance friendly.
     functions: Vec<FunctionOrImport>,
     function_table: Vec<FunctionIndex>,
+    globals: Vec<Global>,
+    data_table: Vec<(i32, Vec<u8>)>, // TODO: I need the type of a pointer to memory...?
     exports: Vec<Export>,
-    memory_types: Vec<Limit>,
+    memories: Vec<MemoryOrImport>,
 }
 
 enum FunctionOrImport {
@@ -32,6 +34,11 @@ impl FunctionOrImport {
             Self::Fn(Function { type_index, .. }) => *type_index,
         }
     }
+}
+
+enum MemoryOrImport {
+    Memory(Limit),
+    Import(MemoryImport),
 }
 
 struct Function {
@@ -52,12 +59,23 @@ struct FunctionImport {
     type_index: TypeIndex,
 }
 
+pub struct MemoryImport {
+    pub module_name: String,
+    pub name: String,
+    pub limit: Limit,
+}
+
 pub struct TypedFunctionImport {
     pub module_name: String,
     pub name: String,
     pub type_: FunctionType,
 }
 
+#[derive(Debug)]
+pub struct Global {
+    pub global_type: GlobalType,
+    pub expression: Expression,
+}
 
 #[derive(Debug)]
 pub enum Expression {
@@ -218,7 +236,7 @@ enum FloatRel2 {
 
 impl Module {
     pub fn empty() -> Self {
-        Self { function_types: vec![], functions: vec![], exports: vec![], memory_types: vec![], function_table: vec![] }
+        Self { function_types: vec![], functions: vec![], exports: vec![], memories: vec![], function_table: vec![], data_table: vec![], globals: vec![], }
     }
 
     pub fn add_function_type(&mut self, fn_type: FunctionType) -> TypeIndex {
@@ -240,9 +258,21 @@ impl Module {
         fn_index
     }
 
+    pub fn add_global(&mut self, global: Global) -> GlobalIndex {
+        let global_index = GlobalIndex(self.globals.len() as u32);
+        self.globals.push(global);
+        global_index
+    }
+
     pub fn add_memory(&mut self, limit: Limit) -> MemoryIndex {
-        let memory_index = MemoryIndex(self.memory_types.len() as u32);
-        self.memory_types.push(limit);
+        let memory_index = MemoryIndex(self.memories.len() as u32);
+        self.memories.push(MemoryOrImport::Memory(limit));
+        memory_index
+    }
+
+    pub fn add_memory_import(&mut self, memory_import: MemoryImport) -> MemoryIndex {
+        let memory_index = MemoryIndex(self.memories.len() as u32);
+        self.memories.push(MemoryOrImport::Import(memory_import));
         memory_index
     }
 
@@ -266,6 +296,10 @@ impl Module {
         self.function_table = function_table
     }
 
+    pub fn register_data_table(&mut self, data_table: Vec<(i32, Vec<u8>)>) {
+        self.data_table = data_table
+    }
+
     pub fn binary_format(self) -> sections::Module {
         let mut bin_module = sections::Module::empty();
 
@@ -279,6 +313,14 @@ impl Module {
             Some(FunctionSection { type_indices: function_types_map })
         };
 
+        bin_module.memory_section = {
+            let memory_types = self.memories.iter().filter_map(|memory| match memory {
+                MemoryOrImport::Memory(limit) => Some(*limit),
+                MemoryOrImport::Import(_) => None,
+            }).collect();
+            Some(MemorySection { memory_types })
+        };
+
         bin_module.table_section = {
             let number_of_closures = self.function_table.len() as u32;
             let table_type = TableType {
@@ -290,18 +332,23 @@ impl Module {
 
         bin_module.import_section = {
             // TODO: Can this be done without cloning of strings?
-            let imports: Vec<Import> = self.functions.iter().filter_map(|fn_| match fn_ {
-                FunctionOrImport::Import(fn_import) => Some(Import { module_name: fn_import.module_name.clone(), name: fn_import.name.clone(), import_description: ImportDescription::FunctionTypeIndex(fn_import.type_index) }),
+            let mut imports: Vec<Import> = self.functions.iter().filter_map(|fn_| match fn_ {
+                FunctionOrImport::Import(fn_import) => Some(Import {
+                    module_name: fn_import.module_name.clone(),
+                    name: fn_import.name.clone(),
+                    import_description: ImportDescription::FunctionTypeIndex(fn_import.type_index) }),
                 FunctionOrImport::Fn(_) => None,
             }).collect();
 
-            //imports.push(Import {
-            //    module_name: "env".to_string(), name: "closure_table".to_string(),
-            //    import_description: {
-            //        let number_of_closures = self.function_table.len() as u32;
-            //        ImportDescription::TableType(RefType::FuncRef, Limit::MinMax { min: number_of_closures, max: number_of_closures })
-            //    }
-            //});
+            // TODO: Can this be done without cloning of strings?
+            imports.extend(self.memories.into_iter().filter_map(|memory| match memory {
+                MemoryOrImport::Import(memory_import) => Some(Import {
+                    module_name: memory_import.module_name.clone(), 
+                    name: memory_import.name.clone(), 
+                    import_description: ImportDescription::MemoryType(memory_import.limit)
+                }),
+                MemoryOrImport::Memory(_) => None,
+            }));
 
             Some(ImportSection { imports })
         };
@@ -321,8 +368,27 @@ impl Module {
             Some(CodeSection { codes })
         };
 
-        bin_module.memory_section = {
-            Some(MemorySection { memory_types: self.memory_types })
+        bin_module.data_section = {
+            let data_items = self.data_table.into_iter().map(|(_address, initialize)|
+                // To use Active Data segment, I need to compute memory offset.
+                // Unfortunately that won't compile, because I don't have memory imported in
+                // generated segment.
+                // I could try to import memory, but it seems wasm-merge doesn't allow me to do that,
+                // it will try to generate final wasm file with multiple memories.
+                // So it seems I can't import memory that's used in runtime.
+                // So instead I have an Active Data segment s.t. I will have to initialize the
+                // memory manually when the wasm module executes.
+                DataItem::Passive { initialize, }
+            ).collect();
+            Some(DataSection { data_items })
+        };
+
+        bin_module.globals_section = {
+            let globals = self.globals.into_iter().map(|global| sections::Global {
+                    global_type: global.global_type,
+                    expression: global.expression.binary_format(),
+            }).collect();
+            Some(GlobalsSection { globals })
         };
 
         bin_module.export_section = Some(ExportSection { exports: self.exports });
