@@ -34,7 +34,7 @@ pub struct Runtime {
 
 impl Runtime {
     pub const BYTE_ARRAY_HEADER_BYTE_SIZE: i32 = 6;
-    pub const BYTE_ARRAY_TAG: u8 = 2;
+    pub const BYTE_ARRAY_TAG: u8 = 3;
     pub const GC_TAG_LIVE: u8 = 0;
 
     pub fn encode_byte_array(bytes: &[u8]) -> Vec<u8> {

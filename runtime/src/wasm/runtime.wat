@@ -32,8 +32,8 @@
   (global $TAGGED_POINTER_BYTE_SIZE i32 (i32.const 5))
   (global $ENV_TAG i32 (i32.const 0))
   (global $CONST_TAG i32 (i32.const 1))
-  (global $BYTE_ARRAY_TAG i32 (i32.const 2))
-  (global $TUPLE_TAG i32 (i32.const 3))
+  (global $TUPLE_TAG i32 (i32.const 2))
+  (global $BYTE_ARRAY_TAG i32 (i32.const 3))
   (global $BYTE_ARRAY_SLICE_TAG i32 (i32.const 4))
 
   (global $GC_TAG_BYTE_SIZE i32 (i32.const 1))

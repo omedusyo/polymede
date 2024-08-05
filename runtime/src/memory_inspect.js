@@ -1,7 +1,8 @@
 const ENV_TAG = 0;
 const CONST_TAG = 1;
-const ARRAY_TAG = 2;
-const TUPLE_TAG = 3;
+const TUPLE_TAG = 2;
+const ARRAY_TAG = 3;
+const ARRAY_SLICE_TAG = 4;
 
 const TAGGED_POINTER_BYTE_SIZE = 5;
 
