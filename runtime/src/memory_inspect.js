@@ -53,8 +53,8 @@ module.exports.readRawPointer = readRawPointer;
 function readTuple(view, tagged_pointer) {
   if (tagged_pointer.tag != "Tuple") { throw Error(`Attempt to read non-tuple as tuple @ ${tagged_pointer}`) }
   const tuple_pointer = tagged_pointer.pointer;
-  // 1 byte for GC, 4 bytes for variant, 1 byte for count, followed by components
-  const variant_offset = 1;
+  // 1 byte for GC, 1 byte for tag, 4 bytes for variant, 1 byte for count, followed by components
+  const variant_offset = 2;
   const count_offset = variant_offset + 4;
   const components_offset = count_offset + 1;
 

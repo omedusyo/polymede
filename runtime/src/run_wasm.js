@@ -14,10 +14,13 @@ function run(bytes) {
     const static_byte_size = STATIC_BUFFER.byteLength;
 
     const page_byte_size = 2**16; // 65 KB
-    // TODO: How many pages should I allocate for static?
     const static_pages = Math.ceil(static_byte_size / page_byte_size);
+    // TODO: Revert to the below
+    // const stack_pages = 16;
+    // const heap_pages = 256;
+    // TODO: Delete
     const stack_pages = 16;
-    const heap_pages = 256;
+    const heap_pages = 1;
     const total_pages = static_pages + stack_pages + 2*heap_pages;
 
     const stack_byte_size = page_byte_size * stack_pages; // 1 MB. Note that this is Linear Stack in Linear Memory, not the wasm's stack.
@@ -127,7 +130,7 @@ function run(bytes) {
         main();
 
         console.log("> Main executed succesfully.");
-        // log_stack(0);
+        log_stack(0);
         console.log("> Performing command...");
 
         perform(
@@ -138,7 +141,7 @@ function run(bytes) {
           GLOBAL.STACK_START,
           GLOBAL.STACK,
         );
-        // log_stack(1);
+        log_stack(1);
         console.log("> Exiting.");
 
     });

@@ -2,6 +2,7 @@
   (import "runtime" "const" (func $const (param i32)))
   (import "runtime" "get_const" (func $get_const (result i32)))
   (import "runtime" "tuple" (func $tuple (param i32) (param i32)))
+  (import "runtime" "gc" (func $gc))
 
   (import "console" "log_int" (func $console_log_int (param i32)))
   (import "console" "log_two_ints" (func $console_log_two_ints (param i32) (param i32)))
@@ -30,6 +31,11 @@
   (func $dec (call $const (i32.sub (call $get_const) (i32.const 1))))
   (export "i32_dec" (func $dec))
 
+  (func $garbage_collection
+    (call $gc)
+    (call $const (i32.const 1))
+  )
+  (export "garbage_collection" (func $garbage_collection))
 
   ;; TODO: This whole thing needs to be replaced by function tables, no?
   ;; For some magical reason 13 is for printing an integer.

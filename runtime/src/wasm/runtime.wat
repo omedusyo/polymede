@@ -23,9 +23,9 @@
 
   (; (export  ;)
 
-  (global $STACK (mut i32) (i32.const 0))
+  (global $STACK (mut i32) (global.get $STACK_START))
   (export "stack" (global $STACK))
-  (global $ENV (mut i32) (i32.const 0))
+  (global $ENV (mut i32) (global.get $STACK_START))
   (export "env" (global $ENV))
 
   (; ===Global Constants=== ;)
@@ -34,6 +34,10 @@
   (global $CONST_TAG i32 (i32.const 1))
   (global $BYTE_ARRAY_TAG i32 (i32.const 2))
   (global $TUPLE_TAG i32 (i32.const 3))
+  (global $BYTE_ARRAY_SLICE_TAG i32 (i32.const 4))
+
+  (global $GC_TAG_BYTE_SIZE i32 (i32.const 1))
+  (global $TAG_BYTE_SIZE i32 (i32.const 1))
 
   ;; | tag 1 byte | env pointer 4 bytes | count 4 bytes |  ... | sequence of tagged pointers/constants, 5 bytes each | ...
   (global $ENV_HEADER_BYTE_SIZE i32 (i32.const 9)) ;; 9 bytes, 1 byte for tag, 4 bytes for parent env pointer, 4 bytes for env count.
@@ -44,11 +48,15 @@
   (global $ENV_COUNTER_OFFSET i32 (i32.const -4))
   (global $ENV_HEADER_START_OFFSET i32 (i32.const -9))
 
-  ;; | gc 1 byte | variant 4 bytes | count 1 byte | ... | sequence of tagged pointers/constants, 5 bytes each | ...
-  (global $TUPLE_HEADER_BYTE_SIZE i32 (i32.const 6)) ;; 6 bytes, 1 byte for GC bit, 4 bytes for variant, 1 byte for count
-  (global $TUPLE_HEADER_OFFSET i32 (i32.const 6))
-  (global $TUPLE_VARIANT_OFFSET i32 (i32.const 1))
-  (global $TUPLE_COUNT_OFFSET i32 (i32.const 5))
+  ;; | gc 1 byte | tag 1 byte | variant 4 bytes | count 1 byte | ... | sequence of tagged pointers/constants, 5 bytes each | ...
+  (global $TUPLE_HEADER_BYTE_SIZE i32 (i32.const 7)) ;; 6 bytes, 1 byte for GC bit, 4 bytes for variant, 1 byte for count
+  (global $TUPLE_VARIANT_OFFSET i32 (i32.const 2))
+  (global $TUPLE_COUNT_OFFSET i32 (i32.const 6))
+  ;; TODO: Change this to $TUPLE_COMPONENTS_OFFSET
+  (global $TUPLE_HEADER_OFFSET i32 (i32.const 7))
+
+  (global $TUPLE_VARIANT_BYTE_SIZE i32 (i32.const 4))
+  (global $TUPLE_COUNT_BYTE_SIZE i32 (i32.const 1))
 
   ;; | gc 1 byte | tag 1 byte | count 4 byte | string contents |
   (global $BYTE_ARRAY_HEADER_BYTE_SIZE i32 (i32.const 6))
@@ -116,15 +124,18 @@
 
     (local.set $tuple_pointer (global.get $FREE))
     (; ==header== ;)
-    (; 1 bit (takes the whole byte ofcourse) for garbage collection. ;)
+    (; 1 bit (takes the whole byte ofcourse) for garbage collection liveness. ;)
     (i32.store8 (global.get $FREE) (global.get $GC_TAG_LIVE))
-    (call $inc_free (i32.const 1))
+    (call $inc_free (global.get $GC_TAG_BYTE_SIZE))
+    ;; tag (used by gc going from grey ~> black)
+    (i32.store8 (global.get $FREE) (global.get $TUPLE_TAG))
+    (call $inc_free (global.get $TAG_BYTE_SIZE))
     (; 4 bytes for variant ;)
     (i32.store (global.get $FREE) (local.get $variant))
-    (call $inc_free (i32.const 4))
+    (call $inc_free (global.get $TUPLE_VARIANT_BYTE_SIZE))
     (; 1 byte for number of components ;)
     (i32.store8 (global.get $FREE) (local.get $count))
-    (call $inc_free (i32.const 1))
+    (call $inc_free (global.get $TUPLE_COUNT_BYTE_SIZE))
     
     (; ==payload== ;)
     (; go back to the start of the component on the stack ;)
@@ -485,6 +496,18 @@
   )
   (export "array_slice" (func $array_slice))
 
+  (func $allocate_array (param $byte_size i32) (result i32)
+    ;; Allocates space for an array on the heap. Returns raw_pointer to the array.
+    (; ==check if we have enough space on the heap== ;)
+    ;; TODO
+    (i32.const 0)
+  )
+
+  (func $concat_arrays (param $raw_pointer_0 i32) (param $raw_pointer1 i32) (result i32)
+    ;; Copies and concatenates two arrays into a new location on the heap. Returns raw_pointer to the new array.
+    ;; TODO;
+    (i32.const 0)
+  )
 
   (; =====Garbage Collector===== ;)
   (func $gc_if_out_of_space (param $allocation_request_byte_size i32)
@@ -569,6 +592,7 @@
 
   (func $gc_traverse_grey
     (local $current_grey i32)
+    (local $current_grey_tag i32)
     (local $next_grey i32)
     (local $tuple_components_count i32)
     (local $component_tag i32)
@@ -584,41 +608,58 @@
       ;;          you will have to introduce a $tag for heap objects,
       ;;          since without this information GC won't know what it is trying to move.
 
-      ;; skip the tuple header
-      (local.set $tuple_components_count (i32.load8_u (i32.add (local.get $current_grey) (global.get $TUPLE_COUNT_OFFSET))))
-      (local.set $current_grey (i32.add (local.get $current_grey) (global.get $TUPLE_HEADER_OFFSET)))
-      (local.set $next_grey
-        (i32.add
-          (local.get $current_grey)
-          (i32.mul (local.get $tuple_components_count) (global.get $TAGGED_POINTER_BYTE_SIZE))))
+      (local.set $current_grey_tag (i32.load8_u (i32.add (local.get $current_grey) (i32.const 1))))
+      (if (i32.eq (local.get $current_grey_tag) (global.get $TUPLE_TAG))
+      (then
+        ;; ==Tuple==
+        ;; skip the tuple header
+        (local.set $tuple_components_count (i32.load8_u (i32.add (local.get $current_grey) (global.get $TUPLE_COUNT_OFFSET))))
+        (local.set $current_grey (i32.add (local.get $current_grey) (global.get $TUPLE_HEADER_OFFSET)))
+        (local.set $next_grey
+          (i32.add
+            (local.get $current_grey)
+            (i32.mul (local.get $tuple_components_count) (global.get $TAGGED_POINTER_BYTE_SIZE))))
 
-      (block $end_components_loop
-      (loop $components_loop
-        (i32.eq (local.get $current_grey) (local.get $next_grey))
-        (br_if $end_components_loop)
+        (block $end_components_loop
+        (loop $components_loop
+          (i32.eq (local.get $current_grey) (local.get $next_grey))
+          (br_if $end_components_loop)
 
-        (local.set $component_tag (i32.load8_u (local.get $current_grey)))
-        (if (i32.eq (local.get $component_tag) (global.get $CONST_TAG))
-        (then
-          ;; ==const==
-          ;; skip
-          (local.set $current_grey (i32.add (local.get $current_grey) (global.get $TAGGED_POINTER_BYTE_SIZE)))
-        )
-        (else (if (i32.eq (local.get $component_tag) (global.get $TUPLE_TAG))
-        (then
-          ;; ==tuple pointer==
-          ;; move the tuple to B, and update the current tagged pointer
-          (i32.store
-            (i32.add (local.get $current_grey) (i32.const 1))
-            (call $gc_move_tuple (i32.load (i32.add (local.get $current_grey) (i32.const 1)))))
-          (local.set $current_grey (i32.add (local.get $current_grey) (global.get $TAGGED_POINTER_BYTE_SIZE)))
-        )
-        (else
-          ;; unknown tag
-          unreachable))))
+          (local.set $component_tag (i32.load8_u (local.get $current_grey)))
+          (if (i32.eq (local.get $component_tag) (global.get $CONST_TAG))
+          (then
+            ;; ==const==
+            ;; skip
+            (local.set $current_grey (i32.add (local.get $current_grey) (global.get $TAGGED_POINTER_BYTE_SIZE)))
+          )
+          (else (if (i32.eq (local.get $component_tag) (global.get $TUPLE_TAG))
+          (then
+            ;; ==tuple pointer==
+            ;; move the tuple to B, and update the current tagged pointer
+            (i32.store
+              (i32.add (local.get $current_grey) (global.get $TAG_BYTE_SIZE))
+              (call $gc_move_tuple (i32.load (i32.add (local.get $current_grey) (global.get $TAG_BYTE_SIZE)))))
+            (local.set $current_grey (i32.add (local.get $current_grey) (global.get $TAGGED_POINTER_BYTE_SIZE)))
+          )
+          (else
+            ;; unknown tag
+            unreachable))))
 
-        (br $components_loop)
-      ))
+          (br $components_loop)
+        ))
+      )
+      (else (if (i32.eq (local.get $current_grey_tag) (global.get $BYTE_ARRAY_SLICE_TAG))
+      (then
+        ;; ==Byte Array Slice==
+        ;; TODO
+        unreachable)
+      (else (if (i32.eq (local.get $current_grey_tag) (global.get $BYTE_ARRAY_TAG))
+      (then
+        ;; ==Byte Array==
+        ;; TODO
+        unreachable)
+      (else
+        unreachable))))))
 
       (br $main_loop)
     ))
