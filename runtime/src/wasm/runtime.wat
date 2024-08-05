@@ -62,7 +62,7 @@
   (global $BYTE_ARRAY_HEADER_BYTE_SIZE i32 (i32.const 6))
   (global $BYTE_ARRAY_COUNT_OFFSET i32 (i32.const 2))
   ;; | gc 1 byte | tag 1 byte | 1st pointer 4 byte | 2nd pointer 4 byte | count 4 byte |
-  (global $SLICE_SIZE i32 (i32.const 14))
+  (global $SLICE_BYTE_SIZE i32 (i32.const 14))
   (global $SLICE_PARENT_POINTER_OFFSET i32 (i32.const 2))
   (global $SLICE_POINTER_OFFSET i32 (i32.const 6))
   (global $SLICE_COUNT_OFFSET i32 (i32.const 10))
@@ -594,8 +594,13 @@
     (local $current_grey i32)
     (local $current_grey_tag i32)
     (local $next_grey i32)
+
     (local $tuple_components_count i32)
     (local $component_tag i32)
+
+    (local $slice_parent_pointer i32)
+    (local $new_slice_parent_pointer i32)
+    (local $new_slice_pointer i32)
 
     (local.set $current_grey (global.get $B_HEAP_START))
 
@@ -651,13 +656,32 @@
       (else (if (i32.eq (local.get $current_grey_tag) (global.get $BYTE_ARRAY_SLICE_TAG))
       (then
         ;; ==Byte Array Slice==
-        ;; TODO
-        unreachable)
+        (local.set $slice_parent_pointer (i32.load (i32.add (local.get $current_grey) (global.get $SLICE_PARENT_POINTER_OFFSET))))
+
+        ;; Update the two pointers. Note that we don't need to update slice_count.
+        (local.set $new_slice_parent_pointer (call $gc_move_byte_array_slice (local.get $slice_parent_pointer)))
+        (local.set $new_slice_pointer
+          (i32.add (local.get $new_slice_parent_pointer)
+                   (i32.sub (i32.load (i32.add (local.get $current_grey) (global.get $SLICE_POINTER_OFFSET))) ;; slice_pointer
+                            (local.get $slice_parent_pointer))))
+
+        (i32.store
+          (i32.add (local.get $current_grey) (global.get $SLICE_PARENT_POINTER_OFFSET))
+          (local.get $new_slice_parent_pointer))
+
+        (i32.store (i32.add (local.get $current_grey) (global.get $SLICE_POINTER_OFFSET)) (local.get $new_slice_pointer))
+
+        (local.set $current_grey (i32.add (local.get $current_grey) (global.get $SLICE_BYTE_SIZE)))
+      )
       (else (if (i32.eq (local.get $current_grey_tag) (global.get $BYTE_ARRAY_TAG))
       (then
         ;; ==Byte Array==
-        ;; TODO
-        unreachable)
+        ;; skip
+        (local.set $current_grey
+          (i32.add (local.get $current_grey)
+          (i32.add (global.get $BYTE_ARRAY_HEADER_BYTE_SIZE)
+                   (i32.load (i32.add (local.get $current_grey) (global.get $BYTE_ARRAY_COUNT_OFFSET))))))
+      )
       (else
         unreachable))))))
 
@@ -699,4 +723,60 @@
     (local.get $q)
   )
   (export "gc_move_tuple" (func $gc_move_tuple))
+
+  ;; p is a raw pointer that points to a start of a string in A_SPACE (or possibly in STATIC).
+  ;; q is a raw pointer that points to the new location of the tuple in B_SPAC (or possibly to p again if it is in STATIC)
+  ;; returns q
+  (func $gc_move_byte_array (param $p i32) (result i32)
+    (local $q i32)
+    (local $byte_array_size i32)
+
+    (if (i32.eq (i32.load8_u (local.get $p)) (global.get $GC_TAG_MOVED))
+      (then ;; moved
+        (local.set $q (i32.load (i32.add (local.get $p) (i32.const 1)))))
+      (else ;; live
+        (if (i32.lt_u (local.get $p) (global.get $STACK_START)) ;; if p in STATIC
+          (then ;; static
+            unreachable
+            (local.set $q (local.get $p))
+          )
+          (else ;; on the heap
+            (local.set $q (global.get $FREE))
+            (local.set $byte_array_size
+              (i32.add (global.get $BYTE_ARRAY_HEADER_BYTE_SIZE)
+                       (i32.load (i32.add (local.get $p) (global.get $BYTE_ARRAY_COUNT_OFFSET)))))
+            (memory.copy (local.get $q) (local.get $p) (local.get $byte_array_size))
+
+            ;; put tombstone at p pointing to q
+            (i32.store8 (local.get $p) (global.get $GC_TAG_MOVED))
+            (i32.store (i32.add (local.get $p) (i32.const 1)) (local.get $q))
+          )
+        )
+      )
+    )
+
+    (local.get $q)
+  )
+  (export "gc_move_byte_array" (func $gc_move_byte_array))
+
+  (func $gc_move_byte_array_slice (param $p i32) (result i32)
+    (local $q i32)
+
+    (if (i32.eq (i32.load8_u (local.get $p)) (global.get $GC_TAG_MOVED))
+      (then ;; moved
+        (local.set $q (i32.load (i32.add (local.get $p) (i32.const 1)))))
+      (else ;; live
+        (local.set $q (global.get $FREE))
+        (memory.copy (local.get $q) (local.get $p) (global.get $SLICE_BYTE_SIZE))
+
+        ;; put tombstone at p pointing to q
+        (i32.store8 (local.get $p) (global.get $GC_TAG_MOVED))
+        (i32.store (i32.add (local.get $p) (i32.const 1)) (local.get $q))
+      )
+    )
+
+    (local.get $q)
+  )
+  (export "gc_move_byte_array_slice" (func $gc_move_byte_array_slice))
+  
 )
