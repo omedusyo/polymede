@@ -15,12 +15,8 @@ function run(bytes) {
 
     const page_byte_size = 2**16; // 65 KB
     const static_pages = Math.ceil(static_byte_size / page_byte_size);
-    // TODO: Revert to the below
-    // const stack_pages = 16;
-    // const heap_pages = 256;
-    // TODO: Delete
     const stack_pages = 16;
-    const heap_pages = 1;
+    const heap_pages = 256;
     const total_pages = static_pages + stack_pages + 2*heap_pages;
 
     const stack_byte_size = page_byte_size * stack_pages; // 1 MB. Note that this is Linear Stack in Linear Memory, not the wasm's stack.
