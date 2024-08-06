@@ -21,8 +21,6 @@
 
   (import "primitives" "perform_primitive_command" (func $perform_primitive_command (param i32)))
 
-  (; (export  ;)
-
   (global $STACK (mut i32) (global.get $STACK_START))
   (export "stack" (global $STACK))
   (global $ENV (mut i32) (global.get $STACK_START))
@@ -30,6 +28,7 @@
 
   (; ===Global Constants=== ;)
   (global $TAGGED_POINTER_BYTE_SIZE i32 (i32.const 5))
+
   (global $ENV_TAG i32 (i32.const 0))
   (global $CONST_TAG i32 (i32.const 1))
   (global $TUPLE_TAG i32 (i32.const 2))
@@ -644,6 +643,16 @@
 
         (local.set $current_element (i32.add (local.get $current_element) (global.get $TAGGED_POINTER_BYTE_SIZE)))
       )
+      (else (if (i32.eq (local.get $tag) (global.get $BYTE_ARRAY_SLICE_TAG))
+      (then
+        ;; ==slice pointer==
+        (local.set $moved_to (call $gc_move_byte_array_slice (i32.load (i32.add (local.get $current_element) (i32.const 1)))))
+        (i32.store
+          (i32.add (local.get $current_element) (i32.const 1))
+          (local.get $moved_to))
+
+        (local.set $current_element (i32.add (local.get $current_element) (global.get $TAGGED_POINTER_BYTE_SIZE)))
+      )
       (else (if (i32.eq (local.get $tag) (global.get $ENV_TAG))
       (then
         ;; ==env==
@@ -652,7 +661,7 @@
       )
       (else
         ;; unknown tag
-        unreachable))))))
+        unreachable))))))))
       (br $main_loop)))
 
   )
@@ -676,10 +685,6 @@
     (loop $main_loop
       (i32.eq (local.get $current_grey) (global.get $FREE))
       (br_if $end_loop)
-
-      ;; WARNING: If you have other things than tuples on the heap,
-      ;;          you will have to introduce a $tag for heap objects,
-      ;;          since without this information GC won't know what it is trying to move.
 
       (local.set $current_grey_tag (i32.load8_u (i32.add (local.get $current_grey) (i32.const 1))))
       (if (i32.eq (local.get $current_grey_tag) (global.get $TUPLE_TAG))
@@ -714,9 +719,18 @@
               (call $gc_move_tuple (i32.load (i32.add (local.get $current_grey) (global.get $TAG_BYTE_SIZE)))))
             (local.set $current_grey (i32.add (local.get $current_grey) (global.get $TAGGED_POINTER_BYTE_SIZE)))
           )
+          (else (if (i32.eq (local.get $component_tag) (global.get $BYTE_ARRAY_SLICE_TAG))
+          (then
+            ;; ==slice pointer==
+            ;; move the slice to B, and update the current tagged pointer
+            (i32.store
+              (i32.add (local.get $current_grey) (global.get $TAG_BYTE_SIZE))
+              (call $gc_move_byte_array_slice (i32.load (i32.add (local.get $current_grey) (global.get $TAG_BYTE_SIZE)))))
+            (local.set $current_grey (i32.add (local.get $current_grey) (global.get $TAGGED_POINTER_BYTE_SIZE)))
+          )
           (else
             ;; unknown tag
-            unreachable))))
+            unreachable))))))
 
           (br $components_loop)
         ))
@@ -727,7 +741,7 @@
         (local.set $slice_parent_pointer (i32.load (i32.add (local.get $current_grey) (global.get $SLICE_PARENT_POINTER_OFFSET))))
 
         ;; Update the two pointers. Note that we don't need to update slice_count.
-        (local.set $new_slice_parent_pointer (call $gc_move_byte_array_slice (local.get $slice_parent_pointer)))
+        (local.set $new_slice_parent_pointer (call $gc_move_byte_array (local.get $slice_parent_pointer)))
         (local.set $new_slice_pointer
           (i32.add (local.get $new_slice_parent_pointer)
                    (i32.sub (i32.load (i32.add (local.get $current_grey) (global.get $SLICE_POINTER_OFFSET))) ;; slice_pointer
@@ -805,7 +819,6 @@
       (else ;; live
         (if (i32.lt_u (local.get $p) (global.get $STACK_START)) ;; if p in STATIC
           (then ;; static
-            unreachable
             (local.set $q (local.get $p))
           )
           (else ;; on the heap
@@ -814,6 +827,9 @@
               (i32.add (global.get $BYTE_ARRAY_HEADER_BYTE_SIZE)
                        (i32.load (i32.add (local.get $p) (global.get $BYTE_ARRAY_COUNT_OFFSET)))))
             (memory.copy (local.get $q) (local.get $p) (local.get $byte_array_size))
+
+            ;; update B_SPACE pointer
+            (global.set $FREE (i32.add (global.get $FREE) (local.get $byte_array_size)))
 
             ;; put tombstone at p pointing to q
             (i32.store8 (local.get $p) (global.get $GC_TAG_MOVED))
@@ -836,6 +852,9 @@
       (else ;; live
         (local.set $q (global.get $FREE))
         (memory.copy (local.get $q) (local.get $p) (global.get $SLICE_BYTE_SIZE))
+
+        ;; update B_SPACE pointer
+        (global.set $FREE (i32.add (global.get $FREE) (global.get $SLICE_BYTE_SIZE)))
 
         ;; put tombstone at p pointing to q
         (i32.store8 (local.get $p) (global.get $GC_TAG_MOVED))
