@@ -66,6 +66,9 @@
   (global $SLICE_PARENT_POINTER_OFFSET i32 (i32.const 2))
   (global $SLICE_POINTER_OFFSET i32 (i32.const 6))
   (global $SLICE_COUNT_OFFSET i32 (i32.const 10))
+  (global $SLICE_PARENT_POINTER_SIZE i32 (i32.const 4))
+  (global $SLICE_POINTER_SIZE i32 (i32.const 4))
+  (global $SLICE_COUNT_SIZE i32 (i32.const 4))
 
   (global $GC_TAG_LIVE i32 (i32.const 0))
   (global $GC_TAG_MOVED i32 (i32.const 1))
@@ -87,6 +90,18 @@
   (func $inc_free (param $count i32)
     (global.set $FREE (i32.add (global.get $FREE) (local.get $count)))
   )
+
+  ;; Assume x is either a constant or tagged pointer.
+  ;;   stack = [..., x]
+  ;; ~>
+  ;;   stack = [..., x, x]
+  (func $dup
+    (memory.copy (global.get $STACK)
+                 (i32.sub (global.get $STACK) (global.get $TAGGED_POINTER_BYTE_SIZE))
+                 (global.get $TAGGED_POINTER_BYTE_SIZE))
+    (call $inc_stack (global.get $TAGGED_POINTER_BYTE_SIZE))
+  )
+  (export "dup" (func $dup))
 
   (; ===Constant=== ;)
   (; Pushes constant to Linear Stack ;)
@@ -144,9 +159,9 @@
     (memory.copy (global.get $FREE) (global.get $STACK) (local.get $component_byte_size))
     (call $inc_free (local.get $component_byte_size))
     
-    (; ==tagged pointer to the tuple on the stack== ;)
+    (; ==Push tagged pointer to the tuple on the stack== ;)
     (i32.store8 (global.get $STACK) (global.get $TUPLE_TAG))
-    (call $inc_stack (i32.const 1))
+    (call $inc_stack (global.get $TAG_BYTE_SIZE))
 
     (i32.store (global.get $STACK) (local.get $tuple_pointer))
     (call $inc_stack (i32.const 4))
@@ -489,12 +504,65 @@
   )
   (export "and_then" (func $and_then))
 
-  (; =====Byte Arrays====== ;)
-  (func $array_slice (param $parent_raw_pointer i32) (param $raw_pointer i32) (param $count i32)
-    ;; Create an array slice on the heap, then push a tagged pointer to it to the stack.
+  (; =====Byte Arrays and Slices====== ;)
+  ;; Create an array slice on the heap, then push a tagged pointer to it to the stack.
+  (func $array_slice (param $slice_parent_pointer i32) (param $slice_pointer i32) (param $slice_count i32)
+    (local $pointer_to_slice i32)
     ;; TODO
+    (call $gc_if_out_of_space (global.get $SLICE_BYTE_SIZE))
+
+    (local.set $pointer_to_slice (global.get $FREE))
+
+    (i32.store8 (global.get $FREE) (global.get $GC_TAG_LIVE))
+
+    ;; 1 byte for garbage collection liveness.
+    (i32.store8 (global.get $FREE) (global.get $GC_TAG_LIVE))
+    (call $inc_free (global.get $GC_TAG_BYTE_SIZE))
+    ;; tag (used by gc going from grey ~> black)
+    (i32.store8 (global.get $FREE) (global.get $BYTE_ARRAY_SLICE_TAG))
+    (call $inc_free (global.get $TAG_BYTE_SIZE))
+
+    (; 4 bytes for slice_parent_pointer;)
+    (i32.store (global.get $FREE) (local.get $slice_parent_pointer))
+    (call $inc_free (global.get $SLICE_PARENT_POINTER_SIZE))
+
+    (; 4 bytes for slice_pointer ;)
+    (i32.store (global.get $FREE) (local.get $slice_pointer))
+    (call $inc_free (global.get $SLICE_POINTER_SIZE))
+
+    (; 4 bytes for slice_count ;)
+    (i32.store (global.get $FREE) (local.get $slice_count))
+    (call $inc_free (global.get $SLICE_COUNT_SIZE))
+
+    ;; ==Push tagged pointer to the slice on the stack==
+    (i32.store8 (global.get $STACK) (global.get $BYTE_ARRAY_SLICE_TAG))
+    (call $inc_stack (global.get $TAG_BYTE_SIZE))
+
+    (i32.store (global.get $STACK) (local.get $pointer_to_slice))
+    (call $inc_stack (i32.const 4))
   )
   (export "array_slice" (func $array_slice))
+
+  ;;   stack = [..., pointer to slice]
+  ;; ~>
+  ;;   stack = [...]
+  (func $get_array_slice_pointer (result i32)
+    (call $dec_stack (i32.const 4))
+    (i32.load (i32.add (i32.load (global.get $STACK)) (global.get $SLICE_POINTER_OFFSET)))
+    (call $dec_stack (i32.const 1))
+  )
+  (export "get_array_slice_pointer" (func $get_array_slice_pointer))
+
+  ;;   stack = [..., pointer to slice]
+  ;; ~>
+  ;;   stack = [...]
+  (func $get_array_slice_count (result i32)
+    (call $dec_stack (i32.const 4))
+    (i32.load (i32.add (i32.load (global.get $STACK)) (global.get $SLICE_COUNT_OFFSET)))
+    (call $dec_stack (i32.const 1))
+  )
+  (export "get_array_slice_count" (func $get_array_slice_count))
+
 
   (func $allocate_array (param $byte_size i32) (result i32)
     ;; Allocates space for an array on the heap. Returns raw_pointer to the array.

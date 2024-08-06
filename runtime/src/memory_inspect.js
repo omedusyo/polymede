@@ -1,8 +1,8 @@
 const ENV_TAG = 0;
 const CONST_TAG = 1;
 const TUPLE_TAG = 2;
-const ARRAY_TAG = 3;
-const ARRAY_SLICE_TAG = 4;
+const BYTE_ARRAY_TAG = 3;
+const BYTE_ARRAY_SLICE_TAG = 4;
 
 const TAGGED_POINTER_BYTE_SIZE = 5;
 
@@ -22,13 +22,17 @@ function Tuple(variant, components, address) {
   return { type: "Tuple",  variant, components, address };
 }
 
+function ByteArraySlice(parent_pointer, pointer, count, address) {
+  return { type: "ByteArraySlice", parent_pointer, pointer, count, address };
+}
+
 // TODO: May be useful during GC inspection.
 function Moved(pointer) {
   return { type: "Moved", pointer };
 }
 
-function Array(byte_count, bytes, address) {
-  return { type: "Array",  byte_count, bytes, address };
+function ByteArray(byte_count, bytes, address) {
+  return { type: "ByteArray",  byte_count, bytes, address };
 }
 
 function Env(old_env_pointer, values, address) {
@@ -43,7 +47,11 @@ function readRawPointer(view, raw_pointer) {
   } else if (tag == TUPLE_TAG) {
     const tuple_pointer = view.getInt32(raw_pointer + 1, true);
     return TaggedPointer("Tuple", tuple_pointer, raw_pointer);
-  } else if (tag == ARRAY_TAG) {
+  } else if (tag == BYTE_ARRAY_SLICE_TAG) {
+    const slice_pointer = view.getInt32(raw_pointer + 1, true);
+    return TaggedPointer("ByteArraySlice", slice_pointer, raw_pointer);
+    throw Error("Slices not yet implemented");
+  } else if (tag == BYTE_ARRAY_TAG) {
     throw Error("Arrays not yet implemented");
   } else {
     throw Error(`Unknown value Tag ${tag}`);
@@ -133,7 +141,9 @@ function readStack(view, raw_pointer_start, raw_pointer_end) {
         }
         stack.push(Env(old_env_pointer, values, raw_pointer));
         readNextValue(raw_pointer + ENV_HEADER_BYTE_SIZE + count * TAGGED_POINTER_BYTE_SIZE);
-      } else if (tag == ARRAY_TAG) {
+      } else if (tag == BYTE_ARRAY_SLICE_TAG) {
+        throw Error("Slices not yet implemented");
+      } else if (tag == BYTE_ARRAY_TAG) {
         throw Error("Arrays not yet implemented");
       } else {
         throw Error(`Unknown value Tag ${tag}`);
@@ -175,7 +185,9 @@ function deepReadStack(view, raw_pointer_start, raw_pointer_end) {
         }
         stack.push(Env(old_env_pointer, values, raw_pointer));
         readNextValue(raw_pointer + ENV_HEADER_BYTE_SIZE + count * TAGGED_POINTER_BYTE_SIZE);
-      } else if (tag == ARRAY_TAG) {
+      } else if (tag == BYTE_ARRAY_SLICE_TAG) {
+        throw Error("Slices not yet implemented");
+      } else if (tag == BYTE_ARRAY_TAG) {
         throw Error("Arrays not yet implemented");
       } else {
         throw Error(`Unknown value Tag ${tag}`);
@@ -203,7 +215,7 @@ function showValue(x) {
       values_str.push(showValue(value));
     });
     return `Env[#${x.old_env_pointer}](${values_str.join(", ")})`;
-  } else if (x.type == "Array") {
+  } else if (x.type == "ByteArray") {
     throw Error("Arrays not yet implemented");
   } else {
     throw Error(`Unexpected value type in ${x}`);
@@ -226,7 +238,7 @@ function showValueWithAddress(x) {
       values_str.push(showValueWithAddress(value));
     });
     return `Env@${x.address}[#${x.old_env_pointer}](${values_str.join(", ")})`;
-  } else if (x.type == "Array") {
+  } else if (x.type == "ByteArray") {
     throw Error("Arrays not yet implemented");
   } else {
     throw Error(`Unexpected value type in ${x}`);

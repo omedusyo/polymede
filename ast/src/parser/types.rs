@@ -58,9 +58,11 @@ pub fn primitive_type(state: &mut State) -> Result<Type> {
     let t = type_.clone();
     match type_ {
         I32 => Ok(t),
+        String => Ok(t),
         Command(x) =>  {
             match *x {
                 I32 => Ok(t),
+                String => Ok(t),
                 _ => Err(Error::ExpectedPrimitiveType { received: t }),
             }
         },

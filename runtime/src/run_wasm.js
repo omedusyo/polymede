@@ -104,6 +104,15 @@ function run(bytes) {
         log_two_ints(x, y) {
           console.log("Logging two ints", x, y);
         },
+        log_string(pointer, byte_count) {
+          // console.log("pointer", pointer);
+          // console.log("byte_count", byte_count);
+
+          const string_view = new DataView(memory.buffer, pointer,byte_count);
+          let utf8decoder = new TextDecoder();
+          let s = utf8decoder.decode(string_view);
+          console.log(s);
+        }
       },
     };
 
@@ -130,18 +139,18 @@ function run(bytes) {
         main();
 
         console.log("> Main executed succesfully.");
-        log_stack(0);
+        // log_stack(0);
         console.log("> Performing command...");
 
         perform(
           view,
           { get_tuple_pointer, perform_primitive_command, unpack_in_reverse, copy_value_to_stack, make_env_from_closure  },
           GLOBAL.TABLE,
-          true, // tracing
+          false, // tracing
           GLOBAL.STACK_START,
           GLOBAL.STACK,
         );
-        log_stack(1);
+        // log_stack(1);
         console.log("> Exiting.");
 
     });
