@@ -22,6 +22,7 @@ pub fn term(state: &mut State) -> Result<Term> {
             Ok(Term::TypedTerm(Box::new(TypedTerm {type_, term})))
         },
         StartTerm::Int(x) => Ok(Term::Int(x)),
+        StartTerm::StringLiteral(s) => Ok(Term::StringLiteral(s)),
         StartTerm::VariableUse(variable) => Ok(Term::VariableUse(variable)),
         StartTerm::FunctionApplication(function_name) => {
             let type_args: Vec<Type> = if state.is_next_token_open_angle()? {

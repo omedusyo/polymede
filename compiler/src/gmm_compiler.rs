@@ -1,11 +1,12 @@
 use crate::graph_memory_machine as gmm;
 use crate::runtime::Runtime;
 use wasm::{
-    syntax::{Module, TypedFunctionImport, TypedFunction, fn_type, Expression, call, return_call, call_indirect, return_call_indirect, i32_const, i32_eq, seq},
+    syntax::{CustomSection, Module, TypedFunctionImport, TypedFunction, Global, MemoryImport, fn_type, Expression, call, return_call, call_indirect, return_call_indirect, i32_const, i32_eq, seq},
     base::{
         indices::{FunctionIndex, TableIndex, TypeIndex},
-        types::{FunctionType, BlockType},
+        types::{FunctionType, BlockType, GlobalType, ValueType, NumType, Mutability},
         export::{Export, ExportDescription},
+        memory::Limit,
     },
 };
 use std::collections::HashMap;
@@ -21,6 +22,8 @@ pub type Result<A> = std::result::Result<A, CompilationError>;
 
 type FunctionTableIndex = i32;
 
+type RawPointerToStatic = i32;
+
 #[derive(Debug)]
 struct State {
     gmm_to_wasm_name_map: HashMap<gmm::FunctionName, FunctionInfo>,
@@ -30,6 +33,9 @@ struct State {
     function_type_for_call_indirect: TypeIndex,
     function_table_map: HashMap<FunctionIndex, FunctionTableIndex>,
     function_table: Vec<FunctionIndex>,
+
+    current_static_offset: RawPointerToStatic,
+    byte_array_store: Vec<(RawPointerToStatic, Vec<u8>)>,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -50,11 +56,14 @@ impl State {
         Self {
             gmm_to_wasm_name_map: HashMap::new(),
 
+            runtime,
+
             function_type_for_call_indirect,
             function_table_map: HashMap::new(),
             function_table: vec![],
 
-            runtime,
+            current_static_offset: 0,
+            byte_array_store: vec![],
         }
     }
 
@@ -84,6 +93,13 @@ impl State {
                 Ok(fn_table_index)
             }
         }
+    }
+
+    fn register_byte_array_literal(&mut self, bytes: Vec<u8>) -> RawPointerToStatic {
+        let raw_pointer: RawPointerToStatic = self.current_static_offset;
+        self.current_static_offset += Runtime::BYTE_ARRAY_HEADER_BYTE_SIZE + (bytes.len() as i32);
+        self.byte_array_store.push((raw_pointer, bytes));
+        raw_pointer
     }
 }
 
@@ -144,7 +160,29 @@ pub fn compile(program: gmm::Program) -> Result<Module> {
     module.add_export(Export { name: "main".to_string(), export_description: ExportDescription::Function(main) });
     module.add_export(Export { name: "function_table".to_string(), export_description: ExportDescription::Table(TableIndex(0)) });
 
+    // TODO: This doesnt' work when wasm-merge is used. It is merged in such a way that I have
+    // multiple memory imports. Jesus... I can resolve this by having the string literals compiled
+    // into the code with passive data segments. Afterwards initializing the STATIC manually.
+    //module.add_memory_import(MemoryImport { module_name: "runtime".to_string(), name: "memory".to_string(), limit: Limit::MinToInfinity { min: 0 } });
+
     module.register_function_table(state.function_table);
+
+    {
+        let mut polymede_static = vec![];
+        for (_, bytes) in state.byte_array_store {
+            polymede_static.extend(Runtime::encode_byte_array(&bytes));
+        }
+
+        // Global variable that stores the size of the STATIC region in bytes.
+        let static_size_global_index = module.add_global(Global {
+            global_type: GlobalType { type_: ValueType::NumType(NumType::I32), mutability: Mutability::Const },
+            expression: i32_const(polymede_static.len() as i32) 
+        });
+        module.add_custom_section_at_the_end(CustomSection { name: "POLYMEDE_STATIC".to_string(), bytes: polymede_static });
+        // Note that I don't really need to export the global, since this information is contained
+        // in the size of the custom section.
+        module.add_export(Export { name: "STATIC_SIZE".to_string(), export_description: ExportDescription::Global(static_size_global_index) });
+    }
 
     Ok(module)
 }
@@ -188,8 +226,15 @@ fn compile_term(state: &mut State, number_of_parameters: usize, term: &gmm::Term
             if tail_position { code.push(call(state.runtime.drop_env, vec![])) }
             Ok(seq(code))
         },
-        gmm::Term::ByteArray(_bytes) => {
-            todo!()
+        gmm::Term::ByteArray(bytes) => {
+            let mut code = vec![];
+            let byte_count = bytes.len() as i32;
+            // TODO: Again I'm cloning the byte array literal.
+            let pointer = state.register_byte_array_literal(bytes.to_vec());
+            code.push(call(state.runtime.array_slice, vec![i32_const(pointer), i32_const(pointer + Runtime::BYTE_ARRAY_HEADER_BYTE_SIZE), i32_const(byte_count)]));
+
+            if tail_position { code.push(call(state.runtime.drop_env, vec![])) }
+            Ok(seq(code))
         },
         gmm::Term::Tuple(variant, terms) => {
             let mut code: Vec<Expression> = compile_terms(state, number_of_parameters, terms)?;

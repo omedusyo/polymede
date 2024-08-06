@@ -2,7 +2,8 @@
 ;;       Also introduce `read` functions that will just copy stuff from the linear stack to WASM stack without consumption.
 
 (module
-  (import "env" "memory" (memory 0))
+  (import "env" "memory" (memory $main_memory 0))
+  (import "env" "STATIC_SIZE" (global $STATIC_SIZE i32)) ;; TODO: recompute everything with respect to STATIC...? in js... You also need to export it from the compiler.
   (import "env" "STACK_SIZE" (global $STACK_SIZE i32))
   (import "env" "HEAP_SIZE" (global $HEAP_SIZE i32))
   (import "env" "STACK_START" (global $STACK_START i32))
@@ -20,17 +21,22 @@
 
   (import "primitives" "perform_primitive_command" (func $perform_primitive_command (param i32)))
 
-  (global $STACK (mut i32) (i32.const 0))
+  (global $STACK (mut i32) (global.get $STACK_START))
   (export "stack" (global $STACK))
-  (global $ENV (mut i32) (i32.const 0))
+  (global $ENV (mut i32) (global.get $STACK_START))
   (export "env" (global $ENV))
 
   (; ===Global Constants=== ;)
   (global $TAGGED_POINTER_BYTE_SIZE i32 (i32.const 5))
+
   (global $ENV_TAG i32 (i32.const 0))
   (global $CONST_TAG i32 (i32.const 1))
-  (global $ARRAY_TAG i32 (i32.const 2))
-  (global $TUPLE_TAG i32 (i32.const 3))
+  (global $TUPLE_TAG i32 (i32.const 2))
+  (global $BYTE_ARRAY_TAG i32 (i32.const 3))
+  (global $BYTE_ARRAY_SLICE_TAG i32 (i32.const 4))
+
+  (global $GC_TAG_BYTE_SIZE i32 (i32.const 1))
+  (global $TAG_BYTE_SIZE i32 (i32.const 1))
 
   ;; | tag 1 byte | env pointer 4 bytes | count 4 bytes |  ... | sequence of tagged pointers/constants, 5 bytes each | ...
   (global $ENV_HEADER_BYTE_SIZE i32 (i32.const 9)) ;; 9 bytes, 1 byte for tag, 4 bytes for parent env pointer, 4 bytes for env count.
@@ -41,15 +47,35 @@
   (global $ENV_COUNTER_OFFSET i32 (i32.const -4))
   (global $ENV_HEADER_START_OFFSET i32 (i32.const -9))
 
-  ;; | gc 1 byte | variant 4 bytes | count 1 byte | ... | sequence of tagged pointers/constants, 5 bytes each | ...
-  (global $TUPLE_HEADER_BYTE_SIZE i32 (i32.const 6)) ;; 6 bytes, 1 byte for GC bit, 4 bytes for variant, 1 byte for count
-  (global $TUPLE_HEADER_OFFSET i32 (i32.const 6))
-  (global $TUPLE_VARIANT_OFFSET i32 (i32.const 1))
-  (global $TUPLE_COUNT_OFFSET i32 (i32.const 5))
+  ;; | gc 1 byte | tag 1 byte | variant 4 bytes | count 1 byte | ... | sequence of tagged pointers/constants, 5 bytes each | ...
+  (global $TUPLE_HEADER_BYTE_SIZE i32 (i32.const 7)) ;; 6 bytes, 1 byte for GC bit, 4 bytes for variant, 1 byte for count
+  (global $TUPLE_VARIANT_OFFSET i32 (i32.const 2))
+  (global $TUPLE_COUNT_OFFSET i32 (i32.const 6))
+  ;; TODO: Change this to $TUPLE_COMPONENTS_OFFSET
+  (global $TUPLE_HEADER_OFFSET i32 (i32.const 7))
+
+  (global $TUPLE_VARIANT_BYTE_SIZE i32 (i32.const 4))
+  (global $TUPLE_COUNT_BYTE_SIZE i32 (i32.const 1))
+
+  ;; | gc 1 byte | tag 1 byte | count 4 byte | string contents |
+  (global $BYTE_ARRAY_HEADER_BYTE_SIZE i32 (i32.const 6))
+  (global $BYTE_ARRAY_COUNT_OFFSET i32 (i32.const 2))
+  (global $BYTE_ARRAY_CONTENTS_OFFSET i32 (i32.const 6))
+  (global $BYTE_ARRAY_COUNT_SIZE i32 (i32.const 4))
+  ;; | gc 1 byte | tag 1 byte | 1st pointer 4 byte | 2nd pointer 4 byte | count 4 byte |
+  (global $SLICE_BYTE_SIZE i32 (i32.const 14))
+  (global $SLICE_PARENT_POINTER_OFFSET i32 (i32.const 2))
+  (global $SLICE_POINTER_OFFSET i32 (i32.const 6))
+  (global $SLICE_COUNT_OFFSET i32 (i32.const 10))
+  (global $SLICE_PARENT_POINTER_SIZE i32 (i32.const 4))
+  (global $SLICE_POINTER_SIZE i32 (i32.const 4))
+  (global $SLICE_COUNT_SIZE i32 (i32.const 4))
 
   (global $GC_TAG_LIVE i32 (i32.const 0))
   (global $GC_TAG_MOVED i32 (i32.const 1))
 
+
+  (; ===Stack/Heap=== ;)
   (func $inc_stack (param $count i32)
     (if (i32.lt_u (i32.add (global.get $STACK) (local.get $count)) (global.get $STACK_SIZE))
       (then
@@ -65,6 +91,18 @@
   (func $inc_free (param $count i32)
     (global.set $FREE (i32.add (global.get $FREE) (local.get $count)))
   )
+
+  ;; Assume x is either a constant or tagged pointer.
+  ;;   stack = [..., x]
+  ;; ~>
+  ;;   stack = [..., x, x]
+  (func $dup
+    (memory.copy (global.get $STACK)
+                 (i32.sub (global.get $STACK) (global.get $TAGGED_POINTER_BYTE_SIZE))
+                 (global.get $TAGGED_POINTER_BYTE_SIZE))
+    (call $inc_stack (global.get $TAGGED_POINTER_BYTE_SIZE))
+  )
+  (export "dup" (func $dup))
 
   (; ===Constant=== ;)
   (; Pushes constant to Linear Stack ;)
@@ -102,15 +140,18 @@
 
     (local.set $tuple_pointer (global.get $FREE))
     (; ==header== ;)
-    (; 1 bit (takes the whole byte ofcourse) for garbage collection. ;)
+    (; 1 bit (takes the whole byte ofcourse) for garbage collection liveness. ;)
     (i32.store8 (global.get $FREE) (global.get $GC_TAG_LIVE))
-    (call $inc_free (i32.const 1))
+    (call $inc_free (global.get $GC_TAG_BYTE_SIZE))
+    ;; tag (used by gc going from grey ~> black)
+    (i32.store8 (global.get $FREE) (global.get $TUPLE_TAG))
+    (call $inc_free (global.get $TAG_BYTE_SIZE))
     (; 4 bytes for variant ;)
     (i32.store (global.get $FREE) (local.get $variant))
-    (call $inc_free (i32.const 4))
+    (call $inc_free (global.get $TUPLE_VARIANT_BYTE_SIZE))
     (; 1 byte for number of components ;)
     (i32.store8 (global.get $FREE) (local.get $count))
-    (call $inc_free (i32.const 1))
+    (call $inc_free (global.get $TUPLE_COUNT_BYTE_SIZE))
     
     (; ==payload== ;)
     (; go back to the start of the component on the stack ;)
@@ -119,9 +160,9 @@
     (memory.copy (global.get $FREE) (global.get $STACK) (local.get $component_byte_size))
     (call $inc_free (local.get $component_byte_size))
     
-    (; ==tagged pointer to the tuple on the stack== ;)
+    (; ==Push tagged pointer to the tuple on the stack== ;)
     (i32.store8 (global.get $STACK) (global.get $TUPLE_TAG))
-    (call $inc_stack (i32.const 1))
+    (call $inc_stack (global.get $TAG_BYTE_SIZE))
 
     (i32.store (global.get $STACK) (local.get $tuple_pointer))
     (call $inc_stack (i32.const 4))
@@ -464,6 +505,127 @@
   )
   (export "and_then" (func $and_then))
 
+  (; =====Byte Arrays and Slices====== ;)
+  ;; Create an array slice on the heap, then push a tagged pointer to it to the stack.
+  (func $array_slice (param $slice_parent_pointer i32) (param $slice_pointer i32) (param $slice_count i32)
+    (local $pointer_to_slice i32)
+    ;; TODO
+    (call $gc_if_out_of_space (global.get $SLICE_BYTE_SIZE))
+
+    (local.set $pointer_to_slice (global.get $FREE))
+
+    (i32.store8 (global.get $FREE) (global.get $GC_TAG_LIVE))
+
+    ;; 1 byte for garbage collection liveness.
+    (i32.store8 (global.get $FREE) (global.get $GC_TAG_LIVE))
+    (call $inc_free (global.get $GC_TAG_BYTE_SIZE))
+    ;; tag (used by gc going from grey ~> black)
+    (i32.store8 (global.get $FREE) (global.get $BYTE_ARRAY_SLICE_TAG))
+    (call $inc_free (global.get $TAG_BYTE_SIZE))
+
+    (; 4 bytes for slice_parent_pointer;)
+    (i32.store (global.get $FREE) (local.get $slice_parent_pointer))
+    (call $inc_free (global.get $SLICE_PARENT_POINTER_SIZE))
+
+    (; 4 bytes for slice_pointer ;)
+    (i32.store (global.get $FREE) (local.get $slice_pointer))
+    (call $inc_free (global.get $SLICE_POINTER_SIZE))
+
+    (; 4 bytes for slice_count ;)
+    (i32.store (global.get $FREE) (local.get $slice_count))
+    (call $inc_free (global.get $SLICE_COUNT_SIZE))
+
+    ;; ==Push tagged pointer to the slice on the stack==
+    (i32.store8 (global.get $STACK) (global.get $BYTE_ARRAY_SLICE_TAG))
+    (call $inc_stack (global.get $TAG_BYTE_SIZE))
+
+    (i32.store (global.get $STACK) (local.get $pointer_to_slice))
+    (call $inc_stack (i32.const 4))
+  )
+  (export "array_slice" (func $array_slice))
+
+  ;;   stack = [..., pointer to slice]
+  ;; ~>
+  ;;   stack = [...]
+  (func $get_array_slice_pointer (result i32)
+    (call $dec_stack (i32.const 4))
+    (i32.load (i32.add (i32.load (global.get $STACK)) (global.get $SLICE_POINTER_OFFSET)))
+    (call $dec_stack (i32.const 1))
+  )
+  (export "get_array_slice_pointer" (func $get_array_slice_pointer))
+
+  ;;   stack = [..., pointer to slice]
+  ;; ~>
+  ;;   stack = [...]
+  (func $get_array_slice_count (result i32)
+    (call $dec_stack (i32.const 4))
+    (i32.load (i32.add (i32.load (global.get $STACK)) (global.get $SLICE_COUNT_OFFSET)))
+    (call $dec_stack (i32.const 1))
+  )
+  (export "get_array_slice_count" (func $get_array_slice_count))
+
+
+  ;; Copies and concatenates two arrays into a new location on the heap. Returns raw_pointer to the new array.
+  ;; The raw pointers point to directly to the start of the byte contents (not to the start of an array), since we may get these data through array slices.
+  (func $concat_arrays (param $raw_pointer_0 i32) (param $count_0 i32) (param $raw_pointer_1 i32) (param $count_1 i32) (result i32)
+    (local $result_array_count i32)
+    (local $result_pointer i32)
+
+    (local.set $result_array_count (i32.add (local.get $count_0) (local.get $count_1)))
+
+    (call $gc_if_out_of_space (i32.add (global.get $BYTE_ARRAY_HEADER_BYTE_SIZE) (local.get $result_array_count)))
+    (local.set $result_pointer (global.get $FREE))
+
+    ;; ==header==
+
+    ;; 1 byte for garbage collection liveness.
+    (i32.store8 (global.get $FREE) (global.get $GC_TAG_LIVE))
+    (call $inc_free (global.get $GC_TAG_BYTE_SIZE))
+    ;; 1 byte tag (used by gc going from grey ~> black)
+    (i32.store8 (global.get $FREE) (global.get $BYTE_ARRAY_TAG))
+    (call $inc_free (global.get $TAG_BYTE_SIZE))
+    ;; 4 byte count 
+    (i32.store (global.get $FREE) (local.get $result_array_count))
+    (call $inc_free (global.get $BYTE_ARRAY_COUNT_SIZE))
+
+    ;; ==contents==
+    (memory.copy (global.get $FREE) (local.get $raw_pointer_0) (local.get $count_0))
+    (call $inc_free (local.get $count_0))
+    (memory.copy (global.get $FREE) (local.get $raw_pointer_1) (local.get $count_1))
+    (call $inc_free (local.get $count_1))
+
+    (local.get $result_pointer)
+  )
+
+  ;;   stack = [..., slice0, slice1]
+  ;; ~>
+  ;;   stack = [..., concat_slice_to_newly_allocated_array]
+  (func $concat_slices
+    (local $raw_pointer_0 i32)
+    (local $count_0 i32)
+    (local $raw_pointer_1 i32)
+    (local $count_1 i32)
+
+    (local $new_array_pointer i32)
+
+    (call $dec_stack (i32.const 4))
+    (local.set $raw_pointer_1 (i32.load (i32.add (i32.load (global.get $STACK)) (global.get $SLICE_POINTER_OFFSET))))
+    (local.set $count_1 (i32.load (i32.add (i32.load (global.get $STACK)) (global.get $SLICE_COUNT_OFFSET))))
+    (call $dec_stack (i32.const 1))
+    
+    (call $dec_stack (i32.const 4))
+    (local.set $raw_pointer_0 (i32.load (i32.add (i32.load (global.get $STACK)) (global.get $SLICE_POINTER_OFFSET))))
+    (local.set $count_0 (i32.load (i32.add (i32.load (global.get $STACK)) (global.get $SLICE_COUNT_OFFSET))))
+    (call $dec_stack (i32.const 1))
+
+    (local.set $new_array_pointer (call $concat_arrays (local.get $raw_pointer_0) (local.get $count_0) (local.get $raw_pointer_1) (local.get $count_1)))
+
+    (call $array_slice
+          (local.get $new_array_pointer)
+          (i32.add (local.get $new_array_pointer) (global.get $BYTE_ARRAY_CONTENTS_OFFSET))
+          (i32.load (i32.add (local.get $new_array_pointer) (global.get $BYTE_ARRAY_COUNT_OFFSET))))
+  )
+  (export "concat_slices" (func $concat_slices))
 
   (; =====Garbage Collector===== ;)
   (func $gc_if_out_of_space (param $allocation_request_byte_size i32)
@@ -532,6 +694,16 @@
 
         (local.set $current_element (i32.add (local.get $current_element) (global.get $TAGGED_POINTER_BYTE_SIZE)))
       )
+      (else (if (i32.eq (local.get $tag) (global.get $BYTE_ARRAY_SLICE_TAG))
+      (then
+        ;; ==slice pointer==
+        (local.set $moved_to (call $gc_move_byte_array_slice (i32.load (i32.add (local.get $current_element) (i32.const 1)))))
+        (i32.store
+          (i32.add (local.get $current_element) (i32.const 1))
+          (local.get $moved_to))
+
+        (local.set $current_element (i32.add (local.get $current_element) (global.get $TAGGED_POINTER_BYTE_SIZE)))
+      )
       (else (if (i32.eq (local.get $tag) (global.get $ENV_TAG))
       (then
         ;; ==env==
@@ -540,7 +712,7 @@
       )
       (else
         ;; unknown tag
-        unreachable))))))
+        unreachable))))))))
       (br $main_loop)))
 
   )
@@ -548,9 +720,15 @@
 
   (func $gc_traverse_grey
     (local $current_grey i32)
+    (local $current_grey_tag i32)
     (local $next_grey i32)
+
     (local $tuple_components_count i32)
     (local $component_tag i32)
+
+    (local $slice_parent_pointer i32)
+    (local $new_slice_parent_pointer i32)
+    (local $new_slice_pointer i32)
 
     (local.set $current_grey (global.get $B_HEAP_START))
 
@@ -559,45 +737,86 @@
       (i32.eq (local.get $current_grey) (global.get $FREE))
       (br_if $end_loop)
 
-      ;; WARNING: If you have other things than tuples on the heap,
-      ;;          you will have to introduce a $tag for heap objects,
-      ;;          since without this information GC won't know what it is trying to move.
+      (local.set $current_grey_tag (i32.load8_u (i32.add (local.get $current_grey) (i32.const 1))))
+      (if (i32.eq (local.get $current_grey_tag) (global.get $TUPLE_TAG))
+      (then
+        ;; ==Tuple==
+        ;; skip the tuple header
+        (local.set $tuple_components_count (i32.load8_u (i32.add (local.get $current_grey) (global.get $TUPLE_COUNT_OFFSET))))
+        (local.set $current_grey (i32.add (local.get $current_grey) (global.get $TUPLE_HEADER_OFFSET)))
+        (local.set $next_grey
+          (i32.add
+            (local.get $current_grey)
+            (i32.mul (local.get $tuple_components_count) (global.get $TAGGED_POINTER_BYTE_SIZE))))
 
-      ;; skip the tuple header
-      (local.set $tuple_components_count (i32.load8_u (i32.add (local.get $current_grey) (global.get $TUPLE_COUNT_OFFSET))))
-      (local.set $current_grey (i32.add (local.get $current_grey) (global.get $TUPLE_HEADER_OFFSET)))
-      (local.set $next_grey
-        (i32.add
-          (local.get $current_grey)
-          (i32.mul (local.get $tuple_components_count) (global.get $TAGGED_POINTER_BYTE_SIZE))))
+        (block $end_components_loop
+        (loop $components_loop
+          (i32.eq (local.get $current_grey) (local.get $next_grey))
+          (br_if $end_components_loop)
 
-      (block $end_components_loop
-      (loop $components_loop
-        (i32.eq (local.get $current_grey) (local.get $next_grey))
-        (br_if $end_components_loop)
+          (local.set $component_tag (i32.load8_u (local.get $current_grey)))
+          (if (i32.eq (local.get $component_tag) (global.get $CONST_TAG))
+          (then
+            ;; ==const==
+            ;; skip
+            (local.set $current_grey (i32.add (local.get $current_grey) (global.get $TAGGED_POINTER_BYTE_SIZE)))
+          )
+          (else (if (i32.eq (local.get $component_tag) (global.get $TUPLE_TAG))
+          (then
+            ;; ==tuple pointer==
+            ;; move the tuple to B, and update the current tagged pointer
+            (i32.store
+              (i32.add (local.get $current_grey) (global.get $TAG_BYTE_SIZE))
+              (call $gc_move_tuple (i32.load (i32.add (local.get $current_grey) (global.get $TAG_BYTE_SIZE)))))
+            (local.set $current_grey (i32.add (local.get $current_grey) (global.get $TAGGED_POINTER_BYTE_SIZE)))
+          )
+          (else (if (i32.eq (local.get $component_tag) (global.get $BYTE_ARRAY_SLICE_TAG))
+          (then
+            ;; ==slice pointer==
+            ;; move the slice to B, and update the current tagged pointer
+            (i32.store
+              (i32.add (local.get $current_grey) (global.get $TAG_BYTE_SIZE))
+              (call $gc_move_byte_array_slice (i32.load (i32.add (local.get $current_grey) (global.get $TAG_BYTE_SIZE)))))
+            (local.set $current_grey (i32.add (local.get $current_grey) (global.get $TAGGED_POINTER_BYTE_SIZE)))
+          )
+          (else
+            ;; unknown tag
+            unreachable))))))
 
-        (local.set $component_tag (i32.load8_u (local.get $current_grey)))
-        (if (i32.eq (local.get $component_tag) (global.get $CONST_TAG))
-        (then
-          ;; ==const==
-          ;; skip
-          (local.set $current_grey (i32.add (local.get $current_grey) (global.get $TAGGED_POINTER_BYTE_SIZE)))
-        )
-        (else (if (i32.eq (local.get $component_tag) (global.get $TUPLE_TAG))
-        (then
-          ;; ==tuple pointer==
-          ;; move the tuple to B, and update the current tagged pointer
-          (i32.store
-            (i32.add (local.get $current_grey) (i32.const 1))
-            (call $gc_move_tuple (i32.load (i32.add (local.get $current_grey) (i32.const 1)))))
-          (local.set $current_grey (i32.add (local.get $current_grey) (global.get $TAGGED_POINTER_BYTE_SIZE)))
-        )
-        (else
-          ;; unknown tag
-          unreachable))))
+          (br $components_loop)
+        ))
+      )
+      (else (if (i32.eq (local.get $current_grey_tag) (global.get $BYTE_ARRAY_SLICE_TAG))
+      (then
+        ;; ==Byte Array Slice==
+        (local.set $slice_parent_pointer (i32.load (i32.add (local.get $current_grey) (global.get $SLICE_PARENT_POINTER_OFFSET))))
 
-        (br $components_loop)
-      ))
+        ;; Update the two pointers. Note that we don't need to update slice_count.
+        (local.set $new_slice_parent_pointer (call $gc_move_byte_array (local.get $slice_parent_pointer)))
+        (local.set $new_slice_pointer
+          (i32.add (local.get $new_slice_parent_pointer)
+                   (i32.sub (i32.load (i32.add (local.get $current_grey) (global.get $SLICE_POINTER_OFFSET))) ;; slice_pointer
+                            (local.get $slice_parent_pointer))))
+
+        (i32.store
+          (i32.add (local.get $current_grey) (global.get $SLICE_PARENT_POINTER_OFFSET))
+          (local.get $new_slice_parent_pointer))
+
+        (i32.store (i32.add (local.get $current_grey) (global.get $SLICE_POINTER_OFFSET)) (local.get $new_slice_pointer))
+
+        (local.set $current_grey (i32.add (local.get $current_grey) (global.get $SLICE_BYTE_SIZE)))
+      )
+      (else (if (i32.eq (local.get $current_grey_tag) (global.get $BYTE_ARRAY_TAG))
+      (then
+        ;; ==Byte Array==
+        ;; skip
+        (local.set $current_grey
+          (i32.add (local.get $current_grey)
+          (i32.add (global.get $BYTE_ARRAY_HEADER_BYTE_SIZE)
+                   (i32.load (i32.add (local.get $current_grey) (global.get $BYTE_ARRAY_COUNT_OFFSET))))))
+      )
+      (else
+        unreachable))))))
 
       (br $main_loop)
     ))
@@ -637,4 +856,65 @@
     (local.get $q)
   )
   (export "gc_move_tuple" (func $gc_move_tuple))
+
+  ;; p is a raw pointer that points to a start of a string in A_SPACE (or possibly in STATIC).
+  ;; q is a raw pointer that points to the new location of the tuple in B_SPAC (or possibly to p again if it is in STATIC)
+  ;; returns q
+  (func $gc_move_byte_array (param $p i32) (result i32)
+    (local $q i32)
+    (local $byte_array_size i32)
+
+    (if (i32.eq (i32.load8_u (local.get $p)) (global.get $GC_TAG_MOVED))
+      (then ;; moved
+        (local.set $q (i32.load (i32.add (local.get $p) (i32.const 1)))))
+      (else ;; live
+        (if (i32.lt_u (local.get $p) (global.get $STACK_START)) ;; if p in STATIC
+          (then ;; static
+            (local.set $q (local.get $p))
+          )
+          (else ;; on the heap
+            (local.set $q (global.get $FREE))
+            (local.set $byte_array_size
+              (i32.add (global.get $BYTE_ARRAY_HEADER_BYTE_SIZE)
+                       (i32.load (i32.add (local.get $p) (global.get $BYTE_ARRAY_COUNT_OFFSET)))))
+            (memory.copy (local.get $q) (local.get $p) (local.get $byte_array_size))
+
+            ;; update B_SPACE pointer
+            (global.set $FREE (i32.add (global.get $FREE) (local.get $byte_array_size)))
+
+            ;; put tombstone at p pointing to q
+            (i32.store8 (local.get $p) (global.get $GC_TAG_MOVED))
+            (i32.store (i32.add (local.get $p) (i32.const 1)) (local.get $q))
+          )
+        )
+      )
+    )
+
+    (local.get $q)
+  )
+  (export "gc_move_byte_array" (func $gc_move_byte_array))
+
+  (func $gc_move_byte_array_slice (param $p i32) (result i32)
+    (local $q i32)
+
+    (if (i32.eq (i32.load8_u (local.get $p)) (global.get $GC_TAG_MOVED))
+      (then ;; moved
+        (local.set $q (i32.load (i32.add (local.get $p) (i32.const 1)))))
+      (else ;; live
+        (local.set $q (global.get $FREE))
+        (memory.copy (local.get $q) (local.get $p) (global.get $SLICE_BYTE_SIZE))
+
+        ;; update B_SPACE pointer
+        (global.set $FREE (i32.add (global.get $FREE) (global.get $SLICE_BYTE_SIZE)))
+
+        ;; put tombstone at p pointing to q
+        (i32.store8 (local.get $p) (global.get $GC_TAG_MOVED))
+        (i32.store (i32.add (local.get $p) (i32.const 1)) (local.get $q))
+      )
+    )
+
+    (local.get $q)
+  )
+  (export "gc_move_byte_array_slice" (func $gc_move_byte_array_slice))
+  
 )

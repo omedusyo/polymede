@@ -8,6 +8,7 @@ use std::collections::HashSet;
 pub enum Term {
     TypedTerm(Box<TypedTerm>),
     Int(i32),
+    StringLiteral(String),
     VariableUse(Variable),
     FunctionApplication(FunctionName, Vec<Type>, Vec<Term>),
     ConstructorUse(ConstructorName, Vec<Term>),
@@ -80,6 +81,7 @@ pub fn desugar_term(term: &base::Term) -> Term {
     match term {
         TypedTerm(typed_term) => Term::TypedTerm(Box::new(desugar_typed_term(typed_term))),
         Int(x) => Term::Int(*x),
+        StringLiteral(s) => Term::StringLiteral(s.clone()), // TODO: the .clone() is very unfortunate
         VariableUse(var) => Term::VariableUse(var.clone()),
         FunctionApplication(fn_name, type_args, args) => Term::FunctionApplication(fn_name.clone(), type_args.clone(), args.into_iter().map(desugar_term).collect()),
         ConstructorUse(constructor_name, args) => Term::ConstructorUse(constructor_name.clone(), args.into_iter().map(desugar_term).collect()),
@@ -221,6 +223,7 @@ fn free_variables(env: &mut Env, term: &Term) {
             env.attempt_to_register_free(var)
         },
         Int(_) => {}, 
+        StringLiteral(_) => {},
         FunctionApplication(_, _, args) => {
             for arg in args {
                 free_variables(env, arg)

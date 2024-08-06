@@ -29,9 +29,27 @@ pub struct Runtime {
     pub make_env_from_closure: FunctionIndex,
     pub pure: FunctionIndex,
     pub and_then: FunctionIndex,
+    pub array_slice: FunctionIndex,
 }
 
 impl Runtime {
+    pub const BYTE_ARRAY_HEADER_BYTE_SIZE: i32 = 6;
+    pub const BYTE_ARRAY_TAG: u8 = 3;
+    pub const GC_TAG_LIVE: u8 = 0;
+
+    pub fn encode_byte_array(bytes: &[u8]) -> Vec<u8> {
+        // Encoding of Byte Array is as follows
+        //   | gc 1 byte | tag 1 byte | count 4 byte | byte array contents |
+        let count = bytes.len() as i32;
+        let mut result = Vec::with_capacity((Self::BYTE_ARRAY_HEADER_BYTE_SIZE + count) as usize);
+        // Note that WASM encodes ints in little-endian byte order.
+        result.extend_from_slice(&Self::GC_TAG_LIVE.to_le_bytes());  // 1 byte
+        result.extend_from_slice(&Self::BYTE_ARRAY_TAG.to_le_bytes()); // 1 byte
+        result.extend_from_slice(&count.to_le_bytes()); // 4 bytes
+        result.extend_from_slice(bytes);
+        result
+    }
+
     pub fn import(module: &mut Module) -> Self {
         let mut number_of_runtime_functions = 0;
         fn import(module: &mut Module, fn_name: &str, type_: FunctionType, number_of_runtime_functions: &mut usize) -> FunctionIndex {
@@ -59,6 +77,7 @@ impl Runtime {
         let make_env_from_closure = import(module, "make_env_from_closure", fn_type(vec![TYPE_I32], vec![TYPE_I32]), &mut number_of_runtime_functions);
         let pure = import(module, "pure", fn_type(vec![], vec![]), &mut number_of_runtime_functions);
         let and_then = import(module, "and_then", fn_type(vec![], vec![]), &mut number_of_runtime_functions);
+        let array_slice = import(module, "array_slice", fn_type(vec![TYPE_I32, TYPE_I32, TYPE_I32], vec![]), &mut number_of_runtime_functions);
 
         Self {
             number_of_runtime_functions,
@@ -81,6 +100,7 @@ impl Runtime {
             make_env_from_closure,
             pure,
             and_then,
+            array_slice,
         }
     }
 }

@@ -237,12 +237,16 @@ fn compile_typed_term(state: &mut State, typed_term: &desugared_polymede::TypedT
     compile_term(state, &typed_term.term)
 }
 
+// TODO: Consider introducing two versions for better performance
+//   fn compile_term(state: &mut State, term: &desugared_polymede::Term) -> gmm::Term
+//   fn compile_term(state: &mut State, term: desugared_polymede::Term) -> gmm::Term
 fn compile_term(state: &mut State, term: &desugared_polymede::Term) -> gmm::Term {
     use desugared_polymede::Term::*;
     match term {
         TypedTerm(typed_term) => compile_typed_term(state, &typed_term),
         VariableUse(var) => compile_var(state, var),
         Int(x) => gmm::Term::Const(*x) ,
+        StringLiteral(s) => gmm::Term::ByteArray(s.clone().into_bytes()), // TODO: Again, this clones the string, which really sucks.
         FunctionApplication(function_name, _, args) => {
             let Some(fn_index) = state.get_function_index(function_name) else { unreachable!() };
             gmm::Term::Call(fn_index, args.iter().map(|arg| compile_term(state, arg)).collect())

@@ -2,7 +2,7 @@ const { showValue, showValueWithAddress, showStack, showStackWithAddress, deepRe
 
 const TAGGED_POINTER_BYTE_SIZE = 5;
 
-const variant_offset = 1;
+const variant_offset = 2;
 const count_offset = variant_offset + 4;
 const components_offset = count_offset + 1;
 

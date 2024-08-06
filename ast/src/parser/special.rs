@@ -45,6 +45,7 @@ pub fn constructor_name_or_variable(state: &mut State) -> Result<VariableOrConst
 pub enum StartTerm {
     TypeAnnotation,
     Int(i32),
+    StringLiteral(String),
     VariableUse(Variable),
     FunctionApplication(Variable),
     ConstructorConstant(ConstructorName),
@@ -99,6 +100,11 @@ pub fn start_term(state: &mut State) -> Result<StartTerm> {
     if state.is_next_token_start_type_annotation()? {
         return Ok(StartTerm::TypeAnnotation)
     } 
+
+    match state.commit_if_next_token_string_literal()? {
+        Some(s) => return Ok(StartTerm::StringLiteral(s)),
+        None => {},
+    }
 
     match state.commit_if_next_token_int()? {
         Some(x) => return Ok(StartTerm::Int(x)),
