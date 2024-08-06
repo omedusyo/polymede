@@ -6,6 +6,7 @@
   (import "runtime" "get_array_slice_pointer" (func $get_array_slice_pointer (result i32)))
   (import "runtime" "get_array_slice_count" (func $get_array_slice_count (result i32)))
   (import "runtime" "gc" (func $gc))
+  (import "runtime" "concat_slices" (func $concat_slices))
 
   ;; console_log_int(x)
   (import "console" "log_int" (func $console_log_int (param i32)))
@@ -37,6 +38,12 @@
 
   (func $dec (call $const (i32.sub (call $get_const) (i32.const 1))))
   (export "i32_dec" (func $dec))
+
+  ;; Stirng, String -> String
+  (func $string_concat
+    ;; TODO: do a swap
+    (call $concat_slices))
+  (export "string_concat" (func $string_concat))
 
   (func $garbage_collection
     (call $gc)
@@ -97,7 +104,6 @@
 
     (if (i32.eq (local.get $op_code) (global.get $OP_CODE_PRINT_STRING))
     (then
-      ;; TODO: Here you need to print the string...
       (call $dup)
       (call $console_log_string (call $get_array_slice_pointer) (call $get_array_slice_count))
       (call $const (i32.const 123456)))

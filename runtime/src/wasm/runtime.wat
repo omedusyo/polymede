@@ -60,6 +60,8 @@
   ;; | gc 1 byte | tag 1 byte | count 4 byte | string contents |
   (global $BYTE_ARRAY_HEADER_BYTE_SIZE i32 (i32.const 6))
   (global $BYTE_ARRAY_COUNT_OFFSET i32 (i32.const 2))
+  (global $BYTE_ARRAY_CONTENTS_OFFSET i32 (i32.const 6))
+  (global $BYTE_ARRAY_COUNT_SIZE i32 (i32.const 4))
   ;; | gc 1 byte | tag 1 byte | 1st pointer 4 byte | 2nd pointer 4 byte | count 4 byte |
   (global $SLICE_BYTE_SIZE i32 (i32.const 14))
   (global $SLICE_PARENT_POINTER_OFFSET i32 (i32.const 2))
@@ -563,18 +565,67 @@
   (export "get_array_slice_count" (func $get_array_slice_count))
 
 
-  (func $allocate_array (param $byte_size i32) (result i32)
-    ;; Allocates space for an array on the heap. Returns raw_pointer to the array.
-    (; ==check if we have enough space on the heap== ;)
-    ;; TODO
-    (i32.const 0)
+  ;; Copies and concatenates two arrays into a new location on the heap. Returns raw_pointer to the new array.
+  ;; The raw pointers point to directly to the start of the byte contents (not to the start of an array), since we may get these data through array slices.
+  (func $concat_arrays (param $raw_pointer_0 i32) (param $count_0 i32) (param $raw_pointer_1 i32) (param $count_1 i32) (result i32)
+    (local $result_array_count i32)
+    (local $result_pointer i32)
+
+    (local.set $result_array_count (i32.add (local.get $count_0) (local.get $count_1)))
+
+    (call $gc_if_out_of_space (i32.add (global.get $BYTE_ARRAY_HEADER_BYTE_SIZE) (local.get $result_array_count)))
+    (local.set $result_pointer (global.get $FREE))
+
+    ;; ==header==
+
+    ;; 1 byte for garbage collection liveness.
+    (i32.store8 (global.get $FREE) (global.get $GC_TAG_LIVE))
+    (call $inc_free (global.get $GC_TAG_BYTE_SIZE))
+    ;; 1 byte tag (used by gc going from grey ~> black)
+    (i32.store8 (global.get $FREE) (global.get $BYTE_ARRAY_TAG))
+    (call $inc_free (global.get $TAG_BYTE_SIZE))
+    ;; 4 byte count 
+    (i32.store (global.get $FREE) (local.get $result_array_count))
+    (call $inc_free (global.get $BYTE_ARRAY_COUNT_SIZE))
+
+    ;; ==contents==
+    (memory.copy (global.get $FREE) (local.get $raw_pointer_0) (local.get $count_0))
+    (call $inc_free (local.get $count_0))
+    (memory.copy (global.get $FREE) (local.get $raw_pointer_1) (local.get $count_1))
+    (call $inc_free (local.get $count_1))
+
+    (local.get $result_pointer)
   )
 
-  (func $concat_arrays (param $raw_pointer_0 i32) (param $raw_pointer1 i32) (result i32)
-    ;; Copies and concatenates two arrays into a new location on the heap. Returns raw_pointer to the new array.
-    ;; TODO;
-    (i32.const 0)
+  ;;   stack = [..., slice0, slice1]
+  ;; ~>
+  ;;   stack = [..., concat_slice_to_newly_allocated_array]
+  (func $concat_slices
+    (local $raw_pointer_0 i32)
+    (local $count_0 i32)
+    (local $raw_pointer_1 i32)
+    (local $count_1 i32)
+
+    (local $new_array_pointer i32)
+
+    (call $dec_stack (i32.const 4))
+    (local.set $raw_pointer_1 (i32.load (i32.add (i32.load (global.get $STACK)) (global.get $SLICE_POINTER_OFFSET))))
+    (local.set $count_1 (i32.load (i32.add (i32.load (global.get $STACK)) (global.get $SLICE_COUNT_OFFSET))))
+    (call $dec_stack (i32.const 1))
+    
+    (call $dec_stack (i32.const 4))
+    (local.set $raw_pointer_0 (i32.load (i32.add (i32.load (global.get $STACK)) (global.get $SLICE_POINTER_OFFSET))))
+    (local.set $count_0 (i32.load (i32.add (i32.load (global.get $STACK)) (global.get $SLICE_COUNT_OFFSET))))
+    (call $dec_stack (i32.const 1))
+
+    (local.set $new_array_pointer (call $concat_arrays (local.get $raw_pointer_0) (local.get $count_0) (local.get $raw_pointer_1) (local.get $count_1)))
+
+    (call $array_slice
+          (local.get $new_array_pointer)
+          (i32.add (local.get $new_array_pointer) (global.get $BYTE_ARRAY_CONTENTS_OFFSET))
+          (i32.load (i32.add (local.get $new_array_pointer) (global.get $BYTE_ARRAY_COUNT_OFFSET))))
   )
+  (export "concat_slices" (func $concat_slices))
 
   (; =====Garbage Collector===== ;)
   (func $gc_if_out_of_space (param $allocation_request_byte_size i32)
