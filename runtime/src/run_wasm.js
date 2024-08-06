@@ -119,7 +119,7 @@ function run(bytes) {
 
     WebAssembly.instantiate(module, config).then(instance => {
         const { main, stack, env, free, function_table, STATIC_SIZE } = instance.exports;
-        const { make_env, make_env_from, make_env_from_closure, drop_env, tuple, partial_apply, get_tuple_pointer, perform_primitive_command, unpack_in_reverse, copy_value_to_stack } = instance.exports;
+        const { make_env, make_env_from, make_env_from_closure, drop_env, array_slice, tuple, partial_apply, get_tuple_pointer, perform_primitive_command, unpack_in_reverse, copy_value_to_stack } = instance.exports;
         const { gc, gc_move_tuple, gc_traverse_grey, gc_walk_stack } = instance.exports;
 
         const const_ = instance.exports["const"];
@@ -138,8 +138,11 @@ function run(bytes) {
 
         main();
 
+        // console.log(array_slice);
+        // array_slice(0, 6, 3);
+
         console.log("> Main executed succesfully.");
-        // log_stack(0);
+        log_stack(0);
         console.log("> Performing command...");
 
         perform(
@@ -150,7 +153,7 @@ function run(bytes) {
           GLOBAL.STACK_START,
           GLOBAL.STACK,
         );
-        // log_stack(1);
+        log_stack(1);
         console.log("> Exiting.");
 
     });

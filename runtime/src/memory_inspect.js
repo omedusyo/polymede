@@ -10,6 +10,21 @@ const PARENT_ENV_POINTER_BYTE_SIZE = 4;
 const ENV_COUNTER_BYTE_SIZE = 4;
 const ENV_HEADER_BYTE_SIZE = 1 + PARENT_ENV_POINTER_BYTE_SIZE + ENV_COUNTER_BYTE_SIZE; // 9 bytes, 1 byte for tag, 4 bytes for parent env pointer, 4 bytes for env count.
 
+
+// | gc 1 byte | tag 1 byte | count 4 byte | string contents |
+const BYTE_ARRAY_HEADER_BYTE_SIZE = 6;
+const BYTE_ARRAY_COUNT_OFFSET = 2;
+const BYTE_ARRAY_CONTENTS_OFFSET = 6;
+const BYTE_ARRAY_COUNT_SIZE = 4;
+// | gc 1 byte | tag 1 byte | 1st pointer 4 byte | 2nd pointer 4 byte | count 4 byte |
+const SLICE_BYTE_SIZE = 14;
+const SLICE_PARENT_POINTER_OFFSET = 2;
+const SLICE_POINTER_OFFSET = 6;
+const SLICE_COUNT_OFFSET = 10;
+const SLICE_PARENT_POINTER_SIZE = 4;
+const SLICE_POINTER_SIZE = 4;
+const SLICE_COUNT_SIZE = 4;
+
 function Constant(value, address) {
   return { type: "Const", value, address };
 }
@@ -22,8 +37,8 @@ function Tuple(variant, components, address) {
   return { type: "Tuple",  variant, components, address };
 }
 
-function ByteArraySlice(parent_pointer, pointer, count, address) {
-  return { type: "ByteArraySlice", parent_pointer, pointer, count, address };
+function ByteArraySlice(parent_pointer, pointer, count, contents, address) {
+  return { type: "ByteArraySlice", parent_pointer, pointer, count, contents, address };
 }
 
 // TODO: May be useful during GC inspection.
@@ -81,6 +96,18 @@ function readTuple(view, tagged_pointer) {
 }
 module.exports.readTuple = readTuple;
 
+function readSlice(view, tagged_pointer) {
+  if (tagged_pointer.tag != "ByteArraySlice") { throw Error(`Attempt to read non-slice as a slice @ ${tagged_pointer}`) }
+  const slice_pointer = tagged_pointer.pointer;
+
+  const parent_pointer = view.getInt32(slice_pointer + SLICE_PARENT_POINTER_OFFSET, true);
+  const pointer = view.getInt32(slice_pointer + SLICE_POINTER_OFFSET, true);
+  const count = view.getInt32(slice_pointer + SLICE_COUNT_OFFSET, true);
+
+  return ByteArraySlice(parent_pointer, pointer, count, undefined, slice_pointer);
+}
+module.exports.readSlice = readSlice;
+
 // WARNING: Does not detect cyclic structure.
 function deepReadRawPointer(view, raw_pointer) {
   const tagged_pointer = readRawPointer(view, raw_pointer);
@@ -94,6 +121,8 @@ function deepReadTaggedPointer(view, tagged_pointer) {
   } else if (tagged_pointer.type == "Pointer"){
     if (tagged_pointer.tag == "Tuple") {
       return deepReadTuple(view, tagged_pointer);
+    } else if (tagged_pointer.tag == "ByteArraySlice"){
+      return deepReadSlice(view, tagged_pointer);
     } else {
       throw Error(`We have a pointer that's not a tuple ${tagged_pointer}`);
     }
@@ -112,6 +141,13 @@ function deepReadTuple(view, tagged_pointer) {
   return Tuple(tuple.variant, components, tuple.address);
 }
 module.exports.deepReadTuple = deepReadTuple;
+
+function deepReadSlice(view, tagged_pointer) {
+  const slice = readSlice(view, tagged_pointer);
+  const str_view = new DataView(view.buffer, slice.pointer, slice.count)
+  const str = (new TextDecoder()).decode(str_view)
+  return ByteArraySlice(slice.parent_pointer, slice.pointer, slice.count, str, slice.address);
+}
 
 function readStack(view, raw_pointer_start, raw_pointer_end) {
   const stack = [];
@@ -142,9 +178,9 @@ function readStack(view, raw_pointer_start, raw_pointer_end) {
         stack.push(Env(old_env_pointer, values, raw_pointer));
         readNextValue(raw_pointer + ENV_HEADER_BYTE_SIZE + count * TAGGED_POINTER_BYTE_SIZE);
       } else if (tag == BYTE_ARRAY_SLICE_TAG) {
-        throw Error("Slices not yet implemented");
-      } else if (tag == BYTE_ARRAY_TAG) {
-        throw Error("Arrays not yet implemented");
+        const slice_pointer = view.getInt32(raw_pointer + 1, true);
+        stack.push(TaggedPointer("ByteArraySlice", slice_pointer, raw_pointer));
+        readNextValue(raw_pointer + TAGGED_POINTER_BYTE_SIZE)
       } else {
         throw Error(`Unknown value Tag ${tag}`);
       }
@@ -172,7 +208,7 @@ function deepReadStack(view, raw_pointer_start, raw_pointer_end) {
         const tuple_pointer = view.getInt32(raw_pointer + 1, true);
         const tagged_pointer = TaggedPointer("Tuple", tuple_pointer);
         stack.push(deepReadTuple(view, tagged_pointer));
-        readNextValue(raw_pointer + TAGGED_POINTER_BYTE_SIZE)
+        readNextValue(raw_pointer + TAGGED_POINTER_BYTE_SIZE);
       } else if (tag == ENV_TAG) {
         const old_env_pointer = view.getInt32(raw_pointer + 1, true);
         const count = view.getInt32(raw_pointer + 1 + PARENT_ENV_POINTER_BYTE_SIZE, true);
@@ -186,9 +222,10 @@ function deepReadStack(view, raw_pointer_start, raw_pointer_end) {
         stack.push(Env(old_env_pointer, values, raw_pointer));
         readNextValue(raw_pointer + ENV_HEADER_BYTE_SIZE + count * TAGGED_POINTER_BYTE_SIZE);
       } else if (tag == BYTE_ARRAY_SLICE_TAG) {
-        throw Error("Slices not yet implemented");
-      } else if (tag == BYTE_ARRAY_TAG) {
-        throw Error("Arrays not yet implemented");
+        const slice_pointer = view.getInt32(raw_pointer + 1, true);
+        const tagged_pointer = TaggedPointer("ByteArraySlice", slice_pointer);
+        stack.push(deepReadSlice(view, tagged_pointer));
+        readNextValue(raw_pointer + TAGGED_POINTER_BYTE_SIZE);
       } else {
         throw Error(`Unknown value Tag ${tag}`);
       }
@@ -215,6 +252,8 @@ function showValue(x) {
       values_str.push(showValue(value));
     });
     return `Env[#${x.old_env_pointer}](${values_str.join(", ")})`;
+  } else if (x.type == "ByteArraySlice") {
+    return `Slice[parent:=${x.parent_pointer}, p:=${x.pointer}, c:=${x.count}]("${x.contents}")`;
   } else if (x.type == "ByteArray") {
     throw Error("Arrays not yet implemented");
   } else {
@@ -238,6 +277,8 @@ function showValueWithAddress(x) {
       values_str.push(showValueWithAddress(value));
     });
     return `Env@${x.address}[#${x.old_env_pointer}](${values_str.join(", ")})`;
+  } else if (x.type == "ByteArraySlice") {
+    return `Slice@${x.address}[parent:=${x.parent_pointer}, p:=${x.pointer}, c:=${x.count}]("${x.contents}")`;
   } else if (x.type == "ByteArray") {
     throw Error("Arrays not yet implemented");
   } else {
