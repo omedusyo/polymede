@@ -1,4 +1,3 @@
-====Add String types====
 ====Implement proper command tracing at runtime====
 ====Human Readable Error messages====
 
