@@ -6,7 +6,6 @@ use crate::parser::lex::{
     token::Keyword,
 };
 use crate::parser::program::pre_program;
-use std::str::Chars;
 
 pub type Result<A> = std::result::Result<A, Error>;
 
@@ -18,7 +17,7 @@ pub type Parser<A> = fn(&mut State) -> Result<A>;
 
 #[derive(Debug)]
 pub enum Error {
-    LexError(lexer::Error),
+    LexError(lexer::ErrorWithPosition),
     ExpectedTypeConstructorOrTypeVar { received: Identifier },
     ExpectedTypeConstructorOrTypeVarOrAnythingInPattern { received: Identifier },
     ExpectedTerm { received: Identifier },
