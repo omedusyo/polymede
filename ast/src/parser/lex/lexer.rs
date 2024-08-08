@@ -23,6 +23,8 @@ pub enum Error {
     UnexpectedEnd,
     Expected { requested: Request, found: String },
     ExpectedI32 { found: String },
+    ExpectedF32 { found: String },
+    ExpectedF32ParseFloatError { error: std::num::ParseFloatError },
     ExpectedValidCharacterAfterEscapeSequenceInStringLiteral { found: String },
     ExpectedValidUnicodeSequenceInStringLiteral { found: String },
     ExpectedOpeningBraceForUnicodeSequenceInStringLiteral { found: String },
@@ -379,22 +381,6 @@ impl <'state> State<'state> {
     }
 
     pub fn commit_if_next_token_int(&mut self) -> Result<Option<i32>> {
-        fn digit(c: char) -> Option<i32> {
-            match c {
-                '0' => Some(0),
-                '1' => Some(1),
-                '2' => Some(2),
-                '3' => Some(3),
-                '4' => Some(4),
-                '5' => Some(5),
-                '6' => Some(6),
-                '7' => Some(7),
-                '8' => Some(8),
-                '9' => Some(9),
-                _ => None,
-            }
-        }
-
         self.consume_whitespace();
 
         let mut c = self.read_char_or_fail_when_end()?;
@@ -410,7 +396,7 @@ impl <'state> State<'state> {
         // We commit.
 
         let mut sum: i32;
-        match digit(c) {
+        match digit10(c) {
             Some(d) => {
                 sum = if is_positive { d } else { -d };
                 self.advance();
@@ -435,7 +421,7 @@ impl <'state> State<'state> {
         // Consume the rest of the consecutive digits, and
         // construct the actual number.
         while let Ok(c) = self.read_char_or_fail_when_end() {
-            match digit(c) {
+            match digit10(c) {
                 Some(d) => {
                     self.advance();
 
@@ -503,30 +489,8 @@ impl <'state> State<'state> {
 
     // Note that it doesn't consume whitespace.
     fn hex_int(&mut self) -> Result<u32> {
-        fn hex(c: char) -> Option<u32> {
-            match c.to_ascii_lowercase() {
-                '0' => Some(0),
-                '1' => Some(1),
-                '2' => Some(2),
-                '3' => Some(3),
-                '4' => Some(4),
-                '5' => Some(5),
-                '6' => Some(6),
-                '7' => Some(7),
-                '8' => Some(8),
-                '9' => Some(9),
-                'a' => Some(10),
-                'b' => Some(11),
-                'c' => Some(12),
-                'd' => Some(13),
-                'e' => Some(14),
-                'f' => Some(15),
-                _ => None,
-            }
-        }
-
         let c = self.consume_char_or_fail_when_end()?;
-        let mut sum: u32 = match hex(c) {
+        let mut sum: u32 = match digit16(c) {
             Some(d) => d,
             None => return self.error(Error::ExpectedValidUnicodeSequenceInStringLiteral { found: format!("\\u{}", c.to_string()) })
         };
@@ -547,7 +511,7 @@ impl <'state> State<'state> {
         // Consume the rest of the consecutive digits, and
         // construct the actual number.
         while let Ok(c) = self.read_char_or_fail_when_end() {
-            match hex(c) {
+            match digit16(c) {
                 Some(d) => {
                     self.advance();
 
@@ -569,5 +533,137 @@ impl <'state> State<'state> {
         }
             
         Ok(sum)
+    }
+
+
+    // We implement the following grammar
+    //     Float  ::= Sign? Digit+ '.' Digit+ Exp?
+    //     Exp    ::= 'e' Sign? Digit+
+    //     Sign   ::= [+-]
+    //     Digit  ::= [0-9]
+    pub fn commit_if_next_token_f32(&mut self) -> Result<Option<f32>> {
+
+        fn make_float(state: &State, chars: Vec<char>) -> Result<Option<f32>> {
+            match chars.into_iter().collect::<String>().parse::<f32>() {
+                Ok(float) => Ok(Some(float)),
+                Err(error) =>  state.error(Error::ExpectedF32ParseFloatError { error })
+            }
+        }
+
+        match self.consume_char_or_fail_when_end()? {
+            '%' => {},
+            _ => return Ok(None),
+        }
+
+
+        let mut chars: Vec<char> = vec![];
+
+        let mut c = self.consume_char_or_fail_when_end()?;
+        chars.push(c);
+
+        let mut atleast_one_digit_before_point: bool = false;
+        match c {
+            '-' | '+' => {},
+            _ => if digit10(c).is_some() { atleast_one_digit_before_point = true; } else { return self.error(Error::ExpectedF32 { found: chars.into_iter().collect() }) },
+        };
+
+        loop {
+            c = self.consume_char_or_fail_when_end()?;
+            chars.push(c);
+            match c {
+                '.' => if atleast_one_digit_before_point { break } else { return self.error(Error::ExpectedF32 { found: chars.into_iter().collect() }) }
+                _ => if digit10(c).is_some() {
+                    atleast_one_digit_before_point = true;
+                } else {
+                    // neither a digit nor '.'
+                    return self.error(Error::ExpectedF32 { found: chars.into_iter().collect() })
+                },
+            }
+        }
+        // we can assume that we've seen a '.'
+        let mut atleast_one_digit_after_point: bool = false;
+        loop {
+            c = self.read_char_or_fail_when_end()?;
+            if digit10(c).is_some() {
+                atleast_one_digit_after_point = true;
+                chars.push(c);
+                self.advance();
+            } else if atleast_one_digit_after_point {
+                break
+            } else {
+                chars.push(c);
+                return self.error(Error::ExpectedF32 { found: chars.into_iter().collect() })
+            }
+        }
+
+        // check if we have an exponent
+        match c {
+            'e' => {
+                self.advance();
+
+                let mut atleaset_one_digit_in_exponent: bool = false;
+                c = self.consume_char_or_fail_when_end()?;
+                chars.push(c);
+                match c {
+                    '-' | '+' => {},
+                    _ => if digit10(c).is_some() { atleaset_one_digit_in_exponent = true; } else { return self.error(Error::ExpectedF32 { found: chars.into_iter().collect() }) },
+                }
+
+                loop {
+                    c = self.read_char_or_fail_when_end()?;
+                    if digit10(c).is_some() {
+                        atleaset_one_digit_in_exponent = true;
+                        chars.push(c);
+                        self.advance();
+                    } else if atleaset_one_digit_in_exponent {
+                        break
+                    } else {
+                        chars.push(c);
+                        return self.error(Error::ExpectedF32 { found: chars.into_iter().collect() })
+                    }
+                }
+                make_float(self, chars)
+            },
+            _ => make_float(self, chars),
+        }
+    }
+}
+
+
+fn digit10(c: char) -> Option<i32> {
+    match c {
+        '0' => Some(0),
+        '1' => Some(1),
+        '2' => Some(2),
+        '3' => Some(3),
+        '4' => Some(4),
+        '5' => Some(5),
+        '6' => Some(6),
+        '7' => Some(7),
+        '8' => Some(8),
+        '9' => Some(9),
+        _ => None,
+    }
+}
+
+fn digit16(c: char) -> Option<u32> {
+    match c.to_ascii_lowercase() {
+        '0' => Some(0),
+        '1' => Some(1),
+        '2' => Some(2),
+        '3' => Some(3),
+        '4' => Some(4),
+        '5' => Some(5),
+        '6' => Some(6),
+        '7' => Some(7),
+        '8' => Some(8),
+        '9' => Some(9),
+        'a' => Some(10),
+        'b' => Some(11),
+        'c' => Some(12),
+        'd' => Some(13),
+        'e' => Some(14),
+        'f' => Some(15),
+        _ => None,
     }
 }
