@@ -123,6 +123,6 @@ impl <'show>Show<'show> {
     }
 
     pub fn show_identifier(&self, var: &Identifier) -> String {
-        var.str(self.interner).to_string()
+        format!("{}@(line={}, column={})", var.str(self.interner), var.position().line, var.position().column)
     }
 }

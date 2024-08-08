@@ -45,6 +45,10 @@ impl Identifier {
         let c = self.str(state).chars().nth(0).unwrap();
         c
     }
+
+    pub fn position(&self) -> Position {
+        self.position
+    }
 }
 
 impl PartialEq for Identifier {

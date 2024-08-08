@@ -4,12 +4,18 @@ use crate::parser::lex::{
 };
 use std::str::Chars;
 
-type Result<A> = std::result::Result<A, Error>;
+type Result<A> = std::result::Result<A, ErrorWithPosition>;
 
 #[derive(Debug)]
 pub struct State<'a> {
     chars: Chars<'a>, // UTF code-points iterator
     position: Position
+}
+
+#[derive(Debug)]
+pub struct ErrorWithPosition {
+    pub position: Position,
+    pub error: Error,
 }
 
 #[derive(Debug)]
@@ -100,6 +106,10 @@ impl <'state> State<'state> {
         &mut self.chars
     }
 
+    pub fn error<A>(&self, err: Error) -> Result<A> {
+        Err(ErrorWithPosition { position: self.position, error: err })
+    }
+
     pub fn clone(&self) -> Self {
         Self {
             chars: self.chars.clone(),
@@ -164,21 +174,21 @@ impl <'state> State<'state> {
             Some(_) => {
                 Ok(())
             },
-            None => Err(Error::UnexpectedEnd)
+            None => self.error(Error::UnexpectedEnd)
         }
     }
 
     pub fn read_char_or_fail_when_end(&mut self) -> Result<char> {
         match self.chars.clone().next() {
             Some(c) => Ok(c),
-            None => Err(Error::UnexpectedEnd) 
+            None => self.error(Error::UnexpectedEnd) 
         }
     }
 
     pub fn consume_char_or_fail_when_end(&mut self) -> Result<char> {
         match self.chars.next() {
             Some(c) => Ok(c),
-            None => Err(Error::UnexpectedEnd) 
+            None => self.error(Error::UnexpectedEnd) 
         }
     }
 
@@ -189,7 +199,7 @@ impl <'state> State<'state> {
             let c = self.read_char_or_fail_when_end()?;
             chars_for_error.push(c);
             if c != c0 {
-                return Err(Error::Expected { requested: request, found: chars_for_error.into_iter().collect() })
+                return self.error(Error::Expected { requested: request, found: chars_for_error.into_iter().collect() })
             }
             self.advance();
         }
@@ -234,7 +244,7 @@ impl <'state> State<'state> {
                 } else if c == 'i' {
                     self.match_keyword(request, token::Keyword::Ind)
                 } else {
-                    Err(Error::ExpectedTypeDeclarationKeyword)
+                    self.error(Error::ExpectedTypeDeclarationKeyword)
                 }
             },
             Request::Identifier => {
@@ -245,7 +255,7 @@ impl <'state> State<'state> {
                         chars.push(c);
                         self.advance()
                     } else {
-                        return Err(Error::Expected { requested: request, found: c.to_string() })
+                        return self.error(Error::Expected { requested: request, found: c.to_string() })
                     }
                 };
 
@@ -272,7 +282,7 @@ impl <'state> State<'state> {
                     let token_position = self.advance();
                     Ok(LocatedToken::new(Token::Separator(separator_symbol), token_position))
                 } else {
-                    Err(Error::Expected { requested: request, found: c.to_string() })
+                    self.error(Error::Expected { requested: request, found: c.to_string() })
                 }
             },
             Request::BindingSeparator => {
@@ -282,7 +292,7 @@ impl <'state> State<'state> {
                 if self.chars.next().is_some() {
                     Ok(LocatedToken::new(Token::End, self.position))
                 } else {
-                    Err(Error::UnexpectedEnd) 
+                    self.error(Error::UnexpectedEnd) 
                 }
             },
         }
@@ -315,7 +325,7 @@ impl <'state> State<'state> {
         self.consume_whitespace();
         match self.read_char_or_fail_when_end() {
             Ok(c) => Ok(c == c0),
-            Err(Error::UnexpectedEnd) => Ok(false),
+            Err(ErrorWithPosition { error: Error::UnexpectedEnd, .. }) => Ok(false),
             Err(e) => Err(e)
         }
     }
@@ -361,10 +371,10 @@ impl <'state> State<'state> {
                 match c {
                     'o' => Ok(DeclarationKind::ForeignFunction),
                     'n' => Ok(DeclarationKind::UserFunction),
-                    _ => Err(Error::ExpectedDeclarationKeyword),
+                    _ => self.error(Error::ExpectedDeclarationKeyword),
                 }
             },
-            _ => Err(Error::ExpectedDeclarationKeyword),
+            _ => self.error(Error::ExpectedDeclarationKeyword),
         }
     }
 
@@ -405,7 +415,7 @@ impl <'state> State<'state> {
                 sum = if is_positive { d } else { -d };
                 self.advance();
             },
-            None => return Err(Error::ExpectedI32 { found: c.to_string() })
+            None => return self.error(Error::ExpectedI32 { found: c.to_string() })
         }
 
         // Atleast one digit was consumed.
@@ -437,12 +447,12 @@ impl <'state> State<'state> {
                                     sum = new_sum
                                 },
                                 None => {
-                                    return Err(Error::Int32LiteralOutOfBounds)
+                                    return self.error(Error::Int32LiteralOutOfBounds)
                                 }
                             }
                         },
                         None => {
-                            return Err(Error::Int32LiteralOutOfBounds)
+                            return self.error(Error::Int32LiteralOutOfBounds)
                         }
                     }
                 },
@@ -469,20 +479,20 @@ impl <'state> State<'state> {
                 't' => chars.push('\t'),
                 'u' => {
                     let open_brace = self.consume_char_or_fail_when_end()?;
-                    if open_brace != '{' { return Err(Error::ExpectedOpeningBraceForUnicodeSequenceInStringLiteral { found: format!("\\u{}", open_brace) }) };
+                    if open_brace != '{' { return self.error(Error::ExpectedOpeningBraceForUnicodeSequenceInStringLiteral { found: format!("\\u{}", open_brace) }) };
 
                     let x = self.hex_int()?;
 
                     let close_brace = self.consume_char_or_fail_when_end()?;
-                    if close_brace != '}' { return Err(Error::ExpectedClosingBraceForUnicodeSequenceInStringLiteral { found: format!("\\u{{{:x}{}", x, close_brace) }) };
+                    if close_brace != '}' { return self.error(Error::ExpectedClosingBraceForUnicodeSequenceInStringLiteral { found: format!("\\u{{{:x}{}", x, close_brace) }) };
 
                     match char::from_u32(x) {
                         Some(c) => chars.push(c),
-                        None => return Err(Error::ExpectedValidUnicodeSequenceInStringLiteral { found: format!("\\u{{{:x}}}", x) })
+                        None => return self.error(Error::ExpectedValidUnicodeSequenceInStringLiteral { found: format!("\\u{{{:x}}}", x) })
                     }
 
                 },
-                c => return Err(Error::ExpectedValidCharacterAfterEscapeSequenceInStringLiteral { found: format!("\\{}", c) }),
+                c => return self.error(Error::ExpectedValidCharacterAfterEscapeSequenceInStringLiteral { found: format!("\\{}", c) }),
             }},
             '"' => break,
             c => chars.push(c),
@@ -518,7 +528,7 @@ impl <'state> State<'state> {
         let c = self.consume_char_or_fail_when_end()?;
         let mut sum: u32 = match hex(c) {
             Some(d) => d,
-            None => return Err(Error::ExpectedValidUnicodeSequenceInStringLiteral { found: format!("\\u{}", c.to_string()) })
+            None => return self.error(Error::ExpectedValidUnicodeSequenceInStringLiteral { found: format!("\\u{}", c.to_string()) })
         };
 
         // Ignore all zeroes.
@@ -548,10 +558,10 @@ impl <'state> State<'state> {
                                 Some(new_sum) => {
                                     sum = new_sum
                                 },
-                                None => return Err(Error::ExpectedValidUnicodeSequenceInStringLiteral { found: format!("\\u{:x}{:x}", sum, d) })
+                                None => return self.error(Error::ExpectedValidUnicodeSequenceInStringLiteral { found: format!("\\u{:x}{:x}", sum, d) })
                             }
                         },
-                        None => return Err(Error::ExpectedValidUnicodeSequenceInStringLiteral { found: format!("\\u{:x}{:x}", sum, d) })
+                        None => return self.error(Error::ExpectedValidUnicodeSequenceInStringLiteral { found: format!("\\u{:x}{:x}", sum, d) })
                     }
                 },
                 None => break,
