@@ -542,7 +542,6 @@ impl <'state> State<'state> {
     //     Sign   ::= [+-]
     //     Digit  ::= [0-9]
     pub fn commit_if_next_token_f32(&mut self) -> Result<Option<f32>> {
-
         fn make_float(state: &State, chars: Vec<char>) -> Result<Option<f32>> {
             match chars.into_iter().collect::<String>().parse::<f32>() {
                 Ok(float) => Ok(Some(float)),
@@ -550,8 +549,12 @@ impl <'state> State<'state> {
             }
         }
 
-        match self.consume_char_or_fail_when_end()? {
-            '%' => {},
+        self.consume_whitespace();
+
+        match self.read_char_or_fail_when_end()? {
+            '%' => {
+                self.advance();
+            },
             _ => return Ok(None),
         }
 
@@ -600,6 +603,7 @@ impl <'state> State<'state> {
         match c {
             'e' => {
                 self.advance();
+                chars.push(c);
 
                 let mut atleaset_one_digit_in_exponent: bool = false;
                 c = self.consume_char_or_fail_when_end()?;
