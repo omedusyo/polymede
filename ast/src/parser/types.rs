@@ -44,6 +44,7 @@ pub fn type_(state: &mut State) -> Result<Type> {
                 // A type constant
                 match constructor_name.str(state.interner()) {
                     "I32" => Ok(Type::I32),
+                    "F32" => Ok(Type::F32),
                     "String" => Ok(Type::String),
                     _ => Ok(Type::TypeApplication(constructor_name, vec![])),
                 }
@@ -58,10 +59,12 @@ pub fn primitive_type(state: &mut State) -> Result<Type> {
     let t = type_.clone();
     match type_ {
         I32 => Ok(t),
+        F32 => Ok(t),
         String => Ok(t),
         Command(x) =>  {
             match *x {
                 I32 => Ok(t),
+                F32 => Ok(t),
                 String => Ok(t),
                 _ => Err(Error::ExpectedPrimitiveType { received: t }),
             }

@@ -205,6 +205,10 @@ impl <'lex_state, 'interner> State<'lex_state, 'interner> {
         self.lexer_state.commit_if_next_token_int().map_err(Error::LexError)
     }
 
+    pub fn commit_if_next_token_f32(&mut self) -> Result<Option<f32>> {
+        self.lexer_state.commit_if_next_token_f32().map_err(Error::LexError)
+    }
+
     pub fn commit_if_next_token_string_literal(&mut self) -> Result<Option<String>> {
         self.lexer_state.commit_if_next_token_string_literal().map_err(Error::LexError)
     }

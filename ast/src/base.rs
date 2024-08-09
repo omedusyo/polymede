@@ -140,6 +140,7 @@ pub enum Type {
     TypeApplication(ConstructorName, Vec<Type>),
     Arrow(Box<FunctionType>),
     I32,
+    F32,
     String,
     Command(Box<Type>),
 }
@@ -162,6 +163,7 @@ pub struct TypedTerm {
 pub enum Term {
     TypedTerm(Box<TypedTerm>),
     Int(i32),
+    Float(f32),
     StringLiteral(String),
     VariableUse(Variable),
     FunctionApplication(FunctionName, Vec<Type>, Vec<Term>),
@@ -441,6 +443,7 @@ pub fn type_apply(type_parameters: &[Variable], type_body: &Type, type_arguments
                 Arrow(Box::new(FunctionType { input_types: applied_input_types, output_type: applied_output_type }))
             },
             I32 => I32,
+            F32 => F32,
             String => String,
             Command(type_body) => Command(Box::new(traverse(position_map, type_body, type_arguments))),
         }

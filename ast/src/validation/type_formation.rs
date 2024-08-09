@@ -135,6 +135,7 @@ pub fn check_type(program: &Program, type_env: &TypeScope, type_: &Type) -> Resu
             check_function_type(program, type_env, function_type)
         },
         I32 => Ok(()),
+        F32 => Ok(()),
         String => Ok(()),
         Command(type_) => check_type(program, type_env, type_),
     }
@@ -195,6 +196,7 @@ fn check_positive_occurance(type_var0: &Variable, type_: &Type) -> Result<()> {
                 check(type_var0, &function_type.output_type, polarity)
             },
             I32 => Ok(()),
+            F32 => Ok(()),
             String => Ok(()),
             Command(type_) => check(type_var0, type_, polarity),
         }
