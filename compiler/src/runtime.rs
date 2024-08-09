@@ -1,6 +1,6 @@
 use crate::gmm_compiler::import_runtime_function;
 use wasm::{
-    syntax::{Module, fn_type, TYPE_I32},
+    syntax::{Module, fn_type, TYPE_I32, TYPE_F32},
     base::{
         indices::FunctionIndex,
         types::FunctionType,
@@ -11,6 +11,7 @@ use wasm::{
 pub struct Runtime {
     pub number_of_runtime_functions: usize,
     pub const_: FunctionIndex,
+    pub float32: FunctionIndex,
     pub get_const: FunctionIndex,
     pub tuple: FunctionIndex,
     pub get_tuple_pointer: FunctionIndex,
@@ -59,6 +60,7 @@ impl Runtime {
         }
 
         let const_= import(module, "const", fn_type(vec![TYPE_I32], vec![]), &mut number_of_runtime_functions);
+        let float32 = import(module, "float32", fn_type(vec![TYPE_F32], vec![]), &mut number_of_runtime_functions);
         let get_const = import(module, "get_const", fn_type(vec![], vec![TYPE_I32]) , &mut number_of_runtime_functions);
         let tuple = import(module, "tuple", fn_type(vec![TYPE_I32, TYPE_I32], vec![]), &mut number_of_runtime_functions);
         let get_tuple_pointer = import(module, "get_tuple_pointer", fn_type(vec![], vec![TYPE_I32]), &mut number_of_runtime_functions);
@@ -82,6 +84,7 @@ impl Runtime {
         Self {
             number_of_runtime_functions,
             const_,
+            float32,
             get_const,
             tuple,
             get_tuple_pointer,

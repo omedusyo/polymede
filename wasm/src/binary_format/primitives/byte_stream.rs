@@ -593,8 +593,18 @@ impl ByteStream for I64ToSignedLEB128 {
 }
 
 // ===Floats===
-// TODO: For floats see
-// https://doc.rust-lang.org/beta/std/primitive.f64.html#method.to_le_bytes
+pub struct F32ToIEEE754LittleEndian(Bytes4);
+
+impl F32ToIEEE754LittleEndian {
+    pub fn new(x: f32) -> Self {
+        let bytes = x.to_le_bytes();
+        Self(bytes4(bytes))
+    }
+}
+
+impl ByteStream for F32ToIEEE754LittleEndian {
+    fn next(&mut self) -> Response { self.0.next() }
+}
 
 // ===Strings===
 pub struct UTF8(CVec<Byte>);

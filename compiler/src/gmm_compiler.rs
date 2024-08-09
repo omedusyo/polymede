@@ -1,7 +1,7 @@
 use crate::graph_memory_machine as gmm;
 use crate::runtime::Runtime;
 use wasm::{
-    syntax::{CustomSection, Module, TypedFunctionImport, TypedFunction, Global, MemoryImport, fn_type, Expression, call, return_call, call_indirect, return_call_indirect, i32_const, i32_eq, seq},
+    syntax::{CustomSection, Module, TypedFunctionImport, TypedFunction, Global, MemoryImport, fn_type, Expression, call, return_call, call_indirect, return_call_indirect, i32_const, f32_const, i32_eq, seq},
     base::{
         indices::{FunctionIndex, TableIndex, TypeIndex},
         types::{FunctionType, BlockType, GlobalType, ValueType, NumType, Mutability},
@@ -228,10 +228,7 @@ fn compile_term(state: &mut State, number_of_parameters: usize, term: &gmm::Term
         },
         gmm::Term::Float32(x) => {
             let mut code = vec![];
-            // TODO: Does this actually work?
-            let bytes = x.to_le_bytes();
-            let x_encoded = i32::from_le_bytes(bytes);
-            code.push(call(state.runtime.const_, vec![i32_const(x_encoded)]));
+            code.push(call(state.runtime.float32, vec![f32_const(*x)]));
 
             if tail_position { code.push(call(state.runtime.drop_env, vec![])) }
             Ok(seq(code))

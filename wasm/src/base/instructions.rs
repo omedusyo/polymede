@@ -88,4 +88,7 @@ pub enum Instruction {
     // i64
     I64Const(i64),
     I64Add,
+
+    // f32
+    F32Const(f32),
 }
