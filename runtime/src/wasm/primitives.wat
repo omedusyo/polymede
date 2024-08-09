@@ -19,11 +19,9 @@
   ;; console_log_string(raw_pointer_to_start_of_string_bytes, byte_count)
   (import "console" "log_string" (func $console_log_string (param i32) (param i32)))
 
+  ;; ===i32===
   (func $add (call $const (i32.add (call $get_const) (call $get_const))))
   (export "i32_add" (func $add))
-
-  (func $f32_add (call $float32 (f32.add (call $get_float32) (call $get_float32))))
-  (export "f32_add" (func $f32_add))
 
   (func $mul (call $const (i32.mul (call $get_const) (call $get_const))))
   (export "i32_mul" (func $mul))
@@ -46,6 +44,29 @@
   (func $dec (call $const (i32.sub (call $get_const) (i32.const 1))))
   (export "i32_dec" (func $dec))
 
+  ;; ===f32===
+  (func $f32_add (call $float32 (f32.add (call $get_float32) (call $get_float32))))
+  (export "f32_add" (func $f32_add))
+
+  (func $f32_mul (call $float32 (f32.mul (call $get_float32) (call $get_float32))))
+  (export "f32_mul" (func $f32_mul))
+
+  (func $f32_neg (call $float32 (f32.neg (call $get_float32))))
+  (export "f32_neg" (func $f32_neg))
+
+  (func $f32_abs (call $float32 (f32.abs (call $get_float32))))
+  (export "f32_abs" (func $f32_abs))
+
+  (func $f32_sqrt (call $float32 (f32.sqrt (call $get_float32))))
+  (export "f32_sqrt" (func $f32_sqrt))
+
+  (func $f32_min (call $float32 (f32.min (call $get_float32) (call $get_float32))))
+  (export "f32_min" (func $f32_min))
+
+  (func $f32_max (call $float32 (f32.max (call $get_float32) (call $get_float32))))
+  (export "f32_max" (func $f32_max))
+
+  ;; ===String===
   ;; Stirng, String -> String
   (func $string_concat
     ;; TODO: do a swap
