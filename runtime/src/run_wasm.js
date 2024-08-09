@@ -97,6 +97,9 @@ function run(bytes) {
         log_int(x) {
           console.log(x);
         },
+        log_f32(x) {
+          console.log(x);
+        },
         log_two_ints(x, y) {
           console.log("Logging two ints", x, y);
         },

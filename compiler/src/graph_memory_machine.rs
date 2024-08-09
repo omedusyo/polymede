@@ -8,6 +8,12 @@ pub type ComponentIndex = u8; // max 256 components
 #[derive(Debug)]
 pub enum Term {
     Const(Variant),
+    // There is a choice here. We could encode floats directly as Const.
+    // Since we are targetting wasm, it would have to be little-endian IEEE-754 encoding.
+    // But potentially we could target other VM's, that could use different encodings.
+    // So it seems unnatural to encode floats directly into const here. Hence we defer the encoding
+    // to actual gmm compilers.
+    Float32(f32),
     ByteArray(Vec<u8>),
     // TODO: Rename to Cons (Constructor)
     Tuple(Variant, Vec<Term>),

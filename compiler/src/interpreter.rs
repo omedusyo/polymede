@@ -16,6 +16,7 @@ enum RuntimeError {
     EmptySequenceOfTerms,
     AttemptToPatternMatchOnByteArray,
     AttemptToPatternMatchOnClosure,
+    AttemptToPatternMatchOnFloat32,
     NoMatchesFound,
     UnsupportedPrimitiveFunction { import: FunctionImport }
 }
@@ -23,6 +24,7 @@ enum RuntimeError {
 #[derive(Debug, Clone, PartialEq)]
 enum Value {
     Const(Variant),
+    Float32(f32),
     ByteArray(Vec<u8>),
     Tuple(Variant, Vec<Value>),
     Closure(Closure),
@@ -58,6 +60,7 @@ impl Value {
             (ByteArray(_), _) => Err(RuntimeError::AttemptToPatternMatchOnByteArray),
             (Closure(_), _) => Err(RuntimeError::AttemptToPatternMatchOnClosure),
             (Const(variant0), Variant(variant1)) => Ok(variant0 == variant1),
+            (Float32(_), _) => Err(RuntimeError::AttemptToPatternMatchOnFloat32),
             (Tuple(variant0, _), Variant(variant1)) => Ok(variant0 == variant1),
             (_, Always) => Ok(true),
         }
@@ -120,6 +123,7 @@ impl FunctionEnvironment {
         use Term::*;
         match term {
             Const(variant) => Ok(Value::Const(*variant)),
+            Float32(x) => Ok(Value::Float32(*x)),
             ByteArray(bytes) => Ok(Value::ByteArray(bytes.to_vec())),
             Tuple(variant, terms) => Ok(Value::Tuple(*variant, self.interpret_terms(terms, var_env)?)),
             ProjectComponent(term, i) => {

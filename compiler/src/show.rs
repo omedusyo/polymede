@@ -126,6 +126,7 @@ pub fn show_term(term: &Term, next_parameter: usize) -> PrettyString {
 
     match term {
         Const(variant) => string(format!("{}", variant)),
+        Float32(x) => string(format!("{}", x)),
         ByteArray(bytes) => string(format!("[{}]", bytes.iter().map(|byte| format!("{}", byte)).collect::<Vec<_>>().join(", "))),
         Tuple(variant, args) => {
             if args.is_empty() {

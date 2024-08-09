@@ -246,8 +246,7 @@ fn compile_term(state: &mut State, term: &desugared_polymede::Term) -> gmm::Term
         TypedTerm(typed_term) => compile_typed_term(state, &typed_term),
         VariableUse(var) => compile_var(state, var),
         Int(x) => gmm::Term::Const(*x) ,
-        Float(x) => todo!(), // Should I convert the float to its inderylging IEEE-754
-                             // representation here?
+        Float(x) => gmm::Term::Float32(*x),
         StringLiteral(s) => gmm::Term::ByteArray(s.clone().into_bytes()), // TODO: Again, this clones the string, which really sucks.
         FunctionApplication(function_name, _, args) => {
             let Some(fn_index) = state.get_function_index(function_name) else { unreachable!() };

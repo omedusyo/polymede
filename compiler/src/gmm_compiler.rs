@@ -226,6 +226,16 @@ fn compile_term(state: &mut State, number_of_parameters: usize, term: &gmm::Term
             if tail_position { code.push(call(state.runtime.drop_env, vec![])) }
             Ok(seq(code))
         },
+        gmm::Term::Float32(x) => {
+            let mut code = vec![];
+            // TODO: Does this actually work?
+            let bytes = x.to_le_bytes();
+            let x_encoded = i32::from_le_bytes(bytes);
+            code.push(call(state.runtime.const_, vec![i32_const(x_encoded)]));
+
+            if tail_position { code.push(call(state.runtime.drop_env, vec![])) }
+            Ok(seq(code))
+        },
         gmm::Term::ByteArray(bytes) => {
             let mut code = vec![];
             let byte_count = bytes.len() as i32;

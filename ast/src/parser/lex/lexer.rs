@@ -543,8 +543,13 @@ impl <'state> State<'state> {
     //     Digit  ::= [0-9]
     pub fn commit_if_next_token_f32(&mut self) -> Result<Option<f32>> {
         fn make_float(state: &State, chars: Vec<char>) -> Result<Option<f32>> {
+            // TODO: remove this 
+            println!("float chars {}", chars.clone().into_iter().collect::<String>());
             match chars.into_iter().collect::<String>().parse::<f32>() {
-                Ok(float) => Ok(Some(float)),
+                Ok(float) => {
+                    println!("parsed float {}", float);
+                    Ok(Some(float))
+                },
                 Err(error) =>  state.error(Error::ExpectedF32ParseFloatError { error })
             }
         }

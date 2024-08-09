@@ -114,7 +114,7 @@ pub fn start_term(state: &mut State) -> Result<StartTerm> {
 
     match state.commit_if_next_token_f32()? {
         Some(x) => {
-            println!("THE FLOAT IS {}", x);
+            println!("the float is {}", x);
             return Ok(StartTerm::Float(x))
         },
         None => {},
