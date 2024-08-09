@@ -1,6 +1,8 @@
 (module
   (import "runtime" "const" (func $const (param i32)))
   (import "runtime" "get_const" (func $get_const (result i32)))
+  (import "runtime" "float32" (func $float32 (param f32)))
+  (import "runtime" "get_float32" (func $get_float32 (result f32)))
   (import "runtime" "dup" (func $dup))
   (import "runtime" "tuple" (func $tuple (param i32) (param i32)))
   (import "runtime" "get_array_slice_pointer" (func $get_array_slice_pointer (result i32)))
@@ -10,11 +12,14 @@
 
   ;; console_log_int(x)
   (import "console" "log_int" (func $console_log_int (param i32)))
+  ;; console_log_f32(x)
+  (import "console" "log_f32" (func $console_log_f32 (param f32)))
   ;; console_log_two_ints(x, y)
   (import "console" "log_two_ints" (func $console_log_two_ints (param i32) (param i32)))
   ;; console_log_string(raw_pointer_to_start_of_string_bytes, byte_count)
   (import "console" "log_string" (func $console_log_string (param i32) (param i32)))
 
+  ;; ===i32===
   (func $add (call $const (i32.add (call $get_const) (call $get_const))))
   (export "i32_add" (func $add))
 
@@ -39,6 +44,29 @@
   (func $dec (call $const (i32.sub (call $get_const) (i32.const 1))))
   (export "i32_dec" (func $dec))
 
+  ;; ===f32===
+  (func $f32_add (call $float32 (f32.add (call $get_float32) (call $get_float32))))
+  (export "f32_add" (func $f32_add))
+
+  (func $f32_mul (call $float32 (f32.mul (call $get_float32) (call $get_float32))))
+  (export "f32_mul" (func $f32_mul))
+
+  (func $f32_neg (call $float32 (f32.neg (call $get_float32))))
+  (export "f32_neg" (func $f32_neg))
+
+  (func $f32_abs (call $float32 (f32.abs (call $get_float32))))
+  (export "f32_abs" (func $f32_abs))
+
+  (func $f32_sqrt (call $float32 (f32.sqrt (call $get_float32))))
+  (export "f32_sqrt" (func $f32_sqrt))
+
+  (func $f32_min (call $float32 (f32.min (call $get_float32) (call $get_float32))))
+  (export "f32_min" (func $f32_min))
+
+  (func $f32_max (call $float32 (f32.max (call $get_float32) (call $get_float32))))
+  (export "f32_max" (func $f32_max))
+
+  ;; ===String===
   ;; Stirng, String -> String
   (func $string_concat
     ;; TODO: do a swap
@@ -58,6 +86,7 @@
   (global $OP_CODE_PRINT_INT i32 (i32.const 13))
   (global $OP_CODE_PRINT_TWO_INTS i32 (i32.const 14))
   (global $OP_CODE_PRINT_STRING i32 (i32.const 15))
+  (global $OP_CODE_PRINT_F32 i32 (i32.const 16))
 
   ;; WARNING: When adding a new system-call, don't forget the arity!
 
@@ -68,6 +97,11 @@
     ;; and that has 1 component that's the integer
     (call $tuple (global.get $OP_CODE_PRINT_INT) (i32.const 1)))
   (export "print_int" (func $print_int))
+
+  ;; F32 -> Cmd(I32)
+  (func $print_f32
+    (call $tuple (global.get $OP_CODE_PRINT_F32) (i32.const 1)))
+  (export "print_f32" (func $print_f32))
 
   ;; I32, I32 -> Cmd(I32)
   (func $print_two_ints 
@@ -99,17 +133,23 @@
     (if (i32.eq (local.get $op_code) (global.get $OP_CODE_PRINT_TWO_INTS))
     (then
       (call $console_log_two_ints (call $get_const) (call $get_const))
-      (call $const (i32.const 123456)))
+      (call $const (i32.const 0)))
     (else
 
     (if (i32.eq (local.get $op_code) (global.get $OP_CODE_PRINT_STRING))
     (then
       (call $dup)
       (call $console_log_string (call $get_array_slice_pointer) (call $get_array_slice_count))
-      (call $const (i32.const 123456)))
+      (call $const (i32.const 0)))
     (else
 
-        unreachable))))))
+    (if (i32.eq (local.get $op_code) (global.get $OP_CODE_PRINT_F32))
+    (then
+      (call $console_log_f32 (call $get_float32))
+      (call $const (i32.const 0)))
+    (else
+
+        unreachable))))))))
   )
   (export "perform_primitive_command" (func $perform_primitive_command))
 )

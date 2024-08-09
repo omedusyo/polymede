@@ -522,7 +522,8 @@ impl Expression {
                 // ===Numeric Instructions===
                 Expression::Op0(Op0::Const(NumberLiteral::I32(x))) => instructions.push(instructions::Instruction::I32Const(x)),
                 Expression::Op0(Op0::Const(NumberLiteral::I64(x))) => instructions.push(instructions::Instruction::I64Const(x)),
-                Expression::Op0(Op0::Const(_)) => todo!(),
+                Expression::Op0(Op0::Const(NumberLiteral::F32(x))) => instructions.push(instructions::Instruction::F32Const(x)),
+                Expression::Op0(Op0::Const(NumberLiteral::F64(_x))) => todo!(),
 
                 Expression::Op1(op1, arg) => {
                     binary_format_instructions(*arg, instructions);
@@ -591,6 +592,10 @@ pub fn i32_const(x: i32) -> Expression {
     Expression::Op0(Op0::Const(NumberLiteral::I32(x)))
 }
 
+pub fn f32_const(x: f32) -> Expression {
+    Expression::Op0(Op0::Const(NumberLiteral::F32(x)))
+}
+
 pub fn i32_add(e0: Expression, e1: Expression) -> Expression {
     Expression::Op2(Op2::Int(Size::X32, IntegerOp2::Add), Box::new(e0), Box::new(e1))
 }
@@ -653,6 +658,7 @@ pub fn i64_memory_set(address: Expression, value: Expression) -> Expression {
 
 pub const TYPE_I32: ValueType = ValueType::NumType(NumType::I32);
 pub const TYPE_I64: ValueType = ValueType::NumType(NumType::I64);
+pub const TYPE_F32: ValueType = ValueType::NumType(NumType::F32);
 
 pub fn fn_type(domain: Vec<ValueType>, codomain: Vec<ValueType>) -> FunctionType {
     FunctionType { domain, codomain }

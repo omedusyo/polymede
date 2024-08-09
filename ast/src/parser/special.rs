@@ -45,6 +45,7 @@ pub fn constructor_name_or_variable(state: &mut State) -> Result<VariableOrConst
 pub enum StartTerm {
     TypeAnnotation,
     Int(i32),
+    Float(f32),
     StringLiteral(String),
     VariableUse(Variable),
     FunctionApplication(Variable),
@@ -108,6 +109,11 @@ pub fn start_term(state: &mut State) -> Result<StartTerm> {
 
     match state.commit_if_next_token_int()? {
         Some(x) => return Ok(StartTerm::Int(x)),
+        None => {},
+    }
+
+    match state.commit_if_next_token_f32()? {
+        Some(x) => return Ok(StartTerm::Float(x)),
         None => {},
     }
 

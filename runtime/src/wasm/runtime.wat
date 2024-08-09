@@ -127,6 +127,22 @@
   )
   (export "get_const" (func $get_const))
 
+  (func $float32 (param $variant f32)
+    (i32.store8 (global.get $STACK) (global.get $CONST_TAG))
+    (call $inc_stack (i32.const 1))
+
+    (f32.store (global.get $STACK) (local.get $variant))
+    (call $inc_stack (i32.const 4))
+  )
+  (export "float32" (func $float32))
+
+  (func $get_float32 (result f32)
+    (call $dec_stack (i32.const 4))
+    (f32.load (global.get $STACK))
+    (call $dec_stack (i32.const 1))
+  )
+  (export "get_float32" (func $get_float32))
+
   (; ===Tuple=== ;)
   (; Consumes $count many tagged pointers on the stack, and moves them onto the heap ;)
   (; 0 <= $count <= 255 ;)

@@ -1,4 +1,4 @@
-use crate::binary_format::primitives::byte_stream::{ByteStream, Response, EVec, evector, byte, Byte, Seq, I64ToSignedLEB128, I32ToSignedLEB128, U32ToVariableLEB128};
+use crate::binary_format::primitives::byte_stream::{ByteStream, Response, EVec, evector, byte, Byte, Seq, I64ToSignedLEB128, I32ToSignedLEB128, U32ToVariableLEB128, F32ToIEEE754LittleEndian};
 use crate::binary_format::primitives::encoder::Encoder;
 use crate::binary_format::indices::IndexStream;
 
@@ -92,6 +92,8 @@ impl Instruction {
     pub const I64_CONST: u8 = 0x42;
     pub const I64_ADD: u8 = 0x7c;
 
+    // f32
+    pub const F32_CONST: u8 = 0x43;
 }
 
 pub enum InstructionStream {
@@ -99,6 +101,7 @@ pub enum InstructionStream {
     Simple2(Seq<Byte, Byte>),
     ConstI32(Seq<Byte, I32ToSignedLEB128>),
     ConstI64(Seq<Byte, I64ToSignedLEB128>),
+    ConstF32(Seq<Byte, F32ToIEEE754LittleEndian>),
     SimpleWithIndex(Seq<Byte, IndexStream>),
     SimpleWithDoubleIndex(Seq<Byte, Seq<IndexStream, IndexStream>>),
     // Not just a block instruction, but also if-then, loop
@@ -134,6 +137,11 @@ impl InstructionStream {
     fn i64_const(x: i64) -> Self {
         let s = byte(Instruction::I64_CONST).seq(I64ToSignedLEB128::new(x));
         Self::ConstI64(s)
+    }
+
+    fn f32_const(x: f32) -> Self {
+        let s = byte(Instruction::F32_CONST).seq(F32ToIEEE754LittleEndian::new(x));
+        Self::ConstF32(s)
     }
 
     fn simple_with_index<I: Index>(opcode: u8, index: I) -> Self {
@@ -175,6 +183,7 @@ impl ByteStream for InstructionStream {
             Self::Simple2(s) => s.next(),
             Self::ConstI32(s) => s.next(),
             Self::ConstI64(s) => s.next(),
+            Self::ConstF32(s) => s.next(),
             Self::SimpleWithIndex(s) => s.next(),
             Self::SimpleWithDoubleIndex(s) => s.next(),
             Self::BlockExpr(s) => s.next(),
@@ -277,7 +286,8 @@ impl Encoder for Instruction {
             I64Const(x) => InstructionStream::i64_const(*x),
             I64Add => InstructionStream::simple(Self::I64_ADD),
 
-            _ => todo!(),
+            // f32
+            F32Const(x) => InstructionStream::f32_const(*x),
         }
     }
 }
