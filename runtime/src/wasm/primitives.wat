@@ -19,6 +19,17 @@
   ;; console_log_string(raw_pointer_to_start_of_string_bytes, byte_count)
   (import "console" "log_string" (func $console_log_string (param i32) (param i32)))
 
+  (import "canvas" "get_width" (func $canvas_get_width_raw (result f32)))
+  (import "canvas" "get_height" (func $canvas_get_height_raw (result f32)))
+  ;; fill(r, g, b, a)
+  (import "canvas" "fill" (func $canvas_fill_raw (param i32) (param i32) (param i32) (param f32)))
+  ;; stroke(r, g, b, a)
+  (import "canvas" "stroke" (func $canvas_stroke_raw (param i32) (param i32) (param i32) (param f32)))
+  ;; line_width(x)
+  (import "canvas" "line_width" (func $canvas_line_width_raw (param f32)))
+  ;; fill_rect(x, y, w, h)
+  (import "canvas" "fill_rect" (func $canvas_fill_rect_raw (param f32) (param f32) (param f32) (param f32)))
+
   ;; ===i32===
   (func $add (call $const (i32.add (call $get_const) (call $get_const))))
   (export "i32_add" (func $add))
@@ -26,7 +37,13 @@
   (func $mul (call $const (i32.mul (call $get_const) (call $get_const))))
   (export "i32_mul" (func $mul))
 
-  (func $rem (call $const (i32.rem_s (call $get_const) (call $get_const))))
+  (func $rem
+    (local $x i32)
+    (local $mod_by i32)
+    (local.set $mod_by (call $get_const))
+    (local.set $x (call $get_const))
+    (call $const (i32.rem_s (local.get $mod_by) (local.get $x)))
+  )
   (export "i32_rem" (func $rem))
 
   (func $eq (call $const (i32.eq (call $get_const) (call $get_const))))
@@ -66,6 +83,15 @@
   (func $f32_max (call $float32 (f32.max (call $get_float32) (call $get_float32))))
   (export "f32_max" (func $f32_max))
 
+  (func $f32_div
+    (local $x f32)
+    (local $y f32)
+    (local.set $y (call $get_float32))
+    (local.set $x (call $get_float32))
+    (call $float32 (f32.div (local.get $x) (local.get $y)))
+  )
+  (export "f32_div" (func $f32_div))
+
   ;; ===String===
   ;; Stirng, String -> String
   (func $string_concat
@@ -87,6 +113,13 @@
   (global $OP_CODE_PRINT_TWO_INTS i32 (i32.const 14))
   (global $OP_CODE_PRINT_STRING i32 (i32.const 15))
   (global $OP_CODE_PRINT_F32 i32 (i32.const 16))
+
+  (global $OP_CODE_CANVAS_GET_WIDTH i32 (i32.const 60))
+  (global $OP_CODE_CANVAS_GET_HEIGHT i32 (i32.const 61))
+  (global $OP_CODE_CANVAS_FILL i32 (i32.const 62))
+  (global $OP_CODE_CANVAS_STROKE i32 (i32.const 63))
+  (global $OP_CODE_CANVAS_LINE_WIDTH i32 (i32.const 64))
+  (global $OP_CODE_CANVAS_FILL_RECT i32 (i32.const 65))
 
   ;; WARNING: When adding a new system-call, don't forget the arity!
 
@@ -119,6 +152,35 @@
     (call $tuple (global.get $OP_CODE_PRINT_STRING) (i32.const 1)))
   (export "print_string" (func $print_string))
 
+  ;; ===Canvas===
+  ;; -> Cmd(F32)
+  (func (export "canvas_get_width")
+    (call $tuple (global.get $OP_CODE_CANVAS_GET_WIDTH) (i32.const 0))
+  )
+  ;; -> Cmd(F32)
+  (func (export "canvas_get_height")
+    (call $tuple (global.get $OP_CODE_CANVAS_GET_HEIGHT) (i32.const 0))
+  )
+  ;; r,   g,   b,   a
+  ;; I32, I32, I32, F32 -> Cmd(I32)
+  (func (export "canvas_fill")
+    (call $tuple (global.get $OP_CODE_CANVAS_FILL) (i32.const 4))
+  )
+  ;; r,   g,   b,   a
+  ;; I32, I32, I32, F32 -> Cmd(I32)
+  (func (export "canvas_stroke")
+    (call $tuple (global.get $OP_CODE_CANVAS_STROKE) (i32.const 4))
+  )
+  ;; F32 -> Cmd(I32)
+  (func (export "canvas_line_width")
+    (call $tuple (global.get $OP_CODE_CANVAS_LINE_WIDTH) (i32.const 1))
+  )
+  ;; x,   y,   w,   h
+  ;; F32, F32, F32, F32 -> Cmd(I32)
+  (func (export "canvas_fill_rect")
+    (call $tuple (global.get $OP_CODE_CANVAS_FILL_RECT) (i32.const 4))
+  )
+
   ;; Takes in the system-code as input,
   ;; performs the side-effect, and eventually
   ;; could put the result on the stack if there is any.
@@ -149,7 +211,55 @@
       (call $const (i32.const 0)))
     (else
 
-        unreachable))))))))
+    ;; ===canvas===
+    (if (i32.eq (local.get $op_code) (global.get $OP_CODE_CANVAS_GET_WIDTH))
+    (then (call $float32 (call $canvas_get_width_raw)))
+    (else
+
+    (if (i32.eq (local.get $op_code) (global.get $OP_CODE_CANVAS_GET_HEIGHT))
+    (then (call $float32 (call $canvas_get_height_raw)))
+    (else
+
+    (if (i32.eq (local.get $op_code) (global.get $OP_CODE_CANVAS_FILL))
+    (then (call $canvas_fill))
+    (else
+
+    (if (i32.eq (local.get $op_code) (global.get $OP_CODE_CANVAS_FILL_RECT))
+    (then (call $canvas_fill_rect))
+
+    (else
+
+        unreachable))))))))))))))))
   )
   (export "perform_primitive_command" (func $perform_primitive_command))
+
+  (func $canvas_fill
+    (local $r i32)
+    (local $g i32)
+    (local $b i32)
+    (local $a f32)
+
+    (local.set $r (call $get_const))
+    (local.set $g (call $get_const))
+    (local.set $b (call $get_const))
+    (local.set $a (call $get_float32))
+
+    (call $canvas_fill_raw (local.get $r) (local.get $g) (local.get $b) (local.get $a))
+    (call $const (i32.const 0))
+  )
+
+  (func $canvas_fill_rect
+    (local $x f32)
+    (local $y f32)
+    (local $w f32)
+    (local $h f32)
+
+    (local.set $x (call $get_float32))
+    (local.set $y (call $get_float32))
+    (local.set $w (call $get_float32))
+    (local.set $h (call $get_float32))
+
+    (call $canvas_fill_rect_raw (local.get $x) (local.get $y) (local.get $w) (local.get $h))
+    (call $const (i32.const 0))
+  )
 )

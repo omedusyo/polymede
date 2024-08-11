@@ -87,7 +87,6 @@ cargo run --bin compiler -- -f examples/simple_test.pmd
 
 cargo run --bin compiler -- -f examples/closure_test.pmd -o tmp/closure_test
 
-rm test_out.wasm
 cargo run --bin compiler -- -f test.pmd -o test_out
 
 wasm2wat test_out.wasm -o test_out.wat
@@ -102,7 +101,6 @@ wat2wasm ../runtime/src/wasm/runtime.wat -o runtime.wasm
 wat2wasm ../runtime/src/wasm/primitives.wat -o primitives.wasm
 
 # compile and link
-rm test_out.*
 cargo run --bin compiler -- -f test.pmd -o test_out
 wasm2wat test_out.wasm -o test_out.wat
 
@@ -113,7 +111,6 @@ cat output.wat
 
 TMP_WASM=tmp_wasm
 MODULE=out00
-rm $TMP_WASM/$MODULE.wasm
 cargo run --bin compiler
 
 wasm2wat $TMP_WASM/$MODULE.wasm 

@@ -50,6 +50,7 @@ fn main() -> Result<()> {
     let mut out_interface_file = fs::OpenOptions::new()
         .create(true)
         .write(true)
+        .truncate(true)
         .open(&format!("{}.pmdi", args.out))?;
     out_interface_file.write(interface_str.as_bytes())?;
 
@@ -71,6 +72,7 @@ fn main() -> Result<()> {
     let mut out_gmm_file = fs::OpenOptions::new()
         .create(true)
         .write(true)
+        .truncate(true)
         .open(&format!("{}.gmm", args.out))?;
     out_gmm_file.write(gmm_str.as_bytes())?;
 
@@ -89,6 +91,7 @@ fn main() -> Result<()> {
     let mut wasm_file = fs::OpenOptions::new()
         .create(true)
         .write(true)
+        .truncate(true)
         .open(&format!("{}.wasm", args.out))?;
     wasm_file.write(&bytes)?;
 
