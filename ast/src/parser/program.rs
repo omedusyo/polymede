@@ -6,7 +6,7 @@ use crate::parser::lex::{
     lexer::{Request, LocatedToken, DeclarationKind},
 };
 use crate::parser::{
-    base::{State, Result, Error, PreProgram, Declaration, PreIndDeclaration, PreEnumDeclaration, PreTypeDeclaration},
+    base::{State, Result, Error, PreProgram, Declaration, PreIndDeclaration, PreEnumDeclaration, PreTypeDeclaration, PreMsgTypeDeclaration},
     identifier::{variable, constructor_name, function_name, foreign_function_name},
     term::{term, typed_term},
     types::{foreign_function_type, type_nonempty_sequence, function_type_annotation},
@@ -43,15 +43,23 @@ fn check_program_names_uniqueness(program: &PreProgram) -> Result<()> {
         _ => return Err(Error::MoreThanOneRunDeclaration),
     }
 
+    match program.msg_types.len() {
+        0 => return Err(Error::MsgTypeDeclarationNotFound),
+        1 => {},
+        _ => return Err(Error::MoreThanOneMsgTypeDeclaration),
+    }
+
     Ok(())
 }
 
 fn program_declaration(state: &mut State) -> Result<Declaration> {
+    use DeclarationKind::*;
     match state.peek_declaration_token()? {
-        DeclarationKind::Type => Ok(Declaration::Type(type_declaration(state)?)),
-        DeclarationKind::Run => Ok(Declaration::Run(run_declaration(state)?)),
-        DeclarationKind::UserFunction => Ok(Declaration::Function(FunctionDeclaration::User(user_function_declaration(state)?))),
-        DeclarationKind::ForeignFunction => Ok(Declaration::Function(FunctionDeclaration::Foreign(foreign_function_declaration(state)?))),
+        Type => Ok(Declaration::Type(type_declaration(state)?)),
+        Run => Ok(Declaration::Run(run_declaration(state)?)),
+        UserFunction => Ok(Declaration::Function(FunctionDeclaration::User(user_function_declaration(state)?))),
+        ForeignFunction => Ok(Declaration::Function(FunctionDeclaration::Foreign(foreign_function_declaration(state)?))),
+        MsgType => Ok(Declaration::MsgTypeDeclaration(msg_type_declaration(state)?)),
     }
 }
 
@@ -75,7 +83,7 @@ fn constructor_declaration_sequence(state: &mut State) -> Result<Vec<Constructor
     delimited_possibly_empty_sequence_to_vector( state, constructor_declaration, or_separator)
 }
 
-static FORBIDDEN_TYPE_NAMES:[&str; 4] = ["Fn", "I32", "String", "Cmd"];
+static FORBIDDEN_TYPE_NAMES:[&str; 5] = ["Fn", "I32", "F32", "String", "Cmd"];
 
 fn is_type_name_forbidden(name: &str) -> bool { 
     for forbidden_name in FORBIDDEN_TYPE_NAMES {
@@ -138,6 +146,13 @@ pub fn type_declaration(state: &mut State) -> Result<PreTypeDeclaration> {
     Ok(declaration)
 }
 
+pub fn msg_type_declaration(state: &mut State) -> Result<PreTypeDeclaration> {
+    state.request_keyword(Keyword::Msg)?;
+    // TODO: It seems that this will allow `msgtype`. 
+    let type_declaration = type_declaration(state)?;
+    Ok(type_declaration)
+}
+
 // ===Function Declarations===
 pub fn foreign_function_declaration(state: &mut State) -> Result<ForeignFunctionDeclaration> {
     state.request_keyword(Keyword::Foreign)?;
@@ -198,7 +213,6 @@ pub fn typed_function(state: &mut State, type_: FunctionType) -> Result<TypedFun
         Ok(TypedFunction { type_, function })
     }
 }
-
 
 pub fn run_declaration(state: &mut State) -> Result<RunDeclaration> {
     state.request_keyword(Keyword::Run)?;

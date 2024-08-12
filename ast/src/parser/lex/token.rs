@@ -26,6 +26,7 @@ pub enum Keyword {
     Assign,
     Arrow,
     Type_,
+    Msg,
     Enum,
     Ind,
     Match,
@@ -65,6 +66,7 @@ impl Keyword {
     pub const ENUM: &'static str = "enum";
     pub const IND: &'static str = "ind";
     pub const TYPE: &'static str = "type";
+    pub const MSG: &'static str = "msg";
     pub const MATCH: &'static str = "match";
     pub const FOLD: &'static str = "fold";
     pub const TYPE_OF_VALUE: &'static str = "#";
@@ -88,6 +90,7 @@ impl Keyword {
             Enum => Self::ENUM,
             Ind => Self::IND,
             Type_ => Self::TYPE,
+            Msg => Self::MSG,
             Match => Self::MATCH,
             Fold => Self::FOLD,
             Forall => Self::FORALL,

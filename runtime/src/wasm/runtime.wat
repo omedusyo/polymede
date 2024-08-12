@@ -521,6 +521,14 @@
   )
   (export "and_then" (func $and_then))
 
+  (func $receive
+    ;; Cmd(a)
+    ;; op-code for receive is 2
+    ;; js is responsible for calling pushing a value onto the stack and resumming execution.
+    (call $tuple (i32.const 2) (i32.const 0))
+  )
+  (export "receive" (func $receive))
+
   (; =====Byte Arrays and Slices====== ;)
   ;; Create an array slice on the heap, then push a tagged pointer to it to the stack.
   (func $array_slice (param $slice_parent_pointer i32) (param $slice_pointer i32) (param $slice_count i32)

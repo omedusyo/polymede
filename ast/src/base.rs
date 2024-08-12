@@ -12,6 +12,7 @@ pub struct Program {
     pub function_declarations_ordering: Vec<FunctionName>,
     pub run_declaration: Option<RunDeclaration>,
     pub constructor_to_type_mapping: HashMap<ConstructorName, Variable>,
+    pub msg_type: Option<Variable>,
 }
 
 impl Program {
@@ -24,6 +25,7 @@ impl Program {
             function_declarations_ordering: vec![],
             run_declaration: None,
             constructor_to_type_mapping: HashMap::new(),
+            msg_type: None,
         }
     }
 

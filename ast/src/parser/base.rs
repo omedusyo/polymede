@@ -34,6 +34,8 @@ pub enum Error {
     TypeHasForbiddenName { received: String },
     MoreThanOneRunDeclaration,
     RunDeclarationNotFound,
+    MsgTypeDeclarationNotFound,
+    MoreThanOneMsgTypeDeclaration,
     FunctionHasDifferentNumberOfParametersThanDeclaredInItsType { declared_in_type: usize, parameters: usize },
 }
 
@@ -48,24 +50,32 @@ pub fn parse_program(s: &str) -> Result<Program> {
     let mut state = State::new(s, program.interner_mut());
     let pre_program = pre_program(&mut state)?;
 
+    // ===types===
     for pre_decl in pre_program.type_declarations {
         let decl = TypeDeclaration::new(pre_decl,  &mut program.constructor_to_type_mapping);
         program.type_declarations_ordering.push(decl.name().clone());
         program.type_declarations.insert(decl.name().clone(), decl);
     }
+    // ===msg type====
+    program.msg_type = pre_program.msg_types.into_iter().nth(0);
+
+    // ===functions===
     for decl in pre_program.function_declarations {
         program.function_declarations_ordering.push(decl.name());
         program.function_declarations.insert(decl.name(), decl);
     }
+    // ===run====
     program.run_declaration = pre_program.run_declarations.into_iter().nth(0);
 
     Ok(program)
 }
 
+
 pub enum Declaration {
     Type(PreTypeDeclaration),
     Run(RunDeclaration),
     Function(FunctionDeclaration),
+    MsgTypeDeclaration(PreTypeDeclaration),
 }
 
 #[derive(Debug)]
@@ -73,21 +83,27 @@ pub struct PreProgram {
     pub type_declarations: Vec<PreTypeDeclaration>,
     pub function_declarations: Vec<FunctionDeclaration>,
     pub run_declarations: Vec<RunDeclaration>,
+    pub msg_types: Vec<Variable>,
 }
 
 #[derive(Debug)]
 pub struct PreEnumDeclaration {
-    pub name: ConstructorName,
+    pub name: Variable,
     pub type_parameters: Vec<Variable>,
     pub constructors: Vec<ConstructorDeclaration>,
 }
 
 #[derive(Debug)]
 pub struct PreIndDeclaration {
-    pub name: ConstructorName,
+    pub name: Variable,
     pub type_parameters: Vec<Variable>,
     pub recursive_type_var: Variable,
     pub constructors: Vec<ConstructorDeclaration>,
+}
+
+#[derive(Debug)]
+pub struct PreMsgTypeDeclaration {
+    pub type_declaration: PreTypeDeclaration,
 }
 
 #[derive(Debug)]
@@ -96,21 +112,35 @@ pub enum PreTypeDeclaration {
     Ind(PreIndDeclaration),
 }
 
+impl PreTypeDeclaration {
+    fn name(&self) -> &Variable {
+        match self {
+            Self::Enum(decl) => &decl.name,
+            Self::Ind(decl) => &decl.name,
+        }
+    }
+}
+
 impl PreProgram {
     pub fn new() -> Self {
-        Self { type_declarations: vec![], function_declarations: vec![], run_declarations: vec![] }
+        Self { type_declarations: vec![], function_declarations: vec![], run_declarations: vec![], msg_types: vec![], }
     }
 
     pub fn add_declaration(&mut self, decl: Declaration) {
+        use Declaration::*;
         match decl {
-            Declaration::Type(type_declaration) => {
+            Type(type_declaration) => {
                 self.type_declarations.push(type_declaration)
             },
-            Declaration::Run(run_declaration) => {
+            Run(run_declaration) => {
                 self.run_declarations.push(run_declaration)
             },
-            Declaration::Function(function_declaration) => {
+            Function(function_declaration) => {
                 self.function_declarations.push(function_declaration)
+            },
+            MsgTypeDeclaration(type_declaration) => {
+                self.msg_types.push(type_declaration.name().clone());
+                self.type_declarations.push(type_declaration);
             },
         }
     }

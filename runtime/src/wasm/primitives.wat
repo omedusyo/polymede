@@ -184,6 +184,8 @@
   ;; Takes in the system-code as input,
   ;; performs the side-effect, and eventually
   ;; could put the result on the stack if there is any.
+  ;; TODO: What is the point of having this here? Why not implement this directly in js?
+  ;;       I'm doing that anyway... This is just a pointless extra wrapper.
   (func $perform_primitive_command (param $op_code i32)
     (if (i32.eq (local.get $op_code) (global.get $OP_CODE_PRINT_INT))
     (then
