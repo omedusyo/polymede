@@ -89,6 +89,10 @@ impl <'env>Environment<'env> {
         self.program.get_type_declaration(type_name)
     }
 
+    pub fn get_msg_type(&self) -> Type {
+        self.program.get_msg_type()
+    }
+
     pub fn get_type_declaration_of_constructor(&self, constructor_name: &ConstructorName) -> Option<&TypeDeclaration> {
         self.program.get_type_declaration_of_constructor(constructor_name)
     }
@@ -244,7 +248,8 @@ fn type_infer(env: &mut Environment, term: &Term) -> Result<Type> {
             let Type::Command(_) = &command_type else { return Err(Error::ReturnNonCommandInDoExpression { received: command_type.clone() }) };
             env.close_env();
             Ok(command_type)
-        }
+        },
+        Receive => Ok(Type::Command(Box::new(env.get_msg_type()))),
     }
 }
 
@@ -444,6 +449,14 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
             type_check(env, body, expected_type)?;
             env.close_env();
             Ok(())
+        },
+        Receive => {
+            let msg_cmd_type = Type::Command(Box::new(env.get_msg_type()));
+            if eq_type(&msg_cmd_type, expected_type) {
+                Ok(())
+            } else {
+                Err(Error::ReceiveExpressionIsExpectedToBeNonMessageType { expected_type: expected_type.clone(), msg_cmd_type })
+            }
         },
     }
 }

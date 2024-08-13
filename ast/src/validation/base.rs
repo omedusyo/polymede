@@ -37,6 +37,7 @@ pub enum Error {
     TermDoesntHaveExpectedArrowType { received: Type },
     AttemptToExecuteNonCommand { received: Type },
     ReturnNonCommandInDoExpression { received: Type },
+    ReceiveExpressionIsExpectedToBeNonMessageType { expected_type: Type, msg_cmd_type: Type },
 
     UnableToInferTypeOfMatch,
     UnableToInferTypeOfFold,
@@ -88,6 +89,7 @@ impl Error {
             TermDoesntHaveExpectedArrowType { received } => format!("Term has type {}, but is expected to be an Arrow type.", sh.show_type(received)),
             AttemptToExecuteNonCommand { received } => format!("Term is supposed to be a command but has type {}", sh.show_type(received)),
             ReturnNonCommandInDoExpression { received } => format!("Can't return term of type {} in a do expression", sh.show_type(received)),
+            ReceiveExpressionIsExpectedToBeNonMessageType { expected_type, msg_cmd_type: msg_type } => format!("Receive expression's expected type {} does not match the message type {}", sh.show_type(expected_type), sh.show_type(msg_type)),
 
             UnableToInferTypeOfMatch => format!("Unable to infer type of match expression."),
             UnableToInferTypeOfFold => format!("Unable to infer type of fold expression."),
