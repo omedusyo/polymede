@@ -92,6 +92,7 @@ pub fn term(state: &mut State) -> Result<Term> {
             state.request_token(Request::CloseCurly)?;
             Ok(Term::Do(bindings, Box::new(body)))
         },
+        StartTerm::Receive => Ok(Term::Receive),
     }
 }
 
