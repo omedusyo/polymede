@@ -10,6 +10,8 @@ pub enum Error {
     TypeConstructorIsApplliedToWrongNumberOfArguments { expected: usize, received: usize },
     UndefinedTypeVaraible { variable: Variable },
     NegativeOccuranceOfRecursiveTypeVariableInInductiveDeclaration { variable: Variable },
+    MsgTypeIsNotValueType { received_type: Type },
+    MsgTypeCantHaveTypeParameters,
 
     RunExpressionDoesntHaveExpectedCommandType { received: Type },
 
@@ -57,6 +59,10 @@ impl Error {
             TypeConstructorIsApplliedToWrongNumberOfArguments { expected, received } => format!("Type Constructor is applied to {} arguments but expects {}.", received, expected),
             UndefinedTypeVaraible { variable } => format!("Undefined type variable '{}'.", sh.show_identifier(variable)),
             NegativeOccuranceOfRecursiveTypeVariableInInductiveDeclaration { variable } => format!("Negative occurance of self type variable {} in inductive type declaration.", sh.show_identifier(variable)),
+            MsgTypeIsNotValueType { received_type } => format!("Message type {} is not a value type.", sh.show_type(received_type)),
+            MsgTypeCantHaveTypeParameters => format!("Message type can't have type parameters."),
+
+            FunctionOutputTypeDoesntMatchExpectedType { function_name, expected_type, received_type } => format!("Function's '{}' output type is {} but is expected to be {}.", sh.show_identifier(function_name), sh.show_type(received_type), sh.show_type(expected_type)),
 
             RunExpressionDoesntHaveExpectedCommandType { received } => format!("Run expression is supposed to be a command but has type {}", sh.show_type(received)),
 

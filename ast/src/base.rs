@@ -57,6 +57,12 @@ impl Program {
         }
         result
     }
+
+    pub fn get_msg_type_declaration(&self) -> &TypeDeclaration {
+        let Some(msg_type_name) = &self.msg_type else { unreachable!() };
+        let Some(msg_type_declaration) = self.get_type_declaration(msg_type_name) else { unreachable!() };
+        msg_type_declaration
+    }
     
     pub fn function_declarations_in_source_ordering(&self) -> Vec<&FunctionDeclaration> {
         let mut result = vec![];
@@ -281,6 +287,26 @@ impl TypeDeclaration {
         match self {
             Enum(decl) => decl.constructors_in_source_ordering(),
             Ind(decl) => decl.constructors_in_source_ordering(),
+        }
+    }
+}
+
+impl Type {
+    pub fn is_value_type(&self) -> bool {
+        use Type::*;
+        match self {
+            VariableUse(_) => true,
+            TypeApplication(_, types) => {
+                for type_ in types {
+                    if type_.is_value_type() { return false }
+                }
+                return true
+            },
+            Arrow(_) => false,
+            I32 => true,
+            F32 => true,
+            String => true,
+            Command(_) => false,
         }
     }
 }
