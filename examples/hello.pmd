@@ -1,0 +1,333 @@
+type Bool = enum { F | T }
+type Pair(a, b) = enum { Pair(a, b) }
+type List(a) = enum { Nil | Cons(a, List(a)) }
+
+// ===I32===
+foreign "i32_add"
+fn add : I32, I32 -> I32
+
+foreign "i32_mul"
+fn mul : I32, I32 -> I32
+
+// WARNING: Second argument is what you are dividing by. 😀
+foreign "i32_rem"
+fn remainder : I32, I32 -> I32
+
+foreign "i32_inc"
+fn inc : I32 -> I32
+
+foreign "i32_dec"
+fn dec : I32 -> I32
+
+foreign "i32_eq"
+fn i32_eq : I32, I32 -> I32
+
+foreign "i32_leq"
+fn i32_leq : I32, I32 -> I32
+
+foreign "i32_lt"
+fn i32_lt : I32, I32 -> I32
+
+// ===F32===
+foreign "f32_add"
+fn f32_add : F32, F32 -> F32
+
+foreign "f32_mul"
+fn f32_mul : F32, F32 -> F32
+
+foreign "f32_abs"
+fn f32_abs : F32 -> F32
+
+foreign "f32_sqrt"
+fn f32_sqrt : F32 -> F32
+
+foreign "f32_div"
+fn f32_div : F32, F32 -> F32
+
+foreign "f32_max"
+fn f32_max : F32, F32 -> F32
+
+foreign "f32_min"
+fn f32_min : F32, F32 -> F32
+
+
+// ===String===
+foreign "string_concat"
+fn concat : String, String -> String
+
+// ===Cmd===
+
+foreign "print_int"
+fn print_int : I32 -> Cmd(I32)
+
+foreign "print_f32"
+fn print_f32 : F32 -> Cmd(I32)
+
+foreign "print_two_ints"
+fn print_two_ints : I32, I32 -> Cmd(I32)
+
+foreign "print_string"
+fn print : String -> Cmd(I32)
+
+foreign "garbage_collection"
+fn gc : -> I32
+
+// ===Canvas===
+foreign "canvas_get_width"
+fn get_width : -> Cmd(F32)
+
+foreign "canvas_get_height"
+fn get_height : -> Cmd(F32)
+
+foreign "canvas_fill"
+fn fill : I32, I32, I32, F32 -> Cmd(I32)
+
+foreign "canvas_stroke"
+fn stroke : I32, I32, I32, F32 -> Cmd(I32)
+
+foreign "canvas_line_width"
+fn line_width : F32 -> Cmd(I32)
+
+foreign "canvas_fill_rect"
+fn fill_rect : F32, F32, F32, F32 -> Cmd(I32)
+
+fn eq = # I32, I32 -> Bool : { x, y .
+  match i32_eq(x, y) {
+  | 0 . F
+  | 1 . T
+  }
+}
+
+//fn wat = # F32 -> F32 : { x . %123.312393e10 }
+
+fn singleton = forall { a .
+  # a -> List(a) : { x . Cons(x, Nil) }
+}
+
+fn range = # I32 -> List(I32) : { n .
+  range_interval(0, n)
+}
+
+fn range_interval = # I32, I32 -> List(I32) : { a, b .
+  match eq(a, b) {
+  | T . Nil
+  | F . Cons(a, range_interval(inc(a), b))
+  }
+}
+
+fn sum = # I32 -> I32 : { x .
+  match x {
+  | 0 . 0
+  | _ . add(x, sum(dec(x)))
+  }
+}
+
+fn factorial = # I32 -> I32 : { x .
+  match x {
+  | 0 . 1
+  | _ . mul(x, factorial(dec(x)))
+  }
+}
+
+fn map = forall { a, b . # Fn(a -> b), List(a) -> List(b) : { f, xs .
+  match xs {
+  | Nil . Nil
+  | Cons(x, xs) . Cons(apply f to (x), map<a, b>(f, xs))
+  }
+}}
+
+fn filter = forall { a . # Fn(a -> Bool), List(a) -> List(a) : { f, xs .
+  match xs {
+  | Nil . Nil
+  | Cons(x, xs) .
+    match apply f to (x) {
+    | T . Cons(x, filter<a>(f, xs))
+    | F . filter<a>(f, xs)
+    }
+  }
+}}
+
+fn len = forall { a . # List(a) -> I32 : { xs .
+  len_iter<a>(xs, 0)
+}}
+
+fn len_iter = forall { a . # List(a), I32 -> I32 : { xs, result .
+  match xs {
+  | Nil . result
+  | Cons(x, xs) . len_iter<a>(xs, add(result, 1))
+  }
+}}
+
+fn is_even = # I32 -> Bool : { x .
+  eq(remainder(x, 2), 0)
+}
+
+//fn test_str = # String -> String : { x . 
+//  "he\tll\u{1f923}o, wor😀ld\n\n\n\"''"
+////  "f"
+////  "yoooo"
+//}
+
+// run # I32 : add_5(500)
+// run # I32 : add(5, 256)
+// run # Bool : T
+// run # Pair(Pair(I32, I32), Pair(I32, I32)) : Pair(Pair(40, -1000), Pair(50, 60))
+// run # List(I32) : Cons(10, Cons(20, Cons(30, Cons(40, singleton<I32>(50)))))
+// run # Bool : is_zero(5)
+// run # I32 : sum(5)
+// run # I32 : factorial(6)
+// run # List(I32) : range_interval(50, 55)
+// run # List(I32) : map<I32, I32>(fn { x . factorial(x) }, range(5))
+
+//run # List(I32) :
+//  filter<I32>(fn { x . is_even(x) }, range(10))
+
+//run # Cmd(I32) : do {
+//, xs = range(len<I32>(range(2500)))
+//, ys = filter<I32>(fn { x . is_even(x) }, xs)
+//. print_int(len<I32>(ys))
+//}
+
+//fn hello_loop = # -> Cmd(I32) : { .
+//  do {
+//  , wat <- print("hello\n")
+//  //, wat <- print_int(123)
+//  . hello_loop()
+//  }
+//}
+
+// run # Cmd(I32) : hello_loop()
+
+fn loop = # I32, String -> Cmd(I32) : { x, s .
+  do {
+  , wat <- print_int(x)
+  , wat <- print(s)
+  . loop(add(x, 1), s)
+  }
+}
+
+
+type LoopControl(s, a) = enum { Continue(s) | Break(a) }
+
+fn while = forall { s, a . # s, Fn(s -> LoopControl(s, a)) -> a : { state, f .
+  match apply f to (state) {
+  | Break(a) . a
+  | Continue(new_state) . while<s, a>(new_state, f)
+  }
+}}
+
+fn do_while = forall { s, a . # s, Fn(s -> Cmd(LoopControl(s, a))) -> Cmd(a) : { state, f . do {
+, control <- apply f to (state)
+. match control {
+  | Break(a) . pure(a)
+  | Continue(new_state) . do_while<s, a>(new_state, f)
+  }
+}}}
+
+fn do_for = forall { s, a . # s, List(a), Fn(s, a -> Cmd(LoopControl(s, s))) -> Cmd(s) : { state, xs, f . match xs {
+| Nil . pure(state)
+| Cons(x, xs) . do {
+  , control <- apply f to (state, x)
+  . match control {
+  | Break(new_state) . pure(new_state)
+  | Continue(new_state) . do_for<s, a>(new_state, xs, f)
+  }
+}}}}
+
+//run # Cmd(I32) : do {
+//, x = "foo"
+//, y = "bar"
+//, z = concat(y, x)
+//. loop(z)
+//}
+
+// run # Cmd(String) : pure("qwertydgs")
+
+// run # Cmd(I32) : loop(0, "hello, world, yo!")
+
+//run # Cmd(I32) : do_while<I32, I32>(0, fn { state . do {
+//, wat <- print_int(state)
+//, wat <- print("hello yo")
+//. pure(Continue(add(state, 1)))
+//}})
+
+
+
+//run # Cmd(I32) : do_for<I32, I32>(0, range_interval(500, 600), fn { state, i . 
+//  do {
+//  , watever <- print_int(i)
+//  . pure(Continue(state))
+//  }
+//})
+
+type Vec2D = enum { Vec2D(F32, F32) }
+
+fn length = # Vec2D -> F32 : { v . match v {
+| Vec2D(x, y) . f32_sqrt(f32_add(f32_mul(x, x), f32_mul(y, y)))
+}}
+
+fn vec_add = # Vec2D, Vec2D -> Vec2D : { v, w .
+  match v {
+  | Vec2D(v0, v1) . match w { Vec2D(w0, w1) . Vec2D(f32_add(v0, w0), f32_add(v1, w1)) }
+  }
+}
+
+//run # Cmd(I32) : print_f32(length(Vec2D(%100.0, %100.0)))
+// run # Cmd(I32) : print_int(123)
+
+fn clip = # F32, F32, F32 -> F32 : { a, x, b .
+  f32_min(f32_max(a, x), b)
+}
+
+fn background = # I32, I32, I32, F32 -> Cmd(I32) : { r, g, b, a. do {
+, w <- get_width()
+, h <- get_height()
+, ignore <- fill(r, g, b, a)
+. fill_rect(%0.0, %0.0, w, h)
+}}
+
+fn render_loop = # F32 -> Cmd(I32) : { state . do {
+, tick <- receive
+, w <- get_width()
+, ignore <- background(255, 255, 255, %1.0)
+, ignore <- fill(0, 255, 0, %1.0)
+, ignore <- fill_rect(state, %0.0, %100.0, %100.0)
+. render_loop(clip(%0.0, f32_add(state, %1.0), w))
+}}
+
+fn start_canvas = # -> Cmd(I32) : { . do {
+, w <- get_width()
+, h <- get_height()
+, wat <- do {
+  , x <- print_int(123)
+  , y <- print_f32(%512.5)
+  . print("yoyoyooy")
+  }
+, msg0 <- receive
+, msg1 <- receive
+, msg_again = # List(Msg) : Cons(msg0, Cons(msg1, Nil))
+, ignore <- background(128, 128, 128, %1.0)
+, ignore <- fill(0, 255, 0, %1.0)
+, ignore <- fill_rect(%250.0, %0.0, %100.0, %100.0)
+. render_loop(%0.0)
+}}
+
+msg type Msg = enum {
+| Tick(I32)
+}
+
+fn print_msg = # Msg -> Cmd(I32) : { msg . match msg {
+| Tick(x) . print_int(x)
+}}
+
+fn receive_loop = # -> Cmd(I32) : { . do {
+, u <- print("gimme int: ")
+, msg <- receive
+, u <- print_msg(msg)
+. receive_loop()
+}}
+
+//run # Cmd(I32) : receive_loop()
+//run # Cmd(Msg) : receive
+//run # Cmd(I32) : loop(0, "yo")
+//run # Cmd(I32) : start_canvas()

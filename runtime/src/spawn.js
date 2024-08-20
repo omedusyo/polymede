@@ -1,10 +1,11 @@
-const fs = require('node:fs');
-const { showValue, showValueWithAddress, showStack, showStackWithAddress, deepReadRawPointer, readRawPointer, readTuple, readStack, deepReadStack } = require("./memory_inspect.js");
-const { perform } = require("./perform_command.js");
+import { execute_top_continuation, perform } from "./perform_command.js";
+import { Value, Tag } from "./message.js";
+import { showValue, showValueWithAddress, showStack, showStackWithAddress, deepReadRawPointer, readRawPointer, readTuple, readStack, deepReadStack } from "./memory_inspect.js";
 
-function run(bytes) {
+// ArrayBuffer -> Promise<PolymedeActor>
+export function spawn(bytes) {
 
-  WebAssembly.compile(bytes).then((module) => {
+  return WebAssembly.compile(bytes).then(module => {
     const POLYMEDE_STATIC_CUSTOM_SECTION = WebAssembly.Module.customSections(module, "POLYMEDE_STATIC");
     if (POLYMEDE_STATIC_CUSTOM_SECTION.length == 0) {
       throw Error("wasm module doesn't contain POLYMEDE_STATIC custom section. Did you get your order of wasm-merge arguments wrong (it can strip custom sections in the wrong order)?");
@@ -55,12 +56,19 @@ function run(bytes) {
       view.setUint8(i, static_view.getUint8(i));
     }
 
-    function log_stack(s) {
-      console.log(s, showStackWithAddress(deepReadStack(view, GLOBAL.STACK_START.valueOf(), GLOBAL.STACK.valueOf())));
-    }
-
     function log_heap_meta() {
       console.log(`A_HEAP = ${GLOBAL.A_HEAP_START.valueOf()}, B_HEAP = ${GLOBAL.B_HEAP_START.valueOf()}`);
+    }
+
+    // ===Canvas===
+    const canvas_el = document.querySelector("#canvas");
+    if (!canvas_el.getContext) { throw Error("No canvas detected!"); }
+
+    const ctx = canvas_el.getContext("2d");
+    // const ctx = { }; // fake canvas for command-line
+
+    function log_stack(s) {
+      console.log(s, showStackWithAddress(deepReadStack(view, GLOBAL.STACK_START.valueOf(), GLOBAL.STACK.valueOf())));
     }
 
     const config = {
@@ -74,51 +82,48 @@ function run(bytes) {
         FREE,
         STATIC_START,
 
-        on_stack_overflow: () => {
-          throw Error("Linear Stack Overflow!");
-        },
-        on_garbage_collection: () => {
-          console.log("========Performing GC===========");
-        },
-        on_out_of_memory: () => {
-          throw Error("Out of heap memory!");
-        },
-        debug_int: (x) => {
-          console.log("DEBUGGING x =", x);
-        },
-        debug: () => {
-          console.log("DEBUGGING");
-        },
+        on_stack_overflow: () => { throw Error("Linear Stack Overflow!"); },
+        on_garbage_collection: () => { console.log("========Performing GC==========="); },
+        on_out_of_memory: () => { throw Error("Out of heap memory!"); },
+        debug_int: (x) => { console.log("DEBUGGING x =", x); },
+        debug: () => { console.log("DEBUGGING"); },
         show_stack: (x) => {
           log_stack(x);
         },
       },
       console: {
-        log_int(x) {
-          console.log(x);
-        },
-        log_f32(x) {
-          console.log(x);
-        },
-        log_two_ints(x, y) {
-          console.log("Logging two ints", x, y);
-        },
+        log_int(x) { console.log(x); },
+        log_f32(x) { console.log(x); },
+        log_two_ints(x, y) { console.log("Logging two ints", x, y); },
         log_string(pointer, byte_count) {
-          // console.log("pointer", pointer);
-          // console.log("byte_count", byte_count);
-
           const string_view = new DataView(memory.buffer, pointer,byte_count);
           let utf8decoder = new TextDecoder();
           let s = utf8decoder.decode(string_view);
           console.log(s);
         }
       },
+      canvas: {
+        get_width() { return ctx.canvas.clientWidth; },
+        get_height() { return ctx.canvas.clientHeight; },
+        fill(r, g, b, a) {
+          ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+        },
+        stroke(r, g, b, a) {
+          ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+        },
+        line_width(x) {
+          ctx.lineWidth = x;
+        },
+        fill_rect(x, y, w, h) {
+          ctx.fillRect(x, y, w, h);
+        },
+      }
     };
 
 
-    WebAssembly.instantiate(module, config).then(instance => {
+    return WebAssembly.instantiate(module, config).then(instance => {
         const { main, stack, env, free, function_table, STATIC_SIZE } = instance.exports;
-        const { make_env, make_env_from, make_env_from_closure, drop_env, array_slice, tuple, partial_apply, get_tuple_pointer, perform_primitive_command, unpack_in_reverse, copy_value_to_stack } = instance.exports;
+        const { make_env, make_env_from, make_env_from_closure, drop_env, array_slice, tuple, float32, partial_apply, get_tuple_pointer, perform_primitive_command, unpack_in_reverse, copy_value_to_stack } = instance.exports;
         const { gc, gc_move_tuple, gc_traverse_grey, gc_walk_stack } = instance.exports;
 
         const const_ = instance.exports["const"];
@@ -137,33 +142,68 @@ function run(bytes) {
 
         main();
 
-        // console.log(array_slice);
-        // array_slice(0, 6, 3);
-
         console.log("> Main executed succesfully.");
         log_stack(0);
         console.log("> Performing command...");
+        
+        const continuation_state = {
+          number_of_continuations_left: 0, // Counts number of continuations to be done on the stack.
+        };
 
-        perform(
-          view,
-          { get_tuple_pointer, perform_primitive_command, unpack_in_reverse, copy_value_to_stack, make_env_from_closure  },
-          GLOBAL.TABLE,
-          false, // tracing
-          GLOBAL.STACK_START,
-          GLOBAL.STACK,
-        );
-        log_stack(1);
+        function p() {
+          perform(
+            continuation_state,
+            view,
+            { get_tuple_pointer, perform_primitive_command, unpack_in_reverse, copy_value_to_stack, make_env_from_closure  },
+            GLOBAL.TABLE,
+            false, // tracing
+            GLOBAL.STACK_START,
+            GLOBAL.STACK,
+          );
+        }
+        p();
+
         console.log("> Exiting.");
 
+        return {
+          // ========Send Message==========
+          send(msg) {
+            function push_msg(msg) {
+              switch (msg.tag) {
+                case Tag.Constant:
+                  const_(msg.value);
+                  break;
+                case Tag.Float:
+                  float32(msg.value);
+                  break;
+                case Tag.String:
+                  // TODO: Need to convert string to bytes. Then ask polymede runtime if there's enough space on the heap for a string and a slice to it.
+                  // Afterwards we copy the string, make a slice to it, push a tagged pointer to the slice on top of the stack.
+                  throw Error("SEND: sending a string not yet implemented")
+                  console.log("A string...");
+                  break;
+                case Tag.Tuple:
+                  for (let i = 0; i < msg.args.length; i++) {
+                    push_msg(msg.args[i]);
+                  }
+                  tuple(msg.variant, msg.args.length);
+                  break;
+                default:
+                  throw Error(`Attempt to send a malformed message: ${msg}`)
+              }
+            }
+            push_msg(msg);
+            // resume continuation
+            if (continuation_state.number_of_continuations_left == 0) {
+              return
+            } else {
+              // stack = [..., k, msg]
+              // TODO: This can cause stack overflow, right?
+              execute_top_continuation(continuation_state, { make_env_from_closure }, GLOBAL.TABLE);
+              p();
+            }
+          }
+        };
     });
   });
 }
-
-function main() {
-  const wasm_path = process.argv[2];
-  const wasm_buffer = fs.readFileSync(wasm_path);
-
-  run(wasm_buffer);
-}
-
-main();
