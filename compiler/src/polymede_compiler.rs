@@ -307,6 +307,7 @@ fn compile_term(state: &mut State, term: &desugared_polymede::Term) -> gmm::Term
                 Box::new(gmm::Continuation { body : compile_closure(state, continuation) })
             )
         },
+        Receive => gmm::Term::Receive,
     }
 }
 

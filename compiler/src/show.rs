@@ -223,5 +223,8 @@ pub fn show_term(term: &Term, next_parameter: usize) -> PrettyString {
                 str(")"),
             ])
         },
+        Receive => {
+            str("receive")
+        }
     }
 }
