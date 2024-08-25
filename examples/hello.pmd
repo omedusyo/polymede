@@ -1,5 +1,8 @@
+
 type Bool = enum { F | T }
+
 type Pair(a, b) = enum { Pair(a, b) }
+
 type List(a) = enum { Nil | Cons(a, List(a)) }
 
 // ===I32===
@@ -314,20 +317,24 @@ fn start_canvas = # -> Cmd(I32) : { . do {
 
 msg type Msg = enum {
 | Tick(I32)
+| UserName(String)
 }
 
-fn print_msg = # Msg -> Cmd(I32) : { msg . match msg {
+fn handle_msg = # Msg -> Cmd(I32) : { msg . match msg {
 | Tick(x) . print_int(x)
+| UserName(str) .
+  print(str)
 }}
 
 fn receive_loop = # -> Cmd(I32) : { . do {
 , u <- print("gimme int: ")
 , msg <- receive
-, u <- print_msg(msg)
+, u <- handle_msg(msg)
 . receive_loop()
 }}
 
-//run # Cmd(I32) : receive_loop()
-//run # Cmd(Msg) : receive
+//run # Cmd(I32) : print("hello, world")
 //run # Cmd(I32) : loop(0, "yo")
+//run # Cmd(Msg) : receive
+run # Cmd(I32) : receive_loop()
 //run # Cmd(I32) : start_canvas()

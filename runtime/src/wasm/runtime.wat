@@ -3,7 +3,7 @@
 
 (module
   (import "env" "memory" (memory $main_memory 0))
-  (import "env" "STATIC_SIZE" (global $STATIC_SIZE i32)) ;; TODO: recompute everything with respect to STATIC...? in js... You also need to export it from the compiler.
+  (import "env" "STATIC_SIZE" (global $STATIC_SIZE i32))
   (import "env" "STACK_SIZE" (global $STACK_SIZE i32))
   (import "env" "HEAP_SIZE" (global $HEAP_SIZE i32))
   (import "env" "STACK_START" (global $STACK_START i32))
@@ -91,6 +91,7 @@
   (func $inc_free (param $count i32)
     (global.set $FREE (i32.add (global.get $FREE) (local.get $count)))
   )
+  (export "inc_free" (func $inc_free))
 
   ;; Assume x is either a constant or tagged pointer.
   ;;   stack = [..., x]
@@ -533,7 +534,7 @@
   ;; Create an array slice on the heap, then push a tagged pointer to it to the stack.
   (func $array_slice (param $slice_parent_pointer i32) (param $slice_pointer i32) (param $slice_count i32)
     (local $pointer_to_slice i32)
-    ;; TODO
+
     (call $gc_if_out_of_space (global.get $SLICE_BYTE_SIZE))
 
     (local.set $pointer_to_slice (global.get $FREE))
@@ -666,6 +667,7 @@
           (then)
           (else (call $on_out_of_memory)))))
   )
+  (export "gc_if_out_of_space" (func $gc_if_out_of_space))
 
   ;; A := To Space
   ;; B := From Space

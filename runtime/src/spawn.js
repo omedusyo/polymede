@@ -61,11 +61,11 @@ export function spawn(bytes) {
     }
 
     // ===Canvas===
-    const canvas_el = document.querySelector("#canvas");
-    if (!canvas_el.getContext) { throw Error("No canvas detected!"); }
-
-    const ctx = canvas_el.getContext("2d");
-    // const ctx = { }; // fake canvas for command-line
+    // const canvas_el = document.querySelector("#canvas");
+    // if (!canvas_el.getContext) { throw Error("No canvas detected!"); }
+    //
+    // const ctx = canvas_el.getContext("2d");
+    const ctx = { }; // fake canvas for command-line
 
     function log_stack(s) {
       console.log(s, showStackWithAddress(deepReadStack(view, GLOBAL.STACK_START.valueOf(), GLOBAL.STACK.valueOf())));
@@ -123,7 +123,7 @@ export function spawn(bytes) {
 
     return WebAssembly.instantiate(module, config).then(instance => {
         const { main, stack, env, free, function_table, STATIC_SIZE } = instance.exports;
-        const { make_env, make_env_from, make_env_from_closure, drop_env, array_slice, tuple, float32, partial_apply, get_tuple_pointer, perform_primitive_command, unpack_in_reverse, copy_value_to_stack } = instance.exports;
+        const { make_env, make_env_from, make_env_from_closure, drop_env, array_slice, tuple, float32, partial_apply, get_tuple_pointer, perform_primitive_command, unpack_in_reverse, copy_value_to_stack, gc_if_out_of_space, inc_free } = instance.exports;
         const { gc, gc_move_tuple, gc_traverse_grey, gc_walk_stack } = instance.exports;
 
         const const_ = instance.exports["const"];
@@ -145,6 +145,44 @@ export function spawn(bytes) {
         console.log("> Main executed succesfully.");
         log_stack(0);
         console.log("> Performing command...");
+
+        function make_string(str) {
+          // TODO: move
+          const BYTE_ARRAY_HEADER_BYTE_SIZE = 6;
+          const BYTE_ARRAY_CONTENTS_OFFSET = 6;
+          const GC_TAG_LIVE = 0;
+          const GC_TAG_BYTE_SIZE = 1;
+          const BYTE_ARRAY_TAG = 3;
+          const TAG_BYTE_SIZE = 1;
+          const BYTE_ARRAY_COUNT_SIZE = 4;
+
+          const encoded_str = new TextEncoder().encode(str);
+          gc_if_out_of_space(BYTE_ARRAY_HEADER_BYTE_SIZE + encoded_str.length);
+          const string_pointer = FREE.valueOf();
+
+          // ===create header===
+          // 1 byte for garbage collection liveness.
+          view.setUint8(FREE.valueOf(), GC_TAG_LIVE);
+          inc_free(GC_TAG_BYTE_SIZE);
+          // 1 byte tag (used by gc going from grey ~> black)
+          view.setUint8(FREE.valueOf(), BYTE_ARRAY_TAG);
+          inc_free(TAG_BYTE_SIZE);
+
+          // 4 byte count 
+          view.setUint32(FREE, encoded_str.length, true);
+          inc_free(BYTE_ARRAY_COUNT_SIZE);
+
+          // ===copy string
+          let raw_pointer = FREE.valueOf();
+          for (let i = 0; i < encoded_str.length; i++) {
+            view.setUint8(raw_pointer, encoded_str[i]);
+            raw_pointer += 1;
+          }
+          inc_free(encoded_str.length)
+
+          // ===create slice===
+          array_slice(string_pointer, BYTE_ARRAY_CONTENTS_OFFSET + string_pointer, encoded_str.length);
+        }
         
         const continuation_state = {
           number_of_continuations_left: 0, // Counts number of continuations to be done on the stack.
@@ -177,10 +215,7 @@ export function spawn(bytes) {
                   float32(msg.value);
                   break;
                 case Tag.String:
-                  // TODO: Need to convert string to bytes. Then ask polymede runtime if there's enough space on the heap for a string and a slice to it.
-                  // Afterwards we copy the string, make a slice to it, push a tagged pointer to the slice on top of the stack.
-                  throw Error("SEND: sending a string not yet implemented")
-                  console.log("A string...");
+                  make_string(msg.value);
                   break;
                 case Tag.Tuple:
                   for (let i = 0; i < msg.args.length; i++) {
