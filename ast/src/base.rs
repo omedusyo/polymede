@@ -12,6 +12,7 @@ pub struct Program {
     pub function_declarations_ordering: Vec<FunctionName>,
     pub run_declaration: Option<RunDeclaration>,
     pub constructor_to_type_mapping: HashMap<ConstructorName, Variable>,
+    pub msg_type: Option<Variable>,
 }
 
 impl Program {
@@ -24,6 +25,7 @@ impl Program {
             function_declarations_ordering: vec![],
             run_declaration: None,
             constructor_to_type_mapping: HashMap::new(),
+            msg_type: None,
         }
     }
 
@@ -54,6 +56,18 @@ impl Program {
             result.push(self.get_type_declaration(type_name).unwrap())
         }
         result
+    }
+
+    pub fn get_msg_type_declaration(&self) -> &TypeDeclaration {
+        let Some(msg_type_name) = &self.msg_type else { unreachable!() };
+        let Some(msg_type_declaration) = self.get_type_declaration(msg_type_name) else { unreachable!() };
+        msg_type_declaration
+    }
+
+    pub fn get_msg_type(&self) -> Type {
+        let decl = self.get_msg_type_declaration();
+        let type_name = decl.name();
+        Type::TypeApplication(type_name.clone(), vec![])
     }
     
     pub fn function_declarations_in_source_ordering(&self) -> Vec<&FunctionDeclaration> {
@@ -137,7 +151,7 @@ pub struct RunDeclaration {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Type {
     VariableUse(Variable),
-    TypeApplication(ConstructorName, Vec<Type>),
+    TypeApplication(Variable, Vec<Type>),
     Arrow(Box<FunctionType>),
     I32,
     F32,
@@ -175,6 +189,7 @@ pub enum Term {
     Let(Vec<(Variable, Term)>, Box<Term>),
     Pure(Box<Term>),
     Do(Vec<DoBinding>, Box<Term>),
+    Receive,
 }
 
 #[derive(Debug, Clone)]
@@ -279,6 +294,31 @@ impl TypeDeclaration {
         match self {
             Enum(decl) => decl.constructors_in_source_ordering(),
             Ind(decl) => decl.constructors_in_source_ordering(),
+        }
+    }
+}
+
+impl Type {
+    // Checks: if type parameters are value types, then the type is also a value type.
+    pub fn is_value_type(&self) -> bool {
+        use Type::*;
+        match self {
+            VariableUse(_) => true,
+            TypeApplication(_type_name, types) => {
+                // TODO: This is not sufficient. We need to have access to the declaration of
+                // `_type_name` and that needs to be a value type too. Would be nice if this
+                // information was precomputed. Also you need some sort of loop check for mutually
+                // recursive types.
+                for type_ in types {
+                    if type_.is_value_type() { return false }
+                }
+                return true
+            },
+            Arrow(_) => false,
+            I32 => true,
+            F32 => true,
+            String => true,
+            Command(_) => false,
         }
     }
 }

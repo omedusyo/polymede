@@ -12,6 +12,14 @@ pub fn check_program(program: &Program) -> core::result::Result<(), Vec<ErrorWit
         }
     }
 
+    {
+        let msg_type_decl = program.get_msg_type_declaration();
+        match check_msg_type_declaration(msg_type_decl) {
+            Ok(_) => {},
+            Err(e) => errors.push(ErrorWithLocation::TypeDeclaration(msg_type_decl.name().clone(), e))
+        }
+    }
+
     for decl in program.function_declarations.values() {
         match check_types_in_function_declaration(program, decl) {
             Ok(_) => {},
@@ -52,6 +60,28 @@ fn check_type_declaration(program: &Program, decl: &TypeDeclaration) -> Result<(
             Ok(())
         }
     }
+}
+
+fn check_msg_type_declaration(decl: &TypeDeclaration) -> Result<()> {
+    let constructors = decl.constructors_in_source_ordering();
+
+    use TypeDeclaration::*;
+    let number_of_parameters = match decl {
+        Enum(decl) => decl.type_parameters.len(),
+        Ind(decl) => decl.type_parameters.len(),
+    };
+    if number_of_parameters > 0 {
+        return Err(Error::MsgTypeCantHaveTypeParameters)
+    }
+
+    for constructor in constructors {
+        for type_ in &constructor.parameters {
+            if !type_.is_value_type() {
+                return Err(Error::MsgTypeIsNotValueType { received_type: type_.clone() })
+            }
+        }
+    }
+    Ok(())
 }
 
 fn check_constructor_declaration(program: &Program, type_env: &TypeScope, decl: &ConstructorDeclaration, rec_var: Option<&Variable>) -> Result<()> {

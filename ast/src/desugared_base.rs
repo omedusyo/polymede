@@ -19,6 +19,7 @@ pub enum Term {
     Let(Vec<(Variable, Term)>, Box<Term>),
     Pure(Box<Term>),
     AndThen(Box<Term>, Box<Function>), // Can assume this has exactly 1 parameter.
+    Receive,
 }
 
 #[derive(Debug, Clone)]
@@ -96,6 +97,7 @@ pub fn desugar_term(term: &base::Term) -> Term {
         Let(bindings, body) => Term::Let(bindings.iter().map(|(var, term)| (var.clone(), desugar_term(term))).collect(), Box::new(desugar_term(body))),
         Pure(term) => Term::Pure(Box::new(desugar_term(term))),
         Do(bindings, body) => desugar_do_expression(bindings, body),
+        Receive => Term::Receive,
     }
 }
 
@@ -271,5 +273,6 @@ fn free_variables(env: &mut Env, term: &Term) {
             free_variables(env, cmd_arg);
             free_variables_in_function(env, continuation);
         },
+        Receive => {},
     }
 }

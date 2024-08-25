@@ -54,7 +54,7 @@ function Env(old_env_pointer, values, address) {
   return { type: "Env", old_env_pointer, values, address };
 }
 
-function readRawPointer(view, raw_pointer) {
+export function readRawPointer(view, raw_pointer) {
   const tag = view.getInt8(raw_pointer);
   if (tag == CONST_TAG) {
     const value = view.getInt32(raw_pointer + 1, true);
@@ -72,9 +72,8 @@ function readRawPointer(view, raw_pointer) {
     throw Error(`Unknown value Tag ${tag}`);
   }
 }
-module.exports.readRawPointer = readRawPointer;
 
-function readTuple(view, tagged_pointer) {
+export function readTuple(view, tagged_pointer) {
   if (tagged_pointer.tag != "Tuple") { throw Error(`Attempt to read non-tuple as tuple @ ${tagged_pointer}`) }
   const tuple_pointer = tagged_pointer.pointer;
   // 1 byte for GC, 1 byte for tag, 4 bytes for variant, 1 byte for count, followed by components
@@ -94,9 +93,8 @@ function readTuple(view, tagged_pointer) {
   }
   return Tuple(variant, components, tuple_pointer);
 }
-module.exports.readTuple = readTuple;
 
-function readSlice(view, tagged_pointer) {
+export function readSlice(view, tagged_pointer) {
   if (tagged_pointer.tag != "ByteArraySlice") { throw Error(`Attempt to read non-slice as a slice @ ${tagged_pointer}`) }
   const slice_pointer = tagged_pointer.pointer;
 
@@ -106,16 +104,14 @@ function readSlice(view, tagged_pointer) {
 
   return ByteArraySlice(parent_pointer, pointer, count, undefined, slice_pointer);
 }
-module.exports.readSlice = readSlice;
 
 // WARNING: Does not detect cyclic structure.
-function deepReadRawPointer(view, raw_pointer) {
+export function deepReadRawPointer(view, raw_pointer) {
   const tagged_pointer = readRawPointer(view, raw_pointer);
   return deepReadTaggedPointer(view, tagged_pointer);
 }
-module.exports.deepReadRawPointer = deepReadRawPointer;
 
-function deepReadTaggedPointer(view, tagged_pointer) {
+export function deepReadTaggedPointer(view, tagged_pointer) {
   if (tagged_pointer.type == "Const") {
     return tagged_pointer;
   } else if (tagged_pointer.type == "Pointer"){
@@ -130,9 +126,8 @@ function deepReadTaggedPointer(view, tagged_pointer) {
     throw Error(`We have a tagged pointer that's neither a Const nor a Pointer ${tagged_pointer}`);
   }
 }
-module.exports.deepReadTaggedPointer = deepReadTaggedPointer;
 
-function deepReadTuple(view, tagged_pointer) {
+export function deepReadTuple(view, tagged_pointer) {
   const tuple = readTuple(view, tagged_pointer);
   const components = [];
   tuple.components.forEach(component => {
@@ -140,7 +135,6 @@ function deepReadTuple(view, tagged_pointer) {
   });
   return Tuple(tuple.variant, components, tuple.address);
 }
-module.exports.deepReadTuple = deepReadTuple;
 
 function deepReadSlice(view, tagged_pointer) {
   const slice = readSlice(view, tagged_pointer);
@@ -149,7 +143,7 @@ function deepReadSlice(view, tagged_pointer) {
   return ByteArraySlice(slice.parent_pointer, slice.pointer, slice.count, str, slice.address);
 }
 
-function readStack(view, raw_pointer_start, raw_pointer_end) {
+export function readStack(view, raw_pointer_start, raw_pointer_end) {
   const stack = [];
 
   function readNextValue(raw_pointer) {
@@ -190,9 +184,8 @@ function readStack(view, raw_pointer_start, raw_pointer_end) {
   readNextValue(raw_pointer_start);
   return stack;
 }
-module.exports.readStack = readStack;
 
-function deepReadStack(view, raw_pointer_start, raw_pointer_end) {
+export function deepReadStack(view, raw_pointer_start, raw_pointer_end) {
   const stack = [];
 
   function readNextValue(raw_pointer) {
@@ -235,9 +228,8 @@ function deepReadStack(view, raw_pointer_start, raw_pointer_end) {
   readNextValue(raw_pointer_start);
   return stack;
 }
-module.exports.deepReadStack = deepReadStack;
 
-function showValue(x) {
+export function showValue(x) {
   if (x.type == "Const") {
     return `Const[${x.value}]`;
   } else if (x.type == "Tuple") {
@@ -260,9 +252,8 @@ function showValue(x) {
     throw Error(`Unexpected value type in ${x}`);
   }
 }
-module.exports.showValue = showValue;
 
-function showValueWithAddress(x) {
+export function showValueWithAddress(x) {
   if (x.type == "Const") {
     return `Const@${x.address}[${x.value}]`;
   } else if (x.type == "Tuple") {
@@ -285,9 +276,8 @@ function showValueWithAddress(x) {
     throw Error(`Unexpected value type in ${x}`);
   }
 }
-module.exports.showValueWithAddress = showValueWithAddress;
 
-function showStack(stack) {
+export function showStack(stack) {
   const strings = [];
   stack.forEach(x => {
     strings.push(showValue(x));
@@ -295,9 +285,8 @@ function showStack(stack) {
 
   return `Nil <: ${strings.join(' <: ')}`;
 }
-module.exports.showStack = showStack;
 
-function showStackWithAddress(stack) {
+export function showStackWithAddress(stack) {
   const strings = [];
   stack.forEach(x => {
     strings.push(showValueWithAddress(x));
@@ -305,4 +294,3 @@ function showStackWithAddress(stack) {
 
   return `Nil <: ${strings.join(' <: ')}`;
 }
-module.exports.showStackWithAddress = showStackWithAddress;

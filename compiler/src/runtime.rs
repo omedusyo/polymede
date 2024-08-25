@@ -30,6 +30,7 @@ pub struct Runtime {
     pub make_env_from_closure: FunctionIndex,
     pub pure: FunctionIndex,
     pub and_then: FunctionIndex,
+    pub receive: FunctionIndex,
     pub array_slice: FunctionIndex,
 }
 
@@ -79,6 +80,7 @@ impl Runtime {
         let make_env_from_closure = import(module, "make_env_from_closure", fn_type(vec![TYPE_I32], vec![TYPE_I32]), &mut number_of_runtime_functions);
         let pure = import(module, "pure", fn_type(vec![], vec![]), &mut number_of_runtime_functions);
         let and_then = import(module, "and_then", fn_type(vec![], vec![]), &mut number_of_runtime_functions);
+        let receive = import(module, "receive", fn_type(vec![], vec![]), &mut number_of_runtime_functions);
         let array_slice = import(module, "array_slice", fn_type(vec![TYPE_I32, TYPE_I32, TYPE_I32], vec![]), &mut number_of_runtime_functions);
 
         Self {
@@ -103,6 +105,7 @@ impl Runtime {
             make_env_from_closure,
             pure,
             and_then,
+            receive,
             array_slice,
         }
     }

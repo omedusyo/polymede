@@ -58,6 +58,7 @@ pub enum StartTerm {
     Lambda,
     Pure,
     Do,
+    Receive,
 }
 
 pub enum StartPattern {
@@ -137,6 +138,7 @@ pub fn start_term(state: &mut State) -> Result<StartTerm> {
             "fn" => Ok(StartTerm::Lambda),
             "pure" => Ok(StartTerm::Pure),
             "do" => Ok(StartTerm::Do),
+            "receive" => Ok(StartTerm::Receive),
             _ => {
                 if state.is_next_token_open_paren()? || state.is_next_token_open_angle()? {
                     Ok(StartTerm::FunctionApplication(id))

@@ -191,6 +191,7 @@ impl FunctionEnvironment {
             },
             CommandAndThen(_cmd_term, _continuation_term) => todo!(),
             Pure(_term) => todo!(),
+            Receive => todo!(),
         }
     }
 }

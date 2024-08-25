@@ -32,6 +32,7 @@ pub enum Term {
     Seq(Vec<Term>),
     Pure(Box<Term>),
     CommandAndThen(Box<Term>, Box<Continuation>),
+    Receive,
 }
 
 #[derive(Debug)]

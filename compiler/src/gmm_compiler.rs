@@ -373,6 +373,12 @@ fn compile_term(state: &mut State, number_of_parameters: usize, term: &gmm::Term
             if tail_position { code.push(call(state.runtime.drop_env, vec![])) }
             Ok(seq(code))
         },
+        gmm::Term::Receive => {
+            let mut code = vec![];
+            code.push(call(state.runtime.receive, vec![]));
+            if tail_position { code.push(call(state.runtime.drop_env, vec![])) }
+            Ok(seq(code))
+        },
     }
 }
 

@@ -82,6 +82,7 @@ pub enum DeclarationKind {
     Run,
     UserFunction,
     ForeignFunction,
+    MsgType,
 }
 
 enum WhitespaceState {
@@ -365,6 +366,7 @@ impl <'state> State<'state> {
         match c {
             't' => Ok(DeclarationKind::Type),
             'r' => Ok(DeclarationKind::Run),
+            'm' => Ok(DeclarationKind::MsgType),
             'f' => {
                 let saved_state = self.clone();
                 self.advance();
