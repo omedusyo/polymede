@@ -8,15 +8,15 @@ use crate::binary_format::primitives::encoder::Encoder;
 use crate::base::{
     export::{Export, ExportDescription},
     import::{Import, ImportDescription},
-    indices::{FunctionIndex, GlobalIndex, LocalIndex, TypeIndex},
+    indices::{FunctionIndex, TypeIndex},
     instructions::Instruction,
     memory::Limit,
-    types::{BlockType, FunctionType, GlobalType, Mutability, NumType, RefType, ValueType},
+    types::{FunctionType, GlobalType, Mutability, NumType, RefType, ValueType},
 };
 use crate::binary_format::sections::{
     Code, CodeSection, DataCountSection, DataItem, DataSection, Element, ElementSection,
     ExportSection, Expression, FunctionSection, Global, GlobalsSection, ImportSection,
-    LocalDeclaration, MemorySection, Module, StartSection, TableSection, TableType, TypeSection,
+    MemorySection, Module, StartSection, TableSection, TableType, TypeSection,
 };
 use NumType::*;
 
@@ -99,21 +99,21 @@ pub fn generate0() -> Vec<u8> {
         Instruction::I32Const(1),
         I32Add,
     ];
-    let code1 = vec![
-        LocalGet(LocalIndex(0)),
-        LocalGet(LocalIndex(0)),
-        I32Add,
-        // Nop,
-    ];
-    let code2 = vec![
-        // LocalGet(LocalIndex(0)),
-        I32Const(0),
-        IfThenElse(
-            BlockType::ValueType(ValueType::NumType(I32)),
-            vec![LocalGet(LocalIndex(0))],
-            vec![LocalGet(LocalIndex(0))],
-        ),
-    ];
+    //let code1 = vec![
+    //    LocalGet(LocalIndex(0)),
+    //    LocalGet(LocalIndex(0)),
+    //    I32Add,
+    //    // Nop,
+    //];
+    //let code2 = vec![
+    //    // LocalGet(LocalIndex(0)),
+    //    I32Const(0),
+    //    IfThenElse(
+    //        BlockType::ValueType(ValueType::NumType(I32)),
+    //        vec![LocalGet(LocalIndex(0))],
+    //        vec![LocalGet(LocalIndex(0))],
+    //    ),
+    //];
 
     let code_empty = vec![];
 
@@ -163,39 +163,29 @@ pub fn generate0() -> Vec<u8> {
 
     let mut bytes = module.emit();
 
-    let bytes = bytes.to_vec();
-
-    bytes
+    bytes.to_vec()
 }
 
 pub fn generate1() -> Vec<u8> {
     let module = syntax::example2();
     let mut bytes = module.binary_format().emit();
-    let bytes = bytes.to_vec();
-
-    bytes
+    bytes.to_vec()
 }
 
 pub fn generate_factorial() -> Vec<u8> {
     let module = syntax::example_factorial();
     let mut bytes = module.binary_format().emit();
-    let bytes = bytes.to_vec();
-
-    bytes
+    bytes.to_vec()
 }
 
 pub fn generate_memory0() -> Vec<u8> {
     let module = syntax::example_memory0();
     let mut bytes = module.binary_format().emit();
-    let bytes = bytes.to_vec();
-
-    bytes
+    bytes.to_vec()
 }
 
 pub fn generate_memory1() -> Vec<u8> {
     let module = syntax::example_memory1();
     let mut bytes = module.binary_format().emit();
-    let bytes = bytes.to_vec();
-
-    bytes
+    bytes.to_vec()
 }

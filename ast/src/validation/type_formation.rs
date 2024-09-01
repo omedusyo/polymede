@@ -1,6 +1,6 @@
 use crate::base::{
-    ConstructorDeclaration, ForeignFunctionDeclaration, FunctionDeclaration, FunctionType, Program,
-    RunDeclaration, Type, TypeDeclaration, UserFunctionDeclaration,
+    ConstructorDeclaration, FunctionDeclaration, FunctionType, Program,
+    RunDeclaration, Type, TypeDeclaration,
 };
 use crate::identifier::Variable;
 use crate::validation::base::{Error, ErrorWithLocation, Result};
@@ -108,9 +108,8 @@ fn check_constructor_declaration(
 ) -> Result<()> {
     for type_ in &decl.parameters {
         check_type(program, type_env, type_)?;
-        match rec_var {
-            Some(rec_var) => check_positive_occurance(rec_var, type_)?,
-            _ => {}
+        if let Some(rec_var) = rec_var {
+            check_positive_occurance(rec_var, type_)?
         }
     }
     Ok(())
@@ -126,14 +125,14 @@ fn check_types_in_function_declaration(
             check_function_type(program, &type_env, &decl.function.type_)
         }
         FunctionDeclaration::Foreign(decl) => {
-            let type_env: TypeScope = TypeScope::new(&vec![]);
+            let type_env: TypeScope = TypeScope::new(&[]);
             check_function_type(program, &type_env, &decl.type_)
         }
     }
 }
 
 fn check_types_in_run_declaration(program: &Program, decl: &RunDeclaration) -> Result<()> {
-    let type_env: TypeScope = TypeScope::new(&vec![]);
+    let type_env: TypeScope = TypeScope::new(&[]);
     let Type::Command(_) = &decl.body.type_ else {
         return Err(Error::RunExpressionDoesntHaveExpectedCommandType {
             received: decl.body.type_.clone(),
@@ -168,7 +167,7 @@ pub fn check_type(program: &Program, type_env: &TypeScope, type_: &Type) -> Resu
     use Type::*;
     match type_ {
         VariableUse(type_var) => {
-            if type_env.exists(&type_var) {
+            if type_env.exists(type_var) {
                 Ok(())
             } else {
                 Err(Error::UndefinedTypeVaraible {

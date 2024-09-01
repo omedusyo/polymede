@@ -176,10 +176,8 @@ pub fn example2() {
 
     let result = start(&mut state);
     println!("Raw expr: {:?}", result);
-    match result {
-        Ok(expr) => {
-            println!("Result of parsing {}: {:?}", s, expr.show());
-        }
-        Err(_) => {}
+
+    if let Ok(expr) = result {
+        println!("Result of parsing {}: {:?}", s, expr.show());
     }
 }

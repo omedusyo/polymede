@@ -1,7 +1,6 @@
 use crate::base::{
-    ConstructorDeclaration, EnumDeclaration, ForeignFunctionDeclaration, FunctionDeclaration,
+    ConstructorDeclaration, EnumDeclaration, FunctionDeclaration,
     FunctionType, IndDeclaration, Program, RunDeclaration, Type, TypeDeclaration,
-    UserFunctionDeclaration,
 };
 use crate::identifier::{Identifier, Interner};
 
@@ -142,10 +141,10 @@ impl<'show> Show<'show> {
             TypeApplication(constructor_name, types) => {
                 let constructor_name_str = constructor_name.str(self.interner());
                 if types.is_empty() {
-                    format!("{constructor_name_str}")
+                    constructor_name_str.to_string()
                 } else {
                     let type_strs = types
-                        .into_iter()
+                        .iter()
                         .map(|type_| self.show_type(type_))
                         .collect::<Vec<_>>()
                         .join(", ");
@@ -153,7 +152,7 @@ impl<'show> Show<'show> {
                 }
             }
             Arrow(function_type) => {
-                let fn_type_str = self.show_function_type(&*function_type);
+                let fn_type_str = self.show_function_type(function_type);
                 format!("Fn({fn_type_str})")
             }
             I32 => "I32".to_string(),

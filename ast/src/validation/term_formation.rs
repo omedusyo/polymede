@@ -45,7 +45,7 @@ pub fn check_program(program: &Program) -> core::result::Result<(), Vec<ErrorWit
 }
 
 fn check_run_declaration(program: &Program, decl: &RunDeclaration) -> Result<()> {
-    let type_env = TypeScope::new(&vec![]);
+    let type_env = TypeScope::new(&[]);
     let mut env = Environment::new(program, &type_env);
     type_check(&mut env, &decl.body.term, &decl.body.type_)
 }
@@ -85,16 +85,13 @@ impl<'env> Environment<'env> {
 
     pub fn get_type(&self, var: &Variable) -> Option<&Type> {
         for bindings in self.bindings_stack.iter().rev() {
-            match bindings.get(var) {
-                Some(type_) => return Some(type_),
-                None => {}
-            }
+            if let Some(type_) = bindings.get(var) { return Some(type_) }
         }
         None
     }
 
     pub fn check_type_formation(&self, type_: &Type) -> Result<()> {
-        type_formation::check_type(&self.program, &self.type_env, type_)
+        type_formation::check_type(self.program, self.type_env, type_)
     }
 
     pub fn get_type_declaration(&self, type_name: &Variable) -> Option<&TypeDeclaration> {
@@ -114,10 +111,7 @@ impl<'env> Environment<'env> {
     }
 
     pub fn is_ind_type_declaration(&self, type_name: &Variable) -> bool {
-        match self.program.get_type_declaration(type_name) {
-            Some(TypeDeclaration::Ind(_)) => true,
-            _ => false,
-        }
+        matches!(self.program.get_type_declaration(type_name), Some(TypeDeclaration::Ind(_)))
     }
 
     pub fn get_function_declaration(
@@ -187,7 +181,7 @@ fn type_infer(env: &mut Environment, term: &Term) -> Result<Type> {
                 return Err(Error::UnableToInferTypeOfConstructor);
             }
             let Some((constructor_decl, specialized_types)) =
-                type_decl.type_apply_constructor(constructor_name, &vec![])
+                type_decl.type_apply_constructor(constructor_name, &[])
             else {
                 unreachable!()
             };
@@ -201,7 +195,7 @@ fn type_infer(env: &mut Environment, term: &Term) -> Result<Type> {
 
             let type_name = type_decl.name().clone();
             for (arg, type_) in args.iter().zip(&specialized_types) {
-                type_check(env, arg, &type_)?
+                type_check(env, arg, type_)?
             }
 
             Ok(Type::TypeApplication(type_name, vec![]))
@@ -236,7 +230,7 @@ fn type_infer(env: &mut Environment, term: &Term) -> Result<Type> {
                     Ok(fn_type.output_type)
                 }
                 FunctionDeclaration::Foreign(fn_decl) => {
-                    if type_args.len() != 0 {
+                    if !type_args.is_empty() {
                         return Err(Error::ApplyingWrongNumberOfTypeArgumentsToFunction {
                             function_name: function_name.clone(),
                             expected: 0,
@@ -416,7 +410,7 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
             }
 
             for (arg, type_) in args.iter().zip(&specialized_types) {
-                type_check(env, arg, &type_)?
+                type_check(env, arg, type_)?
             }
 
             Ok(())
@@ -478,7 +472,7 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
                     }
                 }
                 FunctionDeclaration::Foreign(fn_decl) => {
-                    if type_args.len() != 0 {
+                    if !type_args.is_empty() {
                         return Err(Error::ApplyingWrongNumberOfTypeArgumentsToFunction {
                             function_name: function_name.clone(),
                             expected: 0,
@@ -519,7 +513,7 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
                             branch,
                             &type_name,
                             &type_args,
-                            &expected_type,
+                            expected_type,
                         )?;
                     }
                     Ok(())
@@ -551,7 +545,7 @@ fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Resul
                         branch,
                         &type_name,
                         &type_args,
-                        &expected_type,
+                        expected_type,
                     )?;
                 }
                 Ok(())
@@ -700,7 +694,7 @@ fn check_and_extend_pattern(
                     received_type: expected_pattern_type.clone(),
                 });
             };
-            let Some(type_decl) = env.get_type_declaration(&type_name) else {
+            let Some(type_decl) = env.get_type_declaration(type_name) else {
                 return Err(Error::TypeConstructorDoesntExist {
                     type_name: type_name.clone(),
                 });

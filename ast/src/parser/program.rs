@@ -10,7 +10,7 @@ use crate::parser::lex::{
 };
 use crate::parser::{
     base::{
-        Declaration, Error, PreEnumDeclaration, PreIndDeclaration, PreMsgTypeDeclaration,
+        Declaration, Error, PreEnumDeclaration, PreIndDeclaration,
         PreProgram, PreTypeDeclaration, Result, State,
     },
     combinator::delimited_possibly_empty_sequence_to_vector,
@@ -114,7 +114,7 @@ fn is_type_name_forbidden(name: &str) -> bool {
             return true;
         }
     }
-    return false;
+    false
 }
 
 // TODO: Make sure that for ind type declarations the recursive type-variable doesn't shadow any of

@@ -425,6 +425,7 @@ pub struct EnumerateByteValues {
     state: Option<u8>,
 }
 
+#[allow(dead_code)]
 impl EnumerateByteValues {
     pub fn new() -> Self {
         Self { state: Some(0) }
@@ -570,7 +571,7 @@ impl ByteStream for I32ToSignedLEB128 {
             Continue { x } => {
                 let mut val = *x;
                 let byte = (val & 0x7f) as u8; // Last 7 bits.
-                val = val >> 7; // Get rid of the last 7 bits.
+                val >>= 7; // Get rid of the last 7 bits.
                 *x = val;
                 // Note that byte & 0x40 is basically the 7th bit of byte.
                 if (val == 0 && (byte & 0x40) == 0) || (val == -1 && (byte & 0x40) != 0) {
@@ -594,7 +595,7 @@ impl ByteStream for I64ToSignedLEB128 {
             Continue { x } => {
                 let mut val = *x;
                 let byte = (val & 0x7f) as u8; // Last 7 bits.
-                val = val >> 7; // Get rid of the last 7 bits.
+                val >>= 7; // Get rid of the last 7 bits.
                 *x = val;
                 // Note that byte & 0x40 is basically the 7th bit of byte.
                 if (val == 0 && (byte & 0x40) == 0) || (val == -1 && (byte & 0x40) != 0) {

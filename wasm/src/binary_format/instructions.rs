@@ -95,6 +95,7 @@ impl Instruction {
     pub const F32_CONST: u8 = 0x43;
 }
 
+#[allow(clippy::type_complexity)]
 pub enum InstructionStream {
     Simple(Byte),
     Simple2(Seq<Byte, Byte>),

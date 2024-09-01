@@ -76,7 +76,7 @@ pub fn parse_program(s: &str) -> Result<Program> {
         program.type_declarations.insert(decl.name().clone(), decl);
     }
     // ===msg type====
-    program.msg_type = pre_program.msg_types.into_iter().nth(0);
+    program.msg_type = pre_program.msg_types.into_iter().next();
 
     // ===functions===
     for decl in pre_program.function_declarations {
@@ -84,7 +84,7 @@ pub fn parse_program(s: &str) -> Result<Program> {
         program.function_declarations.insert(decl.name(), decl);
     }
     // ===run====
-    program.run_declaration = pre_program.run_declarations.into_iter().nth(0);
+    program.run_declaration = pre_program.run_declarations.into_iter().next();
 
     Ok(program)
 }
@@ -136,6 +136,12 @@ impl PreTypeDeclaration {
             Self::Enum(decl) => &decl.name,
             Self::Ind(decl) => &decl.name,
         }
+    }
+}
+
+impl Default for PreProgram {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -205,7 +211,7 @@ impl<'lex_state, 'interner> State<'lex_state, 'interner> {
     }
 
     pub fn interner(&mut self) -> &mut Interner {
-        &mut self.interner
+        self.interner
     }
 
     pub fn request_token(&mut self, request: Request) -> Result<LocatedToken> {

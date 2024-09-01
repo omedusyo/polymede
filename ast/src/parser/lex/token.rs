@@ -52,7 +52,7 @@ impl SeparatorSymbol {
     pub const AND: char = '&';
 }
 
-pub const BINDING_SEPARATOR: &'static str = ".";
+pub const BINDING_SEPARATOR: &str = ".";
 
 impl Keyword {
     pub const LET: &'static str = "let";

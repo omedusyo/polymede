@@ -278,10 +278,10 @@ impl<'state> State<'state> {
                     }
                 }
                 let s: String = chars.into_iter().collect();
-                return Ok(LocatedToken::new(
+                Ok(LocatedToken::new(
                     Token::Identifier(s),
                     identifier_start_position,
-                ));
+                ))
             }
             Request::Separator(separator_symbol) => {
                 let c = self.read_char_or_fail_when_end()?;
@@ -412,7 +412,7 @@ impl<'state> State<'state> {
                 c = self.read_char_or_fail_when_end()?;
                 false
             }
-            _ if c.is_digit(10) => true,
+            _ if c.is_ascii_digit() => true,
             _ => return Ok(None),
         };
         // We commit.
@@ -540,7 +540,7 @@ impl<'state> State<'state> {
             Some(d) => d,
             None => {
                 return self.error(Error::ExpectedValidUnicodeSequenceInStringLiteral {
-                    found: format!("\\u{}", c.to_string()),
+                    found: format!("\\u{}", c),
                 })
             }
         };

@@ -30,7 +30,7 @@ fn example0() {
 
     println!("Expr value is: {}", v);
 
-    println!("");
+    println!();
     println!("Expr value is: {:?}", c);
 }
 

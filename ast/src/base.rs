@@ -17,6 +17,12 @@ pub struct Program {
     pub msg_type: Option<Variable>,
 }
 
+impl Default for Program {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Program {
     pub fn new() -> Self {
         Self {
@@ -337,7 +343,7 @@ impl Type {
                         return false;
                     }
                 }
-                return true;
+                true
             }
             Arrow(_) => false,
             I32 => true,
@@ -527,7 +533,7 @@ pub fn type_apply(type_parameters: &[Variable], type_body: &Type, type_arguments
             },
             TypeApplication(type_name, args) => {
                 let applied_args: Vec<Type> = args
-                    .into_iter()
+                    .iter()
                     .map(|type_| traverse(position_map, type_, type_arguments))
                     .collect();
                 TypeApplication(type_name.clone(), applied_args)

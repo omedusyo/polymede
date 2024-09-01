@@ -10,7 +10,7 @@ use crate::base::{
 };
 use crate::binary_format::sections;
 use crate::binary_format::sections::{
-    CodeSection, DataItem, DataSection, Element, ElementSection, ExportSection, FunctionSection,
+    CodeSection, Element, ElementSection, ExportSection, FunctionSection,
     GlobalsSection, ImportSection, MemorySection, TableSection, TableType, TypeSection,
 };
 use crate::{ByteStream, Encoder};
@@ -30,15 +30,6 @@ pub struct Module {
 enum FunctionOrImport {
     Fn(Function),
     Import(FunctionImport),
-}
-
-impl FunctionOrImport {
-    fn type_index(&self) -> TypeIndex {
-        match self {
-            Self::Import(FunctionImport { type_index, .. }) => *type_index,
-            Self::Fn(Function { type_index, .. }) => *type_index,
-        }
-    }
 }
 
 enum MemoryOrImport {
@@ -147,12 +138,12 @@ pub enum Expression {
 }
 
 #[derive(Debug)]
-enum Op0 {
+pub enum Op0 {
     Const(NumberLiteral),
 }
 
 #[derive(Debug)]
-enum NumberLiteral {
+pub enum NumberLiteral {
     I32(i32),
     I64(i64),
     F32(f32),
@@ -160,32 +151,32 @@ enum NumberLiteral {
 }
 
 #[derive(Debug)]
-enum Op1 {
+pub enum Op1 {
     Int(Size, IntegerOp1),
     Float(Size, FloatOp1),
 }
 
 #[derive(Debug)]
-enum Op2 {
+pub enum Op2 {
     Int(Size, IntegerOp2),
     Float(Size, FloatOp2),
 }
 
 #[derive(Debug)]
-enum IntegerOp1 {
+pub enum IntegerOp1 {
     Clz,
     Ctz,
     Popcnt,
 }
 
 #[derive(Debug)]
-enum Size {
+pub enum Size {
     X32,
     X64,
 }
 
 #[derive(Debug)]
-enum IntegerOp2 {
+pub enum IntegerOp2 {
     Add,
     Sub,
     Mul,
@@ -201,7 +192,7 @@ enum IntegerOp2 {
 }
 
 #[derive(Debug)]
-enum FloatOp1 {
+pub enum FloatOp1 {
     Abs,
     Neg,
     Sqrt,
@@ -212,7 +203,7 @@ enum FloatOp1 {
 }
 
 #[derive(Debug)]
-enum FloatOp2 {
+pub enum FloatOp2 {
     Add,
     Sub,
     Mul,
@@ -223,29 +214,29 @@ enum FloatOp2 {
 }
 
 #[derive(Debug)]
-enum Signedness {
+pub enum Signedness {
     Signed,
     Unsigned,
 }
 
 #[derive(Debug)]
-enum Rel1 {
+pub enum Rel1 {
     Int(Size, IntegerRel1),
 }
 
 #[derive(Debug)]
-enum Rel2 {
+pub enum Rel2 {
     Int(Size, IntegerRel2),
     Float(Size, FloatRel2),
 }
 
 #[derive(Debug)]
-enum IntegerRel1 {
+pub enum IntegerRel1 {
     Eqz,
 }
 
 #[derive(Debug)]
-enum IntegerRel2 {
+pub enum IntegerRel2 {
     Eq,
     Ne,
     Lt(Signedness),
@@ -255,7 +246,7 @@ enum IntegerRel2 {
 }
 
 #[derive(Debug)]
-enum FloatRel2 {
+pub enum FloatRel2 {
     Eq,
     Ne,
     Lt,
@@ -292,12 +283,11 @@ impl Module {
     pub fn add_typed_function(&mut self, typed_function: TypedFunction) -> FunctionIndex {
         let type_ = typed_function.type_;
         let type_index = self.add_function_type(type_);
-        let fn_index = self.add_function(Function {
+        self.add_function(Function {
             type_index,
             locals: typed_function.locals,
             body: typed_function.body,
-        });
-        fn_index
+        })
     }
 
     pub fn add_global(&mut self, global: Global) -> GlobalIndex {
@@ -1045,12 +1035,6 @@ pub fn example_memory0() -> Module {
 
 pub fn example_memory1() -> Module {
     let mut module = Module::empty();
-
-    let log = module.add_typed_function_import(TypedFunctionImport {
-        module_name: "console".to_string(),
-        name: "log".to_string(),
-        type_: fn_type(vec![TYPE_I32], vec![]),
-    });
 
     let memory = module.add_memory(Limit::MinMax { min: 1, max: 1 });
     module.add_export(Export {

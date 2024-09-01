@@ -152,7 +152,7 @@ impl Error {
                 "Message type {} is not a value type.",
                 sh.show_type(received_type)
             ),
-            MsgTypeCantHaveTypeParameters => format!("Message type can't have type parameters."),
+            MsgTypeCantHaveTypeParameters => "Message type can't have type parameters.".to_string(),
 
             FunctionOutputTypeDoesntMatchExpectedType {
                 function_name,
@@ -280,16 +280,6 @@ impl Error {
                 received,
                 expected
             ),
-            FunctionOutputTypeDoesntMatchExpectedType {
-                function_name,
-                expected_type,
-                received_type,
-            } => format!(
-                "Function's '{}' output type is {} but is expected to be {}.",
-                sh.show_identifier(function_name),
-                sh.show_type(received_type),
-                sh.show_type(expected_type)
-            ),
             TermDoesntHaveExpectedArrowType { received } => format!(
                 "Term has type {}, but is expected to be an Arrow type.",
                 sh.show_type(received)
@@ -310,11 +300,10 @@ impl Error {
                 sh.show_type(expected_type),
                 sh.show_type(msg_type)
             ),
-
-            UnableToInferTypeOfMatch => format!("Unable to infer type of match expression."),
-            UnableToInferTypeOfFold => format!("Unable to infer type of fold expression."),
-            UnableToInferTypeOfLambda => format!("Unable to infer type of lambda expression."),
-            UnableToInferTypeOfConstructor => format!("Unable to infer type of constructor."),
+            UnableToInferTypeOfMatch => "Unable to infer type of match expression.".to_string(),
+            UnableToInferTypeOfFold => "Unable to infer type of fold expression.".to_string(),
+            UnableToInferTypeOfLambda => "Unable to infer type of lambda expression.".to_string(),
+            UnableToInferTypeOfConstructor => "Unable to infer type of constructor.".to_string(),
         }
     }
 }

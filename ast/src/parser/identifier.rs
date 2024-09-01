@@ -20,7 +20,7 @@ pub fn identifier(state: &mut State) -> Result<Identifier> {
 
 pub fn constructor_name(state: &mut State) -> Result<ConstructorName> {
     let id = identifier(state)?;
-    if !id.first_char(&state.interner()).is_ascii_uppercase() {
+    if !id.first_char(state.interner()).is_ascii_uppercase() {
         return Err(Error::ExpectedTypeConstructor { received: id });
     }
     Ok(id)
@@ -28,7 +28,7 @@ pub fn constructor_name(state: &mut State) -> Result<ConstructorName> {
 
 pub fn variable(state: &mut State) -> Result<Variable> {
     let id = identifier(state)?;
-    if !id.first_char(&state.interner()).is_ascii_lowercase() {
+    if !id.first_char(state.interner()).is_ascii_lowercase() {
         return Err(Error::ExpectedTypeConstructor { received: id });
     }
     Ok(id)

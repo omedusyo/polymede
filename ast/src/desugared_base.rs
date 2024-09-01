@@ -77,7 +77,7 @@ fn desugar_pattern_branch(pattern_branch: &base::PatternBranch) -> PatternBranch
             }
             Pattern::Constructor(constructor_name.clone(), desugared_patterns)
         }
-        Int(x) => Pattern::Int(x.clone()),
+        Int(x) => Pattern::Int(*x),
         Variable(var) => Pattern::Variable(var.clone()),
         Anything(identifier) => Pattern::Anything(identifier.clone()),
     };
@@ -98,16 +98,16 @@ pub fn desugar_term(term: &base::Term) -> Term {
         FunctionApplication(fn_name, type_args, args) => Term::FunctionApplication(
             fn_name.clone(),
             type_args.clone(),
-            args.into_iter().map(desugar_term).collect(),
+            args.iter().map(desugar_term).collect(),
         ),
         ConstructorUse(constructor_name, args) => Term::ConstructorUse(
             constructor_name.clone(),
-            args.into_iter().map(desugar_term).collect(),
+            args.iter().map(desugar_term).collect(),
         ),
         Match(arg, pattern_branches) => Term::Match(
             Box::new(desugar_term(arg)),
             pattern_branches
-                .into_iter()
+                .iter()
                 .map(desugar_pattern_branch)
                 .collect(),
         ),
@@ -117,7 +117,7 @@ pub fn desugar_term(term: &base::Term) -> Term {
         Lambda(function) => Term::Lambda(Box::new(desugar_function(function))),
         LambdaApplication(fn_term, args) => Term::LambdaApplication(
             Box::new(desugar_term(fn_term)),
-            args.into_iter().map(desugar_term).collect(),
+            args.iter().map(desugar_term).collect(),
         ),
         Let(bindings, body) => Term::Let(
             bindings
@@ -138,7 +138,7 @@ fn desugar_do_expression(bindings: &[base::DoBinding], body: &base::Term) -> Ter
         let_bindings: &mut Vec<(Variable, Term)>,
     ) -> &'a [base::DoBinding] {
         use base::DoBinding::*;
-        while let Some(Bind(var, term)) = bindings.get(0) {
+        while let Some(Bind(var, term)) = bindings.first() {
             let_bindings.push((var.clone(), desugar_term(term)));
             bindings = &bindings[1..];
         }
