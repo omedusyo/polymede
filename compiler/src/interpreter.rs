@@ -190,17 +190,6 @@ impl FunctionEnvironment {
                 }
                 Err(RuntimeError::NoMatchesFound)
             }
-            Seq(terms) => {
-                if terms.is_empty() {
-                    return Err(RuntimeError::EmptySequenceOfTerms);
-                }
-
-                let mut val = self.interpret(&terms[0], var_env)?;
-                for term in &terms[1..] {
-                    val = self.interpret(term, var_env)?;
-                }
-                Ok(val)
-            }
             CommandAndThen(_cmd_term, _continuation_term) => todo!(),
             Pure(_term) => todo!(),
             Receive => todo!(),

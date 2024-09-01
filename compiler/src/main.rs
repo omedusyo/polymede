@@ -139,7 +139,6 @@ fn example_compilation0() -> Vec<u8> {
     module.bytes()
 }
 
-// TODO: Fix or get rid of this.
 fn example0() {
     use graph_memory_machine::*;
 

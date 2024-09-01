@@ -5,22 +5,17 @@ use wasm::{
     base::{
         export::{Export, ExportDescription},
         indices::{FunctionIndex, TableIndex, TypeIndex},
-        memory::Limit,
         types::{BlockType, FunctionType, GlobalType, Mutability, NumType, ValueType},
     },
     syntax::{
         call, call_indirect, f32_const, fn_type, i32_const, i32_eq, return_call,
-        return_call_indirect, seq, CustomSection, Expression, Global, MemoryImport, Module,
+        seq, CustomSection, Expression, Global, Module,
         TypedFunction, TypedFunctionImport,
     },
 };
 
 #[derive(Debug)]
 pub enum CompilationError {
-    NumberOfPrimitiveFunctionsMismatch {
-        number_of_primitive_functions_assumed_in_program: usize,
-        number_of_primitive_functions_in_library: usize,
-    },
     VariableOutOfBounds {
         var_index_received: gmm::VarName,
         number_of_parameters: usize,
@@ -509,10 +504,6 @@ fn compile_term(
                 code.push(call(state.runtime.drop_env, vec![])); // closes the match's env.
             }
             Ok(seq(code))
-        }
-        gmm::Term::Seq(_terms) => {
-            // TODO: I think I need to introduce am explicit pop instruction for the stack.
-            todo!()
         }
         gmm::Term::CommandAndThen(cmd_term, continuation_term) => {
             let mut code = vec![

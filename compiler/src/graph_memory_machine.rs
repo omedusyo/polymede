@@ -15,7 +15,6 @@ pub enum Term {
     // to actual gmm compilers.
     Float32(f32),
     ByteArray(Vec<u8>),
-    // TODO: Rename to Cons (Constructor)
     Tuple(Variant, Vec<Term>),
     ProjectComponent(Box<Term>, ComponentIndex),
     Call(FunctionName, Vec<Term>),
@@ -29,7 +28,6 @@ pub enum Term {
     // Intention behind match is that the argument will be bound to a new variable
     // that will be accessible in the bodies.
     Match(Box<Term>, Vec<(Pattern, Term)>),
-    Seq(Vec<Term>),
     Pure(Box<Term>),
     CommandAndThen(Box<Term>, Box<Continuation>),
     Receive,
@@ -116,8 +114,4 @@ pub fn let_bind(args: Vec<Term>, e1: Term) -> Term {
 
 pub fn pattern_match(arg: Term, branches: Vec<(Pattern, Term)>) -> Term {
     Term::Match(Box::new(arg), branches)
-}
-
-pub fn seq(terms: Vec<Term>) -> Term {
-    Term::Seq(terms)
 }
