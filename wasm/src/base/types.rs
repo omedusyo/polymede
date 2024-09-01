@@ -51,5 +51,5 @@ pub struct GlobalType {
 #[derive(Debug, Clone, Copy)]
 pub enum Mutability {
     Const,
-    Var
+    Var,
 }

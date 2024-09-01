@@ -1,14 +1,16 @@
 use crate::base::{
-    indices::{LocalIndex, GlobalIndex, DataIndex, LabelIndex, TypeIndex, FunctionIndex, TableIndex},
-    types::BlockType,
+    indices::{
+        DataIndex, FunctionIndex, GlobalIndex, LabelIndex, LocalIndex, TableIndex, TypeIndex,
+    },
     memory::MemoryArgument,
+    types::BlockType,
 };
 
 #[derive(Debug)]
 pub enum Instruction {
     Unreachable,
     Nop,
-    
+
     // ===Control Instructions===
     Block(BlockType, Vec<Instruction>),
     Loop(BlockType, Vec<Instruction>),

@@ -1,7 +1,7 @@
+use crate::expr::Expr;
 use crate::lexer;
-use crate::lexer::{LocatedToken};
-use crate::token::{Token, OperatorSymbol};
-use crate::expr::{Expr};
+use crate::lexer::LocatedToken;
+use crate::token::{OperatorSymbol, Token};
 
 pub fn parse(str: &str) -> Result<Expr, Error> {
     let mut state = State::new(str);
@@ -14,19 +14,18 @@ type Parser<A> = fn(&mut State) -> Result<A, Error>;
 
 #[derive(Debug)]
 pub enum Error {
-    LexError(lexer::Error)
+    LexError(lexer::Error),
 }
-
 
 #[derive(Debug)]
 pub struct State<'a> {
-    lexer_state: lexer::State<'a>
+    lexer_state: lexer::State<'a>,
 }
 
-impl <'state> State<'state> {
+impl<'state> State<'state> {
     pub fn new<'a: 'state>(str: &'a str) -> Self {
         Self {
-            lexer_state: lexer::State::new(str)
+            lexer_state: lexer::State::new(str),
         }
     }
 
@@ -35,7 +34,9 @@ impl <'state> State<'state> {
     }
 
     pub fn clone(&self) -> State<'state> {
-        Self { lexer_state: self.lexer_state.clone() }
+        Self {
+            lexer_state: self.lexer_state.clone(),
+        }
     }
 }
 
@@ -45,9 +46,8 @@ fn left_fold_sequence<A, D>(
     state: &mut State,
     p: Parser<A>,
     delim: Parser<D>,
-    combine: fn(A, D, A) -> A)
- -> Result<A, Error>
-{
+    combine: fn(A, D, A) -> A,
+) -> Result<A, Error> {
     let mut root_a = p(state)?;
 
     loop {
@@ -56,11 +56,11 @@ fn left_fold_sequence<A, D>(
             Ok(d) => {
                 let a = p(state)?;
                 root_a = combine(root_a, d, a);
-            },
+            }
             Err(_) => {
                 // backtrack.
                 *state = saved_state;
-                break
+                break;
             }
         }
     }
@@ -93,12 +93,13 @@ fn additive_expr(state: &mut State) -> Result<Expr, Error> {
         state,
         multiplicative_expr,
         |state: &mut State| {
-            let LocatedToken { position, .. } = state.request_token(lexer::Request::Operator(OperatorSymbol::Add))?;
+            let LocatedToken { position, .. } =
+                state.request_token(lexer::Request::Operator(OperatorSymbol::Add))?;
             Ok(position)
         },
         |root: Expr, position: lexer::Position, expr_right: Expr| {
             Expr::Add(position, Box::new(root), Box::new(expr_right))
-        }
+        },
     )
 }
 
@@ -108,21 +109,21 @@ fn multiplicative_expr(state: &mut State) -> Result<Expr, Error> {
         state,
         literal_or_parenthesized_expr,
         |state: &mut State| {
-            let LocatedToken { position, .. } = state.request_token(lexer::Request::Operator(OperatorSymbol::Mul))?;
+            let LocatedToken { position, .. } =
+                state.request_token(lexer::Request::Operator(OperatorSymbol::Mul))?;
             Ok(position)
         },
         |root: Expr, position: lexer::Position, expr_right: Expr| {
             Expr::Mul(position, Box::new(root), Box::new(expr_right))
-        }
+        },
     )
 }
-
 
 fn literal_or_parenthesized_expr(state: &mut State) -> Result<Expr, Error> {
     let saved_state = state.clone();
     let Ok(_) = state.request_token(lexer::Request::OpenParen) else {
         *state = saved_state; // backtrack
-        // It must be a literal.
+                              // It must be a literal.
         return nat32_literal(state);
     };
     let expr = expr(state)?;
@@ -131,51 +132,54 @@ fn literal_or_parenthesized_expr(state: &mut State) -> Result<Expr, Error> {
 }
 
 fn nat32_literal(state: &mut State) -> Result<Expr, Error> {
-    let LocatedToken { token: Token::Nat32(x), position } = state.request_token(lexer::Request::Nat32)? else { unreachable!() };
+    let LocatedToken {
+        token: Token::Nat32(x),
+        position,
+    } = state.request_token(lexer::Request::Nat32)?
+    else {
+        unreachable!()
+    };
     Ok(Expr::Nat32(position, x))
 }
 
 pub fn example0() {
     let s = "3*2 + 8 + 1 * 2  * 5  ";
     let mut state = State::new(s);
-    
+
     let result = start(&mut state);
     println!("Raw expr: {:?}", result);
     match result {
         Ok(expr) => {
             println!("Result of parsing {}: {:?}", s, expr.show());
-        },
-        Err(_) => {
         }
+        Err(_) => {}
     }
 }
 
 pub fn example1() {
     let s = "(1 + 2) * (3 + 4)  ";
     let mut state = State::new(s);
-    
+
     let result = start(&mut state);
     println!("Raw expr: {:?}", result);
     match result {
         Ok(expr) => {
             println!("Result of parsing {}: {:?}", s, expr.show());
-        },
-        Err(_) => {
         }
+        Err(_) => {}
     }
 }
 
 pub fn example2() {
     let s = "((((3))))";
     let mut state = State::new(s);
-    
+
     let result = start(&mut state);
     println!("Raw expr: {:?}", result);
     match result {
         Ok(expr) => {
             println!("Result of parsing {}: {:?}", s, expr.show());
-        },
-        Err(_) => {
         }
+        Err(_) => {}
     }
 }

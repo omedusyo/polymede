@@ -1,21 +1,29 @@
-mod parser;
-mod token;
-mod lexer;
-mod expr;
 mod base;
 mod codegen;
+mod expr;
+mod lexer;
+mod parser;
+mod token;
 
-use expr::Expr;
 use codegen::compile_from_str;
+use expr::Expr;
 
+use std::fs;
 use std::io;
 use std::io::Write;
-use std::fs;
 
 fn example0() {
     use Expr::*;
     let dummy_position = lexer::Position { column: 1, line: 1 };
-    let expr = Mul(dummy_position, Box::new(Add(dummy_position, Box::new(Nat32(dummy_position, 1)), Box::new(Nat32(dummy_position, 1)))), Box::new(Nat32(dummy_position, 3)));
+    let expr = Mul(
+        dummy_position,
+        Box::new(Add(
+            dummy_position,
+            Box::new(Nat32(dummy_position, 1)),
+            Box::new(Nat32(dummy_position, 1)),
+        )),
+        Box::new(Nat32(dummy_position, 3)),
+    );
     let v = expr.eval();
 
     let c = expr.compile();

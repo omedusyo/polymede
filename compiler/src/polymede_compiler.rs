@@ -1,7 +1,7 @@
+use crate::graph_memory_machine as gmm;
 use ast::base as polymede;
 use ast::desugared_base as desugared_polymede;
-use ast::identifier::{FunctionName, ConstructorName, Variable};
-use crate::graph_memory_machine as gmm;
+use ast::identifier::{ConstructorName, FunctionName, Variable};
 
 use std::collections::HashMap;
 
@@ -42,20 +42,21 @@ impl VariableIndex {
     }
 }
 
-
 impl Env {
     fn new() -> Self {
         Self { scopes: vec![] }
     }
 
-    fn open_env(&mut self) { 
+    fn open_env(&mut self) {
         match self.scopes.last() {
-            Some(top_scope) => {
-                self.scopes.push(Scope { next_var: top_scope.next_var, map: HashMap::new() })
-            },
-            None => {
-                self.scopes.push(Scope { next_var: 0, map: HashMap::new() })
-            }
+            Some(top_scope) => self.scopes.push(Scope {
+                next_var: top_scope.next_var,
+                map: HashMap::new(),
+            }),
+            None => self.scopes.push(Scope {
+                next_var: 0,
+                map: HashMap::new(),
+            }),
         }
     }
 
@@ -66,9 +67,15 @@ impl Env {
     fn extend_var(&mut self, var: Variable) {
         match self.scopes.last_mut() {
             Some(scope) => {
-                scope.map.insert(var, VariableIndex { index: scope.next_var, projections: vec![] });
+                scope.map.insert(
+                    var,
+                    VariableIndex {
+                        index: scope.next_var,
+                        projections: vec![],
+                    },
+                );
                 scope.next_var += 1;
-            },
+            }
             None => unreachable!(),
         }
     }
@@ -82,7 +89,7 @@ impl Env {
                     scope.map.insert(var, index);
                 }
                 scope.next_var += 1;
-            },
+            }
             None => unreachable!(),
         }
     }
@@ -97,7 +104,7 @@ impl Env {
         for scope in self.scopes.iter().rev() {
             match scope.map.get(var) {
                 Some(var_index) => return Some(var_index),
-                None => {},
+                None => {}
             }
         }
         None
@@ -124,7 +131,10 @@ impl State {
         self.env = env;
     }
 
-    fn get_constructor_index(&self, constructor_name: &ConstructorName) -> Option<ConstructorIndex> {
+    fn get_constructor_index(
+        &self,
+        constructor_name: &ConstructorName,
+    ) -> Option<ConstructorIndex> {
         self.constructor_mapping.get(constructor_name).copied()
     }
 
@@ -158,7 +168,7 @@ impl State {
     fn extend_vars(&mut self, vars: Vec<Variable>) {
         self.env.extend_vars(vars)
     }
-    
+
     fn get_var(&self, var: &Variable) -> Option<&VariableIndex> {
         self.env.get(var)
     }
@@ -171,7 +181,9 @@ pub fn compile(program: &polymede::Program) -> gmm::Program {
         let mut count: ConstructorIndex = 0;
 
         for constructor in decl.constructors_in_source_ordering() {
-            state.constructor_mapping.insert(constructor.name.clone(), count);
+            state
+                .constructor_mapping
+                .insert(constructor.name.clone(), count);
             count += 1;
         }
     }
@@ -179,24 +191,34 @@ pub fn compile(program: &polymede::Program) -> gmm::Program {
     // ===Function Name ~> Function Index===
     {
         let mut next_function_index: FunctionIndex = 0;
-        for decl in program.function_declarations_in_source_ordering() { 
-            state.function_mapping.insert(decl.name(), next_function_index);
+        for decl in program.function_declarations_in_source_ordering() {
+            state
+                .function_mapping
+                .insert(decl.name(), next_function_index);
             next_function_index += 1;
         }
     }
-    
-    // ===Main===
-    let Some(run) = &program.run_declaration else { unreachable!() };
-    let main = compile_typed_term(&mut state, &desugared_polymede::desugar_typed_term(&run.body));
 
+    // ===Main===
+    let Some(run) = &program.run_declaration else {
+        unreachable!()
+    };
+    let main = compile_typed_term(
+        &mut state,
+        &desugared_polymede::desugar_typed_term(&run.body),
+    );
 
     // ===Functions===
-    let mut functions: Vec<gmm::FunctionOrImport> = Vec::with_capacity(state.function_mapping.len());
-    for decl in program.function_declarations_in_source_ordering() { 
+    let mut functions: Vec<gmm::FunctionOrImport> =
+        Vec::with_capacity(state.function_mapping.len());
+    for decl in program.function_declarations_in_source_ordering() {
         match decl {
             polymede::FunctionDeclaration::User(decl) => {
-                functions.push(gmm::FunctionOrImport::Fn(compile_function(&mut state, &desugared_polymede::desugar_function(&decl.function.function))));
-            },
+                functions.push(gmm::FunctionOrImport::Fn(compile_function(
+                    &mut state,
+                    &desugared_polymede::desugar_function(&decl.function.function),
+                )));
+            }
             polymede::FunctionDeclaration::Foreign(decl) => {
                 let gmm_import = gmm::FunctionImport {
                     number_of_parameters: decl.type_.input_types.len(),
@@ -211,10 +233,7 @@ pub fn compile(program: &polymede::Program) -> gmm::Program {
         functions.push(gmm::FunctionOrImport::Fn(anon_fn));
     }
 
-    gmm::Program {
-        functions,
-        main,
-    }
+    gmm::Program { functions, main }
 }
 
 fn compile_function(state: &mut State, function: &desugared_polymede::Function) -> gmm::Function {
@@ -229,7 +248,9 @@ fn compile_function(state: &mut State, function: &desugared_polymede::Function) 
 }
 
 fn compile_var(state: &State, var: &Variable) -> gmm::Term {
-    let Some(var_index) = state.get_var(var) else { unreachable!() };
+    let Some(var_index) = state.get_var(var) else {
+        unreachable!()
+    };
     var_index.compile()
 }
 
@@ -245,21 +266,31 @@ fn compile_term(state: &mut State, term: &desugared_polymede::Term) -> gmm::Term
     match term {
         TypedTerm(typed_term) => compile_typed_term(state, &typed_term),
         VariableUse(var) => compile_var(state, var),
-        Int(x) => gmm::Term::Const(*x) ,
+        Int(x) => gmm::Term::Const(*x),
         Float(x) => gmm::Term::Float32(*x),
         StringLiteral(s) => gmm::Term::ByteArray(s.clone().into_bytes()), // TODO: Again, this clones the string, which really sucks.
         FunctionApplication(function_name, _, args) => {
-            let Some(fn_index) = state.get_function_index(function_name) else { unreachable!() };
-            gmm::Term::Call(fn_index, args.iter().map(|arg| compile_term(state, arg)).collect())
-        },
+            let Some(fn_index) = state.get_function_index(function_name) else {
+                unreachable!()
+            };
+            gmm::Term::Call(
+                fn_index,
+                args.iter().map(|arg| compile_term(state, arg)).collect(),
+            )
+        }
         ConstructorUse(constructor_name, args) => {
-            let Some(constructor_index) = state.get_constructor_index(constructor_name) else { unreachable!() };
+            let Some(constructor_index) = state.get_constructor_index(constructor_name) else {
+                unreachable!()
+            };
             if args.is_empty() {
                 gmm::Term::Const(constructor_index)
             } else {
-                gmm::Term::Tuple(constructor_index, args.iter().map(|arg| compile_term(state, arg)).collect())
+                gmm::Term::Tuple(
+                    constructor_index,
+                    args.iter().map(|arg| compile_term(state, arg)).collect(),
+                )
             }
-        },
+        }
         Match(arg, branches) => {
             let gmm_arg = compile_term(state, arg);
             let mut gmm_branches = vec![];
@@ -269,9 +300,12 @@ fn compile_term(state: &mut State, term: &desugared_polymede::Term) -> gmm::Term
                 use desugared_polymede::Pattern::*;
                 let gmm_pattern = match &branch.pattern {
                     Constructor(constructor_name, _) => {
-                        let Some(constructor_index) = state.get_constructor_index(constructor_name) else { unreachable!() };
+                        let Some(constructor_index) = state.get_constructor_index(constructor_name)
+                        else {
+                            unreachable!()
+                        };
                         gmm::Pattern::Variant(constructor_index)
-                    },
+                    }
                     Int(x) => gmm::Pattern::Variant(*x),
                     Variable(_) => gmm::Pattern::Always,
                     Anything(_) => gmm::Pattern::Always,
@@ -280,15 +314,13 @@ fn compile_term(state: &mut State, term: &desugared_polymede::Term) -> gmm::Term
                 state.close_env();
             }
             gmm::Term::Match(Box::new(gmm_arg), gmm_branches)
-        },
-        Lambda(function) => {
-            compile_closure(state, function)
-        },
+        }
+        Lambda(function) => compile_closure(state, function),
         LambdaApplication(fn_term, args) => {
             let gmm_fn_term = compile_term(state, fn_term);
             let gmm_args = args.iter().map(|arg| compile_term(state, arg)).collect();
             gmm::Term::CallClosure(Box::new(gmm_fn_term), gmm_args)
-        },
+        }
         Let(bindings, body) => {
             state.open_env();
             let mut gmm_args: Vec<gmm::Term> = Vec::with_capacity(bindings.len());
@@ -299,14 +331,14 @@ fn compile_term(state: &mut State, term: &desugared_polymede::Term) -> gmm::Term
             let gmm_body = compile_term(state, body);
             state.close_env();
             gmm::Term::Let(gmm_args, Box::new(gmm_body))
-        },
+        }
         Pure(term) => gmm::Term::Pure(Box::new(compile_term(state, term))),
-        AndThen(cmd_term, continuation) => {
-            gmm::Term::CommandAndThen(
-                Box::new(compile_term(state, cmd_term)),
-                Box::new(gmm::Continuation { body : compile_closure(state, continuation) })
-            )
-        },
+        AndThen(cmd_term, continuation) => gmm::Term::CommandAndThen(
+            Box::new(compile_term(state, cmd_term)),
+            Box::new(gmm::Continuation {
+                body: compile_closure(state, continuation),
+            }),
+        ),
         Receive => gmm::Term::Receive,
     }
 }
@@ -328,22 +360,39 @@ fn compile_closure(state: &mut State, function: &desugared_polymede::Function) -
     };
     let function_index = state.add_anonymous_function(gmm_function);
 
-    let free_args = free_vars.iter().map(|var| compile_var(state, var)).collect();
+    let free_args = free_vars
+        .iter()
+        .map(|var| compile_var(state, var))
+        .collect();
     gmm::Term::PartialApply(function_index, free_args)
 }
 
-fn pattern_to_indices_simple(pattern: &desugared_polymede::Pattern, indices: &mut Vec<(Variable, VariableIndex)>, var_index: usize) {
+fn pattern_to_indices_simple(
+    pattern: &desugared_polymede::Pattern,
+    indices: &mut Vec<(Variable, VariableIndex)>,
+    var_index: usize,
+) {
     use desugared_polymede::Pattern::*;
     match pattern {
         Constructor(_, patterns) => {
             for (i, var) in patterns.iter().enumerate() {
-                indices.push((var.clone(), VariableIndex { index: var_index, projections: vec![i as u8] }))
+                indices.push((
+                    var.clone(),
+                    VariableIndex {
+                        index: var_index,
+                        projections: vec![i as u8],
+                    },
+                ))
             }
-        },
-        Variable(var) => {
-            indices.push((var.clone(), VariableIndex { index: var_index, projections: vec![] }))
-        },
-        Int(_) => {},
+        }
+        Variable(var) => indices.push((
+            var.clone(),
+            VariableIndex {
+                index: var_index,
+                projections: vec![],
+            },
+        )),
+        Int(_) => {}
         Anything(_) => {}
     }
 }

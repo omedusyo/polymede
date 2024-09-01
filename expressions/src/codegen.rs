@@ -2,9 +2,10 @@ use crate::expr::Expr;
 use crate::parser;
 use crate::parser::parse;
 
-use wasm::syntax::{Module, Expression, i32_const, i32_add, i32_mul, TypedFunction, fn_type, TYPE_I32};
 use wasm::base::export::{Export, ExportDescription};
-
+use wasm::syntax::{
+    fn_type, i32_add, i32_const, i32_mul, Expression, Module, TypedFunction, TYPE_I32,
+};
 
 pub fn compile(expr: Expr) -> Expression {
     use Expr::*;
@@ -27,7 +28,10 @@ pub fn compile_from_str(str: &str) -> Result<Module, parser::Error> {
         body: compiled_expr,
     });
 
-    module.add_export(Export { name: "value".to_string(), export_description: ExportDescription::Function(value) });
-    
+    module.add_export(Export {
+        name: "value".to_string(),
+        export_description: ExportDescription::Function(value),
+    });
+
     Ok(module)
 }

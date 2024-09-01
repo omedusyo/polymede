@@ -1,4 +1,7 @@
-use crate::graph_memory_machine::{Term, Pattern, Variant, Program, Function, FunctionImport, FunctionOrImport, FunctionName, VarName};
+use crate::graph_memory_machine::{
+    Function, FunctionImport, FunctionName, FunctionOrImport, Pattern, Program, Term, VarName,
+    Variant,
+};
 
 type Result<A> = std::result::Result<A, RuntimeError>;
 
@@ -18,7 +21,7 @@ enum RuntimeError {
     AttemptToPatternMatchOnClosure,
     AttemptToPatternMatchOnFloat32,
     NoMatchesFound,
-    UnsupportedPrimitiveFunction { import: FunctionImport }
+    UnsupportedPrimitiveFunction { import: FunctionImport },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -39,7 +42,7 @@ struct Closure {
 #[derive(Debug, Clone, PartialEq)]
 struct VarEnvironment(Vec<Value>);
 
-type PrimitiveFunction = fn (Vec<Value>) -> Result<Value>;
+type PrimitiveFunction = fn(Vec<Value>) -> Result<Value>;
 
 #[derive(Debug)]
 struct FunctionEnvironment {
@@ -93,7 +96,9 @@ impl VarEnvironment {
 
 impl FunctionEnvironment {
     fn apply(&self, fn_name: FunctionName, args: Vec<Value>) -> Result<Value> {
-        let Some(function) = self.functions.get(fn_name) else { return Err(RuntimeError::UndefinedFunction(fn_name)) };
+        let Some(function) = self.functions.get(fn_name) else {
+            return Err(RuntimeError::UndefinedFunction(fn_name));
+        };
         let function = &self.functions[fn_name];
         match function {
             FunctionOrPrimitive::Function(function) => {
@@ -101,12 +106,13 @@ impl FunctionEnvironment {
                     let mut env = VarEnvironment(args);
                     self.interpret(&function.body, &mut env)
                 } else {
-                    Err(RuntimeError::WrongNumberOfArguments { expected: function.number_of_parameters, received: args.len() })
+                    Err(RuntimeError::WrongNumberOfArguments {
+                        expected: function.number_of_parameters,
+                        received: args.len(),
+                    })
                 }
-            },
-            FunctionOrPrimitive::Primitive(function) => {
-                function(args)
-            },
+            }
+            FunctionOrPrimitive::Primitive(function) => function(args),
         }
     }
 
@@ -125,7 +131,10 @@ impl FunctionEnvironment {
             Const(variant) => Ok(Value::Const(*variant)),
             Float32(x) => Ok(Value::Float32(*x)),
             ByteArray(bytes) => Ok(Value::ByteArray(bytes.to_vec())),
-            Tuple(variant, terms) => Ok(Value::Tuple(*variant, self.interpret_terms(terms, var_env)?)),
+            Tuple(variant, terms) => Ok(Value::Tuple(
+                *variant,
+                self.interpret_terms(terms, var_env)?,
+            )),
             ProjectComponent(term, i) => {
                 let val = self.interpret(term, var_env)?;
                 match val {
@@ -133,17 +142,20 @@ impl FunctionEnvironment {
                         Some(val) => Ok(val.clone()),
                         None => Err(RuntimeError::TupleIndexOutOfBounds),
                     },
-                    _ => Err(RuntimeError::ExpectedTuple)
+                    _ => Err(RuntimeError::ExpectedTuple),
                 }
-            },
+            }
             Call(fn_name, terms) => {
                 let args = self.interpret_terms(terms, var_env)?;
                 self.apply(*fn_name, args)
-            },
+            }
             PartialApply(fn_name, terms) => {
                 let partial_arguments = self.interpret_terms(terms, var_env)?;
-                Ok(Value::Closure(Closure { fn_name: *fn_name, partial_arguments }))
-            },
+                Ok(Value::Closure(Closure {
+                    fn_name: *fn_name,
+                    partial_arguments,
+                }))
+            }
             CallClosure(closure_term, arg_terms) => {
                 match self.interpret(closure_term, var_env)? {
                     Value::Closure(closure) => {
@@ -155,10 +167,10 @@ impl FunctionEnvironment {
                             args.push(arg_val)
                         }
                         self.apply(closure.fn_name, args)
-                    },
+                    }
                     _ => Err(RuntimeError::ExpectedClosure),
                 }
-            },
+            }
             VarUse(var) => var_env.lookup(*var),
             Let(terms, body_term) => {
                 for term in terms {
@@ -168,27 +180,27 @@ impl FunctionEnvironment {
                 let body_val = self.interpret(body_term, var_env)?;
                 var_env.pop_binding()?;
                 Ok(body_val)
-            },
+            }
             Match(term, branches) => {
                 let val = self.interpret(term, var_env)?;
                 for (pattern, body) in branches {
-                    if val.matches(pattern)? { 
-                        return self.interpret(body, var_env)
+                    if val.matches(pattern)? {
+                        return self.interpret(body, var_env);
                     }
                 }
                 Err(RuntimeError::NoMatchesFound)
-            },
+            }
             Seq(terms) => {
                 if terms.len() == 0 {
-                    return Err(RuntimeError::EmptySequenceOfTerms)
+                    return Err(RuntimeError::EmptySequenceOfTerms);
                 }
-                
+
                 let mut val = self.interpret(&terms[0], var_env)?;
                 for term in &terms[1..] {
                     val = self.interpret(term, var_env)?;
                 }
                 Ok(val)
-            },
+            }
             CommandAndThen(_cmd_term, _continuation_term) => todo!(),
             Pure(_term) => todo!(),
             Receive => todo!(),
@@ -202,25 +214,21 @@ fn run(program: Program) -> Result<Value> {
         match function {
             FunctionOrImport::Fn(function) => {
                 functions.push(FunctionOrPrimitive::Function(function))
-            },
-            FunctionOrImport::Import(import) => {
-                functions.push(FunctionOrPrimitive::Primitive(
-                    if import.external_name == "i32_inc" {
-                        increment
-                    } else if import.external_name == "i32_dec" {
-                        decrement
-                    } else if import.external_name == "i32_add" {
-                        addition
-                    } else {
-                        return Err(RuntimeError::UnsupportedPrimitiveFunction { import })
-                    }
-                ))
             }
+            FunctionOrImport::Import(import) => functions.push(FunctionOrPrimitive::Primitive(
+                if import.external_name == "i32_inc" {
+                    increment
+                } else if import.external_name == "i32_dec" {
+                    decrement
+                } else if import.external_name == "i32_add" {
+                    addition
+                } else {
+                    return Err(RuntimeError::UnsupportedPrimitiveFunction { import });
+                },
+            )),
         }
     }
-    let fn_env = FunctionEnvironment {
-        functions,
-    };
+    let fn_env = FunctionEnvironment { functions };
     let mut env = VarEnvironment::new();
 
     fn_env.interpret(&program.main, &mut env)
@@ -234,7 +242,10 @@ fn increment(args: Vec<Value>) -> Result<Value> {
             _ => Err(RuntimeError::ExpectedConstant),
         }
     } else {
-        Err(RuntimeError::WrongNumberOfArguments { expected: 1, received: args.len() })
+        Err(RuntimeError::WrongNumberOfArguments {
+            expected: 1,
+            received: args.len(),
+        })
     }
 }
 
@@ -245,7 +256,10 @@ fn decrement(args: Vec<Value>) -> Result<Value> {
             _ => Err(RuntimeError::ExpectedConstant),
         }
     } else {
-        Err(RuntimeError::WrongNumberOfArguments { expected: 1, received: args.len() })
+        Err(RuntimeError::WrongNumberOfArguments {
+            expected: 1,
+            received: args.len(),
+        })
     }
 }
 
@@ -259,25 +273,29 @@ fn addition(args: Vec<Value>) -> Result<Value> {
             _ => Err(RuntimeError::ExpectedConstant),
         }
     } else {
-        Err(RuntimeError::WrongNumberOfArguments { expected: 2, received: args.len() })
+        Err(RuntimeError::WrongNumberOfArguments {
+            expected: 2,
+            received: args.len(),
+        })
     }
 }
 
 mod tests {
     use super::*;
-    use crate::graph_memory_machine::{FunctionImport, constant, tuple, project, var, call, call_closure, partial_apply, pattern_match};
+    use crate::graph_memory_machine::{
+        call, call_closure, constant, partial_apply, pattern_match, project, tuple, var,
+        FunctionImport,
+    };
 
     #[test]
     fn test_constant() -> Result<()> {
         // functions
         let inc = 0;
         let program = Program {
-            functions: vec![
-                FunctionOrImport::Import(FunctionImport {
-                    number_of_parameters: 1,
-                    external_name: "i32_inc".to_string(),
-                }),
-            ],
+            functions: vec![FunctionOrImport::Import(FunctionImport {
+                number_of_parameters: 1,
+                external_name: "i32_inc".to_string(),
+            })],
             // main: call(inc, vec![constant(666)]),
             main: call(inc, vec![call(inc, vec![constant(666)])]),
         };
@@ -307,7 +325,7 @@ mod tests {
                     body: {
                         let x = 0;
                         tuple(cons, vec![var(x), constant(nil)])
-                    }
+                    },
                 }),
             ],
             main: call(singleton, vec![constant(666)]),
@@ -345,7 +363,7 @@ mod tests {
                     body: {
                         let x = 0;
                         tuple(cons, vec![call(inc, vec![var(x)]), constant(nil)])
-                    }
+                    },
                 }),
             ],
             main: call(singleton, vec![constant(666)]),
@@ -383,17 +401,17 @@ mod tests {
                             vec![
                                 (Pattern::Variant(0), constant(t)),
                                 (Pattern::Always, constant(f)),
-                            ]
+                            ],
                         )
-                    }
+                    },
                 }),
             ],
-            main: call(is_zero, vec![constant(0)])
+            main: call(is_zero, vec![constant(0)]),
         };
 
         let val = run(program)?;
         assert!(val == Value::Const(t));
-        
+
         Ok(())
     }
 
@@ -430,18 +448,24 @@ mod tests {
                             var(n),
                             vec![
                                 (Pattern::Variant(0), constant(0)),
-                                (Pattern::Always, call(add, vec![var(n), call(sum, vec![call(dec, vec![var(n)])])])),
-                            ]
+                                (
+                                    Pattern::Always,
+                                    call(
+                                        add,
+                                        vec![var(n), call(sum, vec![call(dec, vec![var(n)])])],
+                                    ),
+                                ),
+                            ],
                         )
-                    }
+                    },
                 }),
             ],
-            main: call(sum, vec![constant(5)])
+            main: call(sum, vec![constant(5)]),
         };
 
         let val = run(program)?;
         assert!(val == Value::Const(15));
-        
+
         Ok(())
     }
 
@@ -475,18 +499,28 @@ mod tests {
                     body: {
                         let n = 0;
                         let xs = 1;
-                        pattern_match(var(n), vec![
-                            (Pattern::Variant(nil), var(xs)),
-                            (Pattern::Always,
-                                // let_bind(
-                                //     call(dec, vec![var(n)]), {
-                                //         let m = 2;
-                                //         call(range_loop, vec![var(m), tuple(cons, vec![var(m), var(xs)])])
-                                //     }
-                                // )
-                                call(range_loop, vec![call(dec, vec![var(n)]), tuple(cons, vec![call(dec, vec![var(n)]), var(xs)])])
-                            )
-                        ])
+                        pattern_match(
+                            var(n),
+                            vec![
+                                (Pattern::Variant(nil), var(xs)),
+                                (
+                                    Pattern::Always,
+                                    // let_bind(
+                                    //     call(dec, vec![var(n)]), {
+                                    //         let m = 2;
+                                    //         call(range_loop, vec![var(m), tuple(cons, vec![var(m), var(xs)])])
+                                    //     }
+                                    // )
+                                    call(
+                                        range_loop,
+                                        vec![
+                                            call(dec, vec![var(n)]),
+                                            tuple(cons, vec![call(dec, vec![var(n)]), var(xs)]),
+                                        ],
+                                    ),
+                                ),
+                            ],
+                        )
                     },
                 }),
                 // fn range(n) {
@@ -512,7 +546,12 @@ mod tests {
 
         // println!("VALUE: {:?}", val);
         // assert!(val == Tuple(cons, vec![Const(0), Tuple(cons, vec![Const(1), Const(nil)])]));
-        assert!(val == construct(Const(0), construct(Const(1), construct(Const(2), Const(nil)))));
+        assert!(
+            val == construct(
+                Const(0),
+                construct(Const(1), construct(Const(2), Const(nil)))
+            )
+        );
         Ok(())
     }
 
@@ -538,10 +577,13 @@ mod tests {
                         let x = 1;
                         let y = 2;
                         call(add, vec![var(x), var(y)])
-                    }
+                    },
                 }),
             ],
-            main: call_closure(partial_apply(another_add, vec![constant(5)]), vec![constant(6)]),
+            main: call_closure(
+                partial_apply(another_add, vec![constant(5)]),
+                vec![constant(6)],
+            ),
         };
 
         let val = run(program)?;

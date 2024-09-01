@@ -1,6 +1,6 @@
 use crate::parser::lex::{
     token,
-    token::{Token, SeparatorSymbol}
+    token::{SeparatorSymbol, Token},
 };
 use std::str::Chars;
 
@@ -9,7 +9,7 @@ type Result<A> = std::result::Result<A, ErrorWithPosition>;
 #[derive(Debug)]
 pub struct State<'a> {
     chars: Chars<'a>, // UTF code-points iterator
-    position: Position
+    position: Position,
 }
 
 #[derive(Debug)]
@@ -35,15 +35,24 @@ pub enum Error {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Position { pub column: usize, pub line : usize }
+pub struct Position {
+    pub column: usize,
+    pub line: usize,
+}
 
 impl Position {
     pub fn new_line(self) -> Self {
-        Position { column: 1, line: self.line + 1 }
+        Position {
+            column: 1,
+            line: self.line + 1,
+        }
     }
 
     pub fn move_column_by(self, n: usize) -> Self {
-        Position { column: self.column + n, line: self.line }
+        Position {
+            column: self.column + n,
+            line: self.line,
+        }
     }
 }
 
@@ -90,7 +99,7 @@ enum WhitespaceState {
     ConsumeAllUntilNewline,
 }
 
-impl <'state> State<'state> {
+impl<'state> State<'state> {
     // 'a lives atleast as long as 'state ('a contains 'state)
     pub fn new<'a: 'state>(str: &'a str) -> Self {
         Self {
@@ -110,7 +119,10 @@ impl <'state> State<'state> {
     }
 
     pub fn error<A>(&self, err: Error) -> Result<A> {
-        Err(ErrorWithPosition { position: self.position, error: err })
+        Err(ErrorWithPosition {
+            position: self.position,
+            error: err,
+        })
     }
 
     pub fn clone(&self) -> Self {
@@ -126,38 +138,36 @@ impl <'state> State<'state> {
 
         loop {
             let tokens_backup = self.chars.clone();
-            let char = self.chars.next(); 
+            let char = self.chars.next();
             match ws_state {
                 ConsumeWhitespace => {
                     match char {
-                    Some('\n') => {
-                        self.position = self.position.new_line();
-                    },
-                    Some(' ') | Some('\t') => {
-                        self.position = self.position.move_column_by(1);
-                    },
-                    Some('/') => {
-                        self.position = self.position.move_column_by(1);
-                        ws_state = ConsumeAllUntilNewline;
-                    },
-                    Some(_) => {
-                        self.chars = tokens_backup; // backtrack
-                        break
-                    },
-                    None => break,
+                        Some('\n') => {
+                            self.position = self.position.new_line();
+                        }
+                        Some(' ') | Some('\t') => {
+                            self.position = self.position.move_column_by(1);
+                        }
+                        Some('/') => {
+                            self.position = self.position.move_column_by(1);
+                            ws_state = ConsumeAllUntilNewline;
+                        }
+                        Some(_) => {
+                            self.chars = tokens_backup; // backtrack
+                            break;
+                        }
+                        None => break,
+                    }
                 }
-                },
-                ConsumeAllUntilNewline => {
-                    match char {
+                ConsumeAllUntilNewline => match char {
                     Some('\n') => {
                         self.position = self.position.new_line();
                         ws_state = ConsumeWhitespace;
-                    },
+                    }
                     Some(_) => {
                         self.position = self.position.move_column_by(1);
-                    },
-                    None => break,
                     }
+                    None => break,
                 },
             }
         }
@@ -174,35 +184,41 @@ impl <'state> State<'state> {
     pub fn consume_whitespace_or_fail_when_end(&mut self) -> Result<()> {
         self.consume_whitespace();
         match self.chars.clone().next() {
-            Some(_) => {
-                Ok(())
-            },
-            None => self.error(Error::UnexpectedEnd)
+            Some(_) => Ok(()),
+            None => self.error(Error::UnexpectedEnd),
         }
     }
 
     pub fn read_char_or_fail_when_end(&mut self) -> Result<char> {
         match self.chars.clone().next() {
             Some(c) => Ok(c),
-            None => self.error(Error::UnexpectedEnd) 
+            None => self.error(Error::UnexpectedEnd),
         }
     }
 
     pub fn consume_char_or_fail_when_end(&mut self) -> Result<char> {
         match self.chars.next() {
             Some(c) => Ok(c),
-            None => self.error(Error::UnexpectedEnd) 
+            None => self.error(Error::UnexpectedEnd),
         }
     }
 
-    pub fn match_string(&mut self, str: &str, request: Request, result_token: Token) -> Result<LocatedToken> {
+    pub fn match_string(
+        &mut self,
+        str: &str,
+        request: Request,
+        result_token: Token,
+    ) -> Result<LocatedToken> {
         let mut chars_for_error: Vec<char> = vec![];
         let start_position = self.position();
         for c0 in str.chars() {
             let c = self.read_char_or_fail_when_end()?;
             chars_for_error.push(c);
             if c != c0 {
-                return self.error(Error::Expected { requested: request, found: chars_for_error.into_iter().collect() })
+                return self.error(Error::Expected {
+                    requested: request,
+                    found: chars_for_error.into_iter().collect(),
+                });
             }
             self.advance();
         }
@@ -216,30 +232,14 @@ impl <'state> State<'state> {
     pub fn request(&mut self, request: Request) -> Result<LocatedToken> {
         self.consume_whitespace();
         match request {
-            Request::OpenParen => {
-                self.match_string("(", request, Token::OpenParen)
-            },
-            Request::CloseParen => {
-                self.match_string(")", request, Token::CloseParen)
-            },
-            Request::OpenAngle => {
-                self.match_string("<", request, Token::OpenAngle)
-            },
-            Request::CloseAngle => {
-                self.match_string(">", request, Token::CloseAngle)
-            },
-            Request::OpenCurly => {
-                self.match_string("{", request, Token::OpenCurly)
-            },
-            Request::CloseCurly => {
-                self.match_string("}", request, Token::CloseCurly)
-            },
-            Request::Quote => {
-                self.match_string("\"", request, Token::CloseCurly)
-            },
-            Request::Keyword(keyword) => {
-                self.match_keyword(request, keyword)
-            },
+            Request::OpenParen => self.match_string("(", request, Token::OpenParen),
+            Request::CloseParen => self.match_string(")", request, Token::CloseParen),
+            Request::OpenAngle => self.match_string("<", request, Token::OpenAngle),
+            Request::CloseAngle => self.match_string(">", request, Token::CloseAngle),
+            Request::OpenCurly => self.match_string("{", request, Token::OpenCurly),
+            Request::CloseCurly => self.match_string("}", request, Token::CloseCurly),
+            Request::Quote => self.match_string("\"", request, Token::CloseCurly),
+            Request::Keyword(keyword) => self.match_keyword(request, keyword),
             Request::TypeDeclarationKeyword => {
                 let c = self.read_char_or_fail_when_end()?;
                 if c == 'e' {
@@ -249,7 +249,7 @@ impl <'state> State<'state> {
                 } else {
                     self.error(Error::ExpectedTypeDeclarationKeyword)
                 }
-            },
+            }
             Request::Identifier => {
                 let mut chars: Vec<char> = vec![];
                 let identifier_start_position = {
@@ -258,7 +258,10 @@ impl <'state> State<'state> {
                         chars.push(c);
                         self.advance()
                     } else {
-                        return self.error(Error::Expected { requested: request, found: c.to_string() })
+                        return self.error(Error::Expected {
+                            requested: request,
+                            found: c.to_string(),
+                        });
                     }
                 };
 
@@ -268,12 +271,18 @@ impl <'state> State<'state> {
                         self.advance();
                     } else {
                         let s: String = chars.into_iter().collect();
-                        return Ok(LocatedToken::new(Token::Identifier(s), identifier_start_position))
+                        return Ok(LocatedToken::new(
+                            Token::Identifier(s),
+                            identifier_start_position,
+                        ));
                     }
                 }
                 let s: String = chars.into_iter().collect();
-                return Ok(LocatedToken::new(Token::Identifier(s), identifier_start_position))
-            },
+                return Ok(LocatedToken::new(
+                    Token::Identifier(s),
+                    identifier_start_position,
+                ));
+            }
             Request::Separator(separator_symbol) => {
                 let c = self.read_char_or_fail_when_end()?;
                 let c0 = match separator_symbol {
@@ -283,23 +292,28 @@ impl <'state> State<'state> {
                 };
                 if c == c0 {
                     let token_position = self.advance();
-                    Ok(LocatedToken::new(Token::Separator(separator_symbol), token_position))
+                    Ok(LocatedToken::new(
+                        Token::Separator(separator_symbol),
+                        token_position,
+                    ))
                 } else {
-                    self.error(Error::Expected { requested: request, found: c.to_string() })
+                    self.error(Error::Expected {
+                        requested: request,
+                        found: c.to_string(),
+                    })
                 }
-            },
+            }
             Request::BindingSeparator => {
                 self.match_string(token::BINDING_SEPARATOR, request, Token::BindingSeparator)
-            },
+            }
             Request::End => {
                 if self.chars.next().is_some() {
                     Ok(LocatedToken::new(Token::End, self.position))
                 } else {
-                    self.error(Error::UnexpectedEnd) 
+                    self.error(Error::UnexpectedEnd)
                 }
-            },
+            }
         }
-
     }
 
     pub fn request_keyword(&mut self, keyword: token::Keyword) -> Result<LocatedToken> {
@@ -328,8 +342,11 @@ impl <'state> State<'state> {
         self.consume_whitespace();
         match self.read_char_or_fail_when_end() {
             Ok(c) => Ok(c == c0),
-            Err(ErrorWithPosition { error: Error::UnexpectedEnd, .. }) => Ok(false),
-            Err(e) => Err(e)
+            Err(ErrorWithPosition {
+                error: Error::UnexpectedEnd,
+                ..
+            }) => Ok(false),
+            Err(e) => Err(e),
         }
     }
 
@@ -353,7 +370,10 @@ impl <'state> State<'state> {
         self.consume_whitespace();
         let c = self.read_char_or_fail_when_end()?;
         if c == 'f' {
-            self.match_keyword(Request::Keyword(token::Keyword::Forall), token::Keyword::Forall)?;
+            self.match_keyword(
+                Request::Keyword(token::Keyword::Forall),
+                token::Keyword::Forall,
+            )?;
             Ok(true)
         } else {
             Ok(false)
@@ -377,7 +397,7 @@ impl <'state> State<'state> {
                     'n' => Ok(DeclarationKind::UserFunction),
                     _ => self.error(Error::ExpectedDeclarationKeyword),
                 }
-            },
+            }
             _ => self.error(Error::ExpectedDeclarationKeyword),
         }
     }
@@ -391,7 +411,7 @@ impl <'state> State<'state> {
                 self.advance();
                 c = self.read_char_or_fail_when_end()?;
                 false
-            },
+            }
             _ if c.is_digit(10) => true,
             _ => return Ok(None),
         };
@@ -402,8 +422,12 @@ impl <'state> State<'state> {
             Some(d) => {
                 sum = if is_positive { d } else { -d };
                 self.advance();
-            },
-            None => return self.error(Error::ExpectedI32 { found: c.to_string() })
+            }
+            None => {
+                return self.error(Error::ExpectedI32 {
+                    found: c.to_string(),
+                })
+            }
         }
 
         // Atleast one digit was consumed.
@@ -413,9 +437,9 @@ impl <'state> State<'state> {
                 match self.read_char_or_fail_when_end() {
                     Ok('0') => {
                         self.advance();
-                    },
+                    }
                     Ok(_) => break,
-                    Err(_) => return Ok(Some(0))
+                    Err(_) => return Ok(Some(0)),
                 }
             }
         }
@@ -431,70 +455,94 @@ impl <'state> State<'state> {
                     match sum.checked_mul(10) {
                         Some(mul_10_sum) => {
                             match mul_10_sum.checked_add(if is_positive { d } else { -d }) {
-                                Some(new_sum) => {
-                                    sum = new_sum
-                                },
-                                None => {
-                                    return self.error(Error::Int32LiteralOutOfBounds)
-                                }
+                                Some(new_sum) => sum = new_sum,
+                                None => return self.error(Error::Int32LiteralOutOfBounds),
                             }
-                        },
-                        None => {
-                            return self.error(Error::Int32LiteralOutOfBounds)
                         }
+                        None => return self.error(Error::Int32LiteralOutOfBounds),
                     }
-                },
+                }
                 None => break,
             }
         }
-            
+
         Ok(Some(sum))
     }
 
     pub fn commit_if_next_token_string_literal(&mut self) -> Result<Option<String>> {
         self.consume_whitespace();
 
-        if self.read_char_or_fail_when_end()? != '"' { return Ok(None) }
+        if self.read_char_or_fail_when_end()? != '"' {
+            return Ok(None);
+        }
         self.advance();
 
         let mut chars: Vec<char> = vec![];
-        loop { match self.consume_char_or_fail_when_end()? {
-            '\\' => { match self.consume_char_or_fail_when_end()? {
-                'n' => chars.push('\n'),
-                '\\' => chars.push('\\'),
-                '"' => chars.push('"'),
-                '\'' => chars.push('\''),
-                't' => chars.push('\t'),
-                'u' => {
-                    let open_brace = self.consume_char_or_fail_when_end()?;
-                    if open_brace != '{' { return self.error(Error::ExpectedOpeningBraceForUnicodeSequenceInStringLiteral { found: format!("\\u{}", open_brace) }) };
+        loop {
+            match self.consume_char_or_fail_when_end()? {
+                '\\' => match self.consume_char_or_fail_when_end()? {
+                    'n' => chars.push('\n'),
+                    '\\' => chars.push('\\'),
+                    '"' => chars.push('"'),
+                    '\'' => chars.push('\''),
+                    't' => chars.push('\t'),
+                    'u' => {
+                        let open_brace = self.consume_char_or_fail_when_end()?;
+                        if open_brace != '{' {
+                            return self.error(
+                                Error::ExpectedOpeningBraceForUnicodeSequenceInStringLiteral {
+                                    found: format!("\\u{}", open_brace),
+                                },
+                            );
+                        };
 
-                    let x = self.hex_int()?;
+                        let x = self.hex_int()?;
 
-                    let close_brace = self.consume_char_or_fail_when_end()?;
-                    if close_brace != '}' { return self.error(Error::ExpectedClosingBraceForUnicodeSequenceInStringLiteral { found: format!("\\u{{{:x}{}", x, close_brace) }) };
+                        let close_brace = self.consume_char_or_fail_when_end()?;
+                        if close_brace != '}' {
+                            return self.error(
+                                Error::ExpectedClosingBraceForUnicodeSequenceInStringLiteral {
+                                    found: format!("\\u{{{:x}{}", x, close_brace),
+                                },
+                            );
+                        };
 
-                    match char::from_u32(x) {
-                        Some(c) => chars.push(c),
-                        None => return self.error(Error::ExpectedValidUnicodeSequenceInStringLiteral { found: format!("\\u{{{:x}}}", x) })
+                        match char::from_u32(x) {
+                            Some(c) => chars.push(c),
+                            None => {
+                                return self.error(
+                                    Error::ExpectedValidUnicodeSequenceInStringLiteral {
+                                        found: format!("\\u{{{:x}}}", x),
+                                    },
+                                )
+                            }
+                        }
                     }
-
+                    c => {
+                        return self.error(
+                            Error::ExpectedValidCharacterAfterEscapeSequenceInStringLiteral {
+                                found: format!("\\{}", c),
+                            },
+                        )
+                    }
                 },
-                c => return self.error(Error::ExpectedValidCharacterAfterEscapeSequenceInStringLiteral { found: format!("\\{}", c) }),
-            }},
-            '"' => break,
-            c => chars.push(c),
-        }}
+                '"' => break,
+                c => chars.push(c),
+            }
+        }
         Ok(Some(chars.into_iter().collect()))
     }
-
 
     // Note that it doesn't consume whitespace.
     fn hex_int(&mut self) -> Result<u32> {
         let c = self.consume_char_or_fail_when_end()?;
         let mut sum: u32 = match digit16(c) {
             Some(d) => d,
-            None => return self.error(Error::ExpectedValidUnicodeSequenceInStringLiteral { found: format!("\\u{}", c.to_string()) })
+            None => {
+                return self.error(Error::ExpectedValidUnicodeSequenceInStringLiteral {
+                    found: format!("\\u{}", c.to_string()),
+                })
+            }
         };
 
         // Ignore all zeroes.
@@ -503,9 +551,9 @@ impl <'state> State<'state> {
                 match self.read_char_or_fail_when_end() {
                     Ok('0') => {
                         self.advance();
-                    },
+                    }
                     Ok(_) => break,
-                    Err(_) => return Ok(0)
+                    Err(_) => return Ok(0),
                 }
             }
         }
@@ -519,24 +567,29 @@ impl <'state> State<'state> {
 
                     // Watch out for 32 bit overflow.
                     match sum.checked_mul(16) {
-                        Some(mul_16_sum) => {
-                            match mul_16_sum.checked_add(d) {
-                                Some(new_sum) => {
-                                    sum = new_sum
-                                },
-                                None => return self.error(Error::ExpectedValidUnicodeSequenceInStringLiteral { found: format!("\\u{:x}{:x}", sum, d) })
+                        Some(mul_16_sum) => match mul_16_sum.checked_add(d) {
+                            Some(new_sum) => sum = new_sum,
+                            None => {
+                                return self.error(
+                                    Error::ExpectedValidUnicodeSequenceInStringLiteral {
+                                        found: format!("\\u{:x}{:x}", sum, d),
+                                    },
+                                )
                             }
                         },
-                        None => return self.error(Error::ExpectedValidUnicodeSequenceInStringLiteral { found: format!("\\u{:x}{:x}", sum, d) })
+                        None => {
+                            return self.error(Error::ExpectedValidUnicodeSequenceInStringLiteral {
+                                found: format!("\\u{:x}{:x}", sum, d),
+                            })
+                        }
                     }
-                },
+                }
                 None => break,
             }
         }
-            
+
         Ok(sum)
     }
-
 
     // We implement the following grammar
     //     Float  ::= Sign? Digit+ '.' Digit+ Exp?
@@ -547,7 +600,7 @@ impl <'state> State<'state> {
         fn make_float(state: &State, chars: Vec<char>) -> Result<Option<f32>> {
             match chars.into_iter().collect::<String>().parse::<f32>() {
                 Ok(float) => Ok(Some(float)),
-                Err(error) =>  state.error(Error::ExpectedF32ParseFloatError { error })
+                Err(error) => state.error(Error::ExpectedF32ParseFloatError { error }),
             }
         }
 
@@ -556,10 +609,9 @@ impl <'state> State<'state> {
         match self.read_char_or_fail_when_end()? {
             '%' => {
                 self.advance();
-            },
+            }
             _ => return Ok(None),
         }
-
 
         let mut chars: Vec<char> = vec![];
 
@@ -568,21 +620,41 @@ impl <'state> State<'state> {
 
         let mut atleast_one_digit_before_point: bool = false;
         match c {
-            '-' | '+' => {},
-            _ => if digit10(c).is_some() { atleast_one_digit_before_point = true; } else { return self.error(Error::ExpectedF32 { found: chars.into_iter().collect() }) },
+            '-' | '+' => {}
+            _ => {
+                if digit10(c).is_some() {
+                    atleast_one_digit_before_point = true;
+                } else {
+                    return self.error(Error::ExpectedF32 {
+                        found: chars.into_iter().collect(),
+                    });
+                }
+            }
         };
 
         loop {
             c = self.consume_char_or_fail_when_end()?;
             chars.push(c);
             match c {
-                '.' => if atleast_one_digit_before_point { break } else { return self.error(Error::ExpectedF32 { found: chars.into_iter().collect() }) }
-                _ => if digit10(c).is_some() {
-                    atleast_one_digit_before_point = true;
-                } else {
-                    // neither a digit nor '.'
-                    return self.error(Error::ExpectedF32 { found: chars.into_iter().collect() })
-                },
+                '.' => {
+                    if atleast_one_digit_before_point {
+                        break;
+                    } else {
+                        return self.error(Error::ExpectedF32 {
+                            found: chars.into_iter().collect(),
+                        });
+                    }
+                }
+                _ => {
+                    if digit10(c).is_some() {
+                        atleast_one_digit_before_point = true;
+                    } else {
+                        // neither a digit nor '.'
+                        return self.error(Error::ExpectedF32 {
+                            found: chars.into_iter().collect(),
+                        });
+                    }
+                }
             }
         }
         // we can assume that we've seen a '.'
@@ -594,10 +666,12 @@ impl <'state> State<'state> {
                 chars.push(c);
                 self.advance();
             } else if atleast_one_digit_after_point {
-                break
+                break;
             } else {
                 chars.push(c);
-                return self.error(Error::ExpectedF32 { found: chars.into_iter().collect() })
+                return self.error(Error::ExpectedF32 {
+                    found: chars.into_iter().collect(),
+                });
             }
         }
 
@@ -611,8 +685,16 @@ impl <'state> State<'state> {
                 c = self.consume_char_or_fail_when_end()?;
                 chars.push(c);
                 match c {
-                    '-' | '+' => {},
-                    _ => if digit10(c).is_some() { atleaset_one_digit_in_exponent = true; } else { return self.error(Error::ExpectedF32 { found: chars.into_iter().collect() }) },
+                    '-' | '+' => {}
+                    _ => {
+                        if digit10(c).is_some() {
+                            atleaset_one_digit_in_exponent = true;
+                        } else {
+                            return self.error(Error::ExpectedF32 {
+                                found: chars.into_iter().collect(),
+                            });
+                        }
+                    }
                 }
 
                 loop {
@@ -622,19 +704,20 @@ impl <'state> State<'state> {
                         chars.push(c);
                         self.advance();
                     } else if atleaset_one_digit_in_exponent {
-                        break
+                        break;
                     } else {
                         chars.push(c);
-                        return self.error(Error::ExpectedF32 { found: chars.into_iter().collect() })
+                        return self.error(Error::ExpectedF32 {
+                            found: chars.into_iter().collect(),
+                        });
                     }
                 }
                 make_float(self, chars)
-            },
+            }
             _ => make_float(self, chars),
         }
     }
 }
-
 
 fn digit10(c: char) -> Option<i32> {
     match c {

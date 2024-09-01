@@ -1,6 +1,5 @@
 use crate::lexer::Position;
 
-
 #[derive(Debug)]
 pub enum Expr {
     Nat32(Position, u32),
@@ -70,21 +69,21 @@ impl Expr {
         match self {
             Expr::Nat32(_, x) => {
                 vec![Instruction::Push(*x)]
-            },
+            }
             Expr::Add(_, e0, e1) => {
                 let mut instructions0 = e0.compile();
                 let instructions1 = e1.compile();
                 instructions0.extend(instructions1);
                 instructions0.push(Instruction::Add);
                 instructions0
-            },
+            }
             Expr::Mul(_, e0, e1) => {
                 let mut instructions0 = e0.compile();
                 let instructions1 = e1.compile();
                 instructions0.extend(instructions1);
                 instructions0.push(Instruction::Mul);
                 instructions0
-            },
+            }
         }
     }
 }
@@ -103,6 +102,5 @@ impl State {
     //     instruction_pointer: InstructionPointer,
     //     stack: Vec<i32>,
     // }
-    pub fn step(self) {
-    }
+    pub fn step(self) {}
 }

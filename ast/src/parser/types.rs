@@ -1,12 +1,11 @@
 use crate::base::{FunctionType, Type};
-use crate::parser::lex::{
-    token::Keyword,
-    lexer::Request,
-};
+use crate::parser::lex::{lexer::Request, token::Keyword};
 use crate::parser::{
-    base::{State, Result, Error},
-    special::{VariableOrConstructorName, comma, constructor_name_or_variable},
-    combinator::{delimited_nonempty_sequence_to_vector, delimited_possibly_empty_sequence_to_vector},
+    base::{Error, Result, State},
+    combinator::{
+        delimited_nonempty_sequence_to_vector, delimited_possibly_empty_sequence_to_vector,
+    },
+    special::{comma, constructor_name_or_variable, VariableOrConstructorName},
 };
 
 // Parses
@@ -28,12 +27,12 @@ pub fn type_(state: &mut State) -> Result<Type> {
                         let fn_type = function_type(state)?;
                         state.request_token(Request::CloseParen)?;
                         Ok(Type::Arrow(Box::new(fn_type)))
-                    },
+                    }
                     "Cmd" => {
                         let type_ = type_(state)?;
                         state.request_token(Request::CloseParen)?;
                         Ok(Type::Command(Box::new(type_)))
-                    },
+                    }
                     _ => {
                         let type_args = type_nonempty_sequence(state)?;
                         state.request_token(Request::CloseParen)?;
@@ -61,13 +60,11 @@ pub fn primitive_type(state: &mut State) -> Result<Type> {
         I32 => Ok(t),
         F32 => Ok(t),
         String => Ok(t),
-        Command(x) =>  {
-            match *x {
-                I32 => Ok(t),
-                F32 => Ok(t),
-                String => Ok(t),
-                _ => Err(Error::ExpectedPrimitiveType { received: t }),
-            }
+        Command(x) => match *x {
+            I32 => Ok(t),
+            F32 => Ok(t),
+            String => Ok(t),
+            _ => Err(Error::ExpectedPrimitiveType { received: t }),
         },
         _ => Err(Error::ExpectedPrimitiveType { received: type_ }),
     }
@@ -90,14 +87,20 @@ pub fn function_type(state: &mut State) -> Result<FunctionType> {
     let input_types = type_possibly_empty_sequence(state)?;
     state.request_keyword(Keyword::Arrow)?;
     let output_type = type_(state)?;
-    Ok(FunctionType { input_types, output_type })
+    Ok(FunctionType {
+        input_types,
+        output_type,
+    })
 }
 
 pub fn foreign_function_type(state: &mut State) -> Result<FunctionType> {
     let input_types = primitive_type_possibly_empty_sequence(state)?;
     state.request_keyword(Keyword::Arrow)?;
     let output_type = primitive_type(state)?;
-    Ok(FunctionType { input_types, output_type })
+    Ok(FunctionType {
+        input_types,
+        output_type,
+    })
 }
 
 // Parses

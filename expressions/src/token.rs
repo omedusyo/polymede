@@ -4,7 +4,7 @@ pub enum Token {
     OpenParen,
     CloseParen,
     Operator(OperatorSymbol),
-    End
+    End,
 }
 
 #[derive(Debug, Clone, Copy)]

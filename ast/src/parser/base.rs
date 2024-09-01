@@ -1,8 +1,10 @@
-use crate::base::{ Program, TypeDeclaration, RunDeclaration, FunctionDeclaration, ConstructorDeclaration, Type};
-use crate::identifier::{Interner, Variable, ConstructorName, FunctionName, Identifier};
+use crate::base::{
+    ConstructorDeclaration, FunctionDeclaration, Program, RunDeclaration, Type, TypeDeclaration,
+};
+use crate::identifier::{ConstructorName, FunctionName, Identifier, Interner, Variable};
 use crate::parser::lex::{
     lexer,
-    lexer::{Request, LocatedToken, DeclarationKind},
+    lexer::{DeclarationKind, LocatedToken, Request},
     token::Keyword,
 };
 use crate::parser::program::pre_program;
@@ -18,12 +20,24 @@ pub type Parser<A> = fn(&mut State) -> Result<A>;
 #[derive(Debug)]
 pub enum Error {
     LexError(lexer::ErrorWithPosition),
-    ExpectedTypeConstructorOrTypeVar { received: Identifier },
-    ExpectedTypeConstructorOrTypeVarOrAnythingInPattern { received: Identifier },
-    ExpectedTerm { received: Identifier },
-    ExpectedTypeConstructor { received: Identifier },
-    ExpectedPrimitiveType { received: Type },
-    DuplicateVariableNames { duplicates: Vec<Identifier> },
+    ExpectedTypeConstructorOrTypeVar {
+        received: Identifier,
+    },
+    ExpectedTypeConstructorOrTypeVarOrAnythingInPattern {
+        received: Identifier,
+    },
+    ExpectedTerm {
+        received: Identifier,
+    },
+    ExpectedTypeConstructor {
+        received: Identifier,
+    },
+    ExpectedPrimitiveType {
+        received: Type,
+    },
+    DuplicateVariableNames {
+        duplicates: Vec<Identifier>,
+    },
     ExpectedEqualsOrAssignmentSymbol,
     // Atleast one vector is non-empty.
     DuplicateNames {
@@ -31,12 +45,17 @@ pub enum Error {
         constructor_duplicates: Vec<Identifier>,
         function_duplicates: Vec<Identifier>,
     },
-    TypeHasForbiddenName { received: String },
+    TypeHasForbiddenName {
+        received: String,
+    },
     MoreThanOneRunDeclaration,
     RunDeclarationNotFound,
     MsgTypeDeclarationNotFound,
     MoreThanOneMsgTypeDeclaration,
-    FunctionHasDifferentNumberOfParametersThanDeclaredInItsType { declared_in_type: usize, parameters: usize },
+    FunctionHasDifferentNumberOfParametersThanDeclaredInItsType {
+        declared_in_type: usize,
+        parameters: usize,
+    },
 }
 
 #[derive(Debug)]
@@ -52,7 +71,7 @@ pub fn parse_program(s: &str) -> Result<Program> {
 
     // ===types===
     for pre_decl in pre_program.type_declarations {
-        let decl = TypeDeclaration::new(pre_decl,  &mut program.constructor_to_type_mapping);
+        let decl = TypeDeclaration::new(pre_decl, &mut program.constructor_to_type_mapping);
         program.type_declarations_ordering.push(decl.name().clone());
         program.type_declarations.insert(decl.name().clone(), decl);
     }
@@ -69,7 +88,6 @@ pub fn parse_program(s: &str) -> Result<Program> {
 
     Ok(program)
 }
-
 
 pub enum Declaration {
     Type(PreTypeDeclaration),
@@ -123,25 +141,24 @@ impl PreTypeDeclaration {
 
 impl PreProgram {
     pub fn new() -> Self {
-        Self { type_declarations: vec![], function_declarations: vec![], run_declarations: vec![], msg_types: vec![], }
+        Self {
+            type_declarations: vec![],
+            function_declarations: vec![],
+            run_declarations: vec![],
+            msg_types: vec![],
+        }
     }
 
     pub fn add_declaration(&mut self, decl: Declaration) {
         use Declaration::*;
         match decl {
-            Type(type_declaration) => {
-                self.type_declarations.push(type_declaration)
-            },
-            Run(run_declaration) => {
-                self.run_declarations.push(run_declaration)
-            },
-            Function(function_declaration) => {
-                self.function_declarations.push(function_declaration)
-            },
+            Type(type_declaration) => self.type_declarations.push(type_declaration),
+            Run(run_declaration) => self.run_declarations.push(run_declaration),
+            Function(function_declaration) => self.function_declarations.push(function_declaration),
             MsgTypeDeclaration(type_declaration) => {
                 self.msg_types.push(type_declaration.name().clone());
                 self.type_declarations.push(type_declaration);
-            },
+            }
         }
     }
 
@@ -149,12 +166,8 @@ impl PreProgram {
         let mut names = vec![];
         for declaration in &self.type_declarations {
             match declaration {
-                PreTypeDeclaration::Enum(declaration) => {
-                    names.push(declaration.name.clone())
-                },
-                PreTypeDeclaration::Ind(declaration) => {
-                    names.push(declaration.name.clone())
-                },
+                PreTypeDeclaration::Enum(declaration) => names.push(declaration.name.clone()),
+                PreTypeDeclaration::Ind(declaration) => names.push(declaration.name.clone()),
             }
         }
         names
@@ -183,11 +196,11 @@ impl PreProgram {
     }
 }
 
-impl <'lex_state, 'interner> State<'lex_state, 'interner> {
+impl<'lex_state, 'interner> State<'lex_state, 'interner> {
     pub fn new<'a: 'lex_state>(str: &'a str, interner: &'interner mut Interner) -> Self {
         Self {
             interner,
-            lexer_state: lexer::State::new(str)
+            lexer_state: lexer::State::new(str),
         }
     }
 
@@ -204,23 +217,33 @@ impl <'lex_state, 'interner> State<'lex_state, 'interner> {
     }
 
     pub fn consume_optional_or(&mut self) -> Result<()> {
-        self.lexer_state.consume_optional_or().map_err(Error::LexError)
+        self.lexer_state
+            .consume_optional_or()
+            .map_err(Error::LexError)
     }
 
     pub fn consume_whitespace_or_fail_when_end(&mut self) -> Result<()> {
-        self.lexer_state.consume_whitespace_or_fail_when_end().map_err(Error::LexError)
+        self.lexer_state
+            .consume_whitespace_or_fail_when_end()
+            .map_err(Error::LexError)
     }
 
     pub fn consume_optional_comma(&mut self) -> Result<()> {
-        self.lexer_state.consume_optional_comma().map_err(Error::LexError)
+        self.lexer_state
+            .consume_optional_comma()
+            .map_err(Error::LexError)
     }
 
     pub fn is_next_token_open_paren(&mut self) -> Result<bool> {
-        self.lexer_state.is_next_token_open_paren().map_err(Error::LexError)
+        self.lexer_state
+            .is_next_token_open_paren()
+            .map_err(Error::LexError)
     }
 
     pub fn is_next_token_open_angle(&mut self) -> Result<bool> {
-        self.lexer_state.is_next_token_open_angle().map_err(Error::LexError)
+        self.lexer_state
+            .is_next_token_open_angle()
+            .map_err(Error::LexError)
     }
 
     pub fn is_next_token_eq(&mut self) -> Result<bool> {
@@ -228,27 +251,39 @@ impl <'lex_state, 'interner> State<'lex_state, 'interner> {
     }
 
     pub fn is_next_token_start_type_annotation(&mut self) -> Result<bool> {
-        self.lexer_state.is_next_token_start_type_annotation().map_err(Error::LexError)
+        self.lexer_state
+            .is_next_token_start_type_annotation()
+            .map_err(Error::LexError)
     }
 
     pub fn commit_if_next_token_int(&mut self) -> Result<Option<i32>> {
-        self.lexer_state.commit_if_next_token_int().map_err(Error::LexError)
+        self.lexer_state
+            .commit_if_next_token_int()
+            .map_err(Error::LexError)
     }
 
     pub fn commit_if_next_token_f32(&mut self) -> Result<Option<f32>> {
-        self.lexer_state.commit_if_next_token_f32().map_err(Error::LexError)
+        self.lexer_state
+            .commit_if_next_token_f32()
+            .map_err(Error::LexError)
     }
 
     pub fn commit_if_next_token_string_literal(&mut self) -> Result<Option<String>> {
-        self.lexer_state.commit_if_next_token_string_literal().map_err(Error::LexError)
+        self.lexer_state
+            .commit_if_next_token_string_literal()
+            .map_err(Error::LexError)
     }
 
     pub fn commit_if_next_token_forall(&mut self) -> Result<bool> {
-        self.lexer_state.commit_if_next_token_forall().map_err(Error::LexError)
+        self.lexer_state
+            .commit_if_next_token_forall()
+            .map_err(Error::LexError)
     }
 
     pub fn peek_declaration_token(&mut self) -> Result<DeclarationKind> {
-        self.lexer_state.peek_declaration_token().map_err(Error::LexError)
+        self.lexer_state
+            .peek_declaration_token()
+            .map_err(Error::LexError)
     }
 
     pub fn clone(&self) -> lexer::State<'lex_state> {
@@ -256,11 +291,15 @@ impl <'lex_state, 'interner> State<'lex_state, 'interner> {
     }
 
     pub fn read_char_or_fail_when_end(&mut self) -> Result<char> {
-        self.lexer_state.read_char_or_fail_when_end().map_err(Error::LexError)
+        self.lexer_state
+            .read_char_or_fail_when_end()
+            .map_err(Error::LexError)
     }
 
     pub fn consume_char_or_fail_when_end(&mut self) -> Result<char> {
-        self.lexer_state.consume_char_or_fail_when_end().map_err(Error::LexError)
+        self.lexer_state
+            .consume_char_or_fail_when_end()
+            .map_err(Error::LexError)
     }
 
     pub fn restore(&mut self, lexer_state: lexer::State<'lex_state>) {

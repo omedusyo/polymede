@@ -1,14 +1,17 @@
-use crate::binary_format::primitives::byte_stream::{ByteStream, UTF8, string, Response, Enclose, EVec, evector, bytes4, byte, Byte, Bytes4, Bytes, bytes, Vector, vector, CVec, cvector, Seq, U32ToFixed40LEB128};
-use crate::binary_format::primitives::encoder::Encoder;
 use crate::binary_format::indices::IndexStream;
+use crate::binary_format::primitives::byte_stream::{
+    byte, bytes, bytes4, cvector, evector, string, vector, Byte, ByteStream, Bytes, Bytes4, CVec,
+    EVec, Enclose, Response, Seq, U32ToFixed40LEB128, Vector, UTF8,
+};
+use crate::binary_format::primitives::encoder::Encoder;
 
 use crate::base::{
-    types::{FunctionType, ValueType, GlobalType, RefType},
-    indices::{TypeIndex, FunctionIndex },
-    memory::Limit,
     export::Export,
     import::Import,
+    indices::{FunctionIndex, TypeIndex},
     instructions::Instruction,
+    memory::Limit,
+    types::{FunctionType, GlobalType, RefType, ValueType},
 };
 
 type SectionId = u8;
@@ -17,7 +20,7 @@ type SectionId = u8;
 #[derive(Debug)]
 pub struct CustomSection {
     pub name: String,
-    pub bytes: Vec<u8>
+    pub bytes: Vec<u8>,
 }
 
 impl CustomSection {
@@ -36,7 +39,7 @@ impl Encoder for CustomSection {
 // === 1 Type Section ===
 #[derive(Debug)]
 pub struct TypeSection {
-    pub function_types: Vec<FunctionType>
+    pub function_types: Vec<FunctionType>,
 }
 
 impl TypeSection {
@@ -46,16 +49,19 @@ impl TypeSection {
 impl Encoder for TypeSection {
     type S = Seq<Byte, Enclose<CVec<<FunctionType as Encoder>::S>>>;
     fn emit(&self) -> Self::S {
-        let fn_types = self.function_types.iter().map(|fn_type| fn_type.emit()).collect();
-        byte(Self::ID)
-            .seq(cvector(fn_types).enclose())
+        let fn_types = self
+            .function_types
+            .iter()
+            .map(|fn_type| fn_type.emit())
+            .collect();
+        byte(Self::ID).seq(cvector(fn_types).enclose())
     }
 }
 
 // === 2 Import Section ===
 #[derive(Debug)]
 pub struct ImportSection {
-    pub imports: Vec<Import>
+    pub imports: Vec<Import>,
 }
 
 impl ImportSection {
@@ -66,15 +72,14 @@ impl Encoder for ImportSection {
     type S = Seq<Byte, Enclose<CVec<<Import as Encoder>::S>>>;
     fn emit(&self) -> Self::S {
         let imports = self.imports.iter().map(|import| import.emit()).collect();
-        byte(Self::ID)
-            .seq(cvector(imports).enclose())
+        byte(Self::ID).seq(cvector(imports).enclose())
     }
 }
 
 // === 3 Function Section ===
 #[derive(Debug)]
 pub struct FunctionSection {
-    pub type_indices: Vec<TypeIndex>
+    pub type_indices: Vec<TypeIndex>,
 }
 
 impl FunctionSection {
@@ -85,16 +90,19 @@ impl Encoder for FunctionSection {
     type S = Seq<Byte, Enclose<CVec<<TypeIndex as Encoder>::S>>>;
 
     fn emit(&self) -> Self::S {
-        let type_indices = self.type_indices.iter().map(|type_index| type_index.emit()).collect();
-        byte(Self::ID)
-            .seq(cvector(type_indices).enclose())
+        let type_indices = self
+            .type_indices
+            .iter()
+            .map(|type_index| type_index.emit())
+            .collect();
+        byte(Self::ID).seq(cvector(type_indices).enclose())
     }
 }
 
 // === 4 Table Section ===
 #[derive(Debug)]
 pub struct TableSection {
-    pub table_types: Vec<TableType>
+    pub table_types: Vec<TableType>,
 }
 
 impl TableSection {
@@ -105,9 +113,12 @@ impl Encoder for TableSection {
     type S = Seq<Byte, Enclose<CVec<<TableType as Encoder>::S>>>;
 
     fn emit(&self) -> Self::S {
-        let table_types = self.table_types.iter().map(|table_type| table_type.emit()).collect();
-        byte(Self::ID)
-            .seq(cvector(table_types).enclose())
+        let table_types = self
+            .table_types
+            .iter()
+            .map(|table_type| table_type.emit())
+            .collect();
+        byte(Self::ID).seq(cvector(table_types).enclose())
     }
 }
 
@@ -128,7 +139,7 @@ impl Encoder for TableType {
 // === 5 Memory Section ===
 #[derive(Debug)]
 pub struct MemorySection {
-    pub memory_types: Vec<Limit>
+    pub memory_types: Vec<Limit>,
 }
 
 impl MemorySection {
@@ -140,8 +151,7 @@ impl Encoder for MemorySection {
 
     fn emit(&self) -> Self::S {
         let memory_types = self.memory_types.iter().map(|limit| limit.emit()).collect();
-        byte(Self::ID)
-            .seq(cvector(memory_types).enclose())
+        byte(Self::ID).seq(cvector(memory_types).enclose())
     }
 }
 
@@ -160,8 +170,7 @@ impl Encoder for GlobalsSection {
 
     fn emit(&self) -> Self::S {
         let globals = self.globals.iter().map(|global| global.emit()).collect();
-        byte(Self::ID)
-            .seq(cvector(globals).enclose())
+        byte(Self::ID).seq(cvector(globals).enclose())
     }
 }
 
@@ -181,7 +190,7 @@ impl Encoder for Global {
 // === 7 Export Section ===
 #[derive(Debug)]
 pub struct ExportSection {
-    pub exports: Vec<Export>
+    pub exports: Vec<Export>,
 }
 
 impl ExportSection {
@@ -193,8 +202,7 @@ impl Encoder for ExportSection {
 
     fn emit(&self) -> Self::S {
         let exports = self.exports.iter().map(|export| export.emit()).collect();
-        byte(Self::ID)
-            .seq(cvector(exports).enclose())
+        byte(Self::ID).seq(cvector(exports).enclose())
     }
 }
 
@@ -212,8 +220,7 @@ impl Encoder for StartSection {
     type S = Seq<Byte, Enclose<IndexStream>>;
 
     fn emit(&self) -> Self::S {
-        byte(Self::ID)
-            .seq(self.start.emit().enclose())
+        byte(Self::ID).seq(self.start.emit().enclose())
     }
 }
 
@@ -232,8 +239,7 @@ impl Encoder for ElementSection {
 
     fn emit(&self) -> Self::S {
         let elements = self.elements.iter().map(|element| element.emit()).collect();
-        byte(Self::ID)
-            .seq(cvector(elements).enclose())
+        byte(Self::ID).seq(cvector(elements).enclose())
     }
 }
 
@@ -244,10 +250,17 @@ pub struct Element {
 }
 
 impl Encoder for Element {
-    type S = Seq<U32ToFixed40LEB128, Seq<<Expression as Encoder>::S, CVec<<FunctionIndex as Encoder>::S>>>;
+    type S = Seq<
+        U32ToFixed40LEB128,
+        Seq<<Expression as Encoder>::S, CVec<<FunctionIndex as Encoder>::S>>,
+    >;
 
     fn emit(&self) -> Self::S {
-        let fn_references = self.function_references.iter().map(|fn_ref| fn_ref.emit()).collect();
+        let fn_references = self
+            .function_references
+            .iter()
+            .map(|fn_ref| fn_ref.emit())
+            .collect();
         U32ToFixed40LEB128::new(0).seq(self.offset_expression.emit().seq(cvector(fn_references)))
     }
 }
@@ -267,11 +280,9 @@ impl Encoder for CodeSection {
 
     fn emit(&self) -> Self::S {
         let codes = self.codes.iter().map(|code| code.emit()).collect();
-        byte(Self::ID)
-            .seq(cvector(codes).enclose())
+        byte(Self::ID).seq(cvector(codes).enclose())
     }
 }
-
 
 #[derive(Debug)]
 pub struct Code {
@@ -307,14 +318,18 @@ impl Encoder for LocalDeclaration {
 
 #[derive(Debug)]
 pub struct Expression {
-    pub instructions: Vec<Instruction>
+    pub instructions: Vec<Instruction>,
 }
 
 impl Encoder for Expression {
     type S = EVec<<Instruction as Encoder>::S, Byte>;
 
     fn emit(&self) -> Self::S {
-        let instructions = self.instructions.iter().map(|instruction| instruction.emit()).collect();
+        let instructions = self
+            .instructions
+            .iter()
+            .map(|instruction| instruction.emit())
+            .collect();
         evector(instructions, byte(Instruction::END))
     }
 }
@@ -322,7 +337,7 @@ impl Encoder for Expression {
 // === 11 Data Section ===
 #[derive(Debug)]
 pub struct DataSection {
-    pub data_items: Vec<DataItem>
+    pub data_items: Vec<DataItem>,
 }
 
 impl DataSection {
@@ -333,16 +348,24 @@ impl Encoder for DataSection {
     type S = Seq<Byte, Enclose<CVec<<DataItem as Encoder>::S>>>;
 
     fn emit(&self) -> Self::S {
-        let data_items = self.data_items.iter().map(|data_item| data_item.emit()).collect();
-        byte(Self::ID)
-            .seq(cvector(data_items).enclose())
+        let data_items = self
+            .data_items
+            .iter()
+            .map(|data_item| data_item.emit())
+            .collect();
+        byte(Self::ID).seq(cvector(data_items).enclose())
     }
 }
 
 #[derive(Debug)]
 pub enum DataItem {
-    Active { initialize: Vec<u8>, offset_expression: Expression },
-    Passive { initialize: Vec<u8> }
+    Active {
+        initialize: Vec<u8>,
+        offset_expression: Expression,
+    },
+    Passive {
+        initialize: Vec<u8>,
+    },
 }
 
 pub enum DataItemStream {
@@ -364,14 +387,19 @@ impl Encoder for DataItem {
     fn emit(&self) -> Self::S {
         use DataItem::*;
         match self {
-            Active { initialize, offset_expression: offset } => {
+            Active {
+                initialize,
+                offset_expression: offset,
+            } => {
                 let initialize: Vec<_> = initialize.iter().map(|b| byte(*b)).collect();
-                DataItemStream::Active(U32ToFixed40LEB128::new(0).seq(offset.emit().seq(cvector(initialize))))
-            },
+                DataItemStream::Active(
+                    U32ToFixed40LEB128::new(0).seq(offset.emit().seq(cvector(initialize))),
+                )
+            }
             Passive { initialize } => {
                 let initialize: Vec<_> = initialize.iter().map(|b| byte(*b)).collect();
                 DataItemStream::Passive(U32ToFixed40LEB128::new(1).seq(cvector(initialize)))
-            },
+            }
         }
     }
 }
@@ -390,8 +418,7 @@ impl Encoder for DataCountSection {
     type S = Seq<Byte, Enclose<U32ToFixed40LEB128>>;
 
     fn emit(&self) -> Self::S {
-        byte(Self::ID)
-            .seq(U32ToFixed40LEB128::new(self.count).enclose())
+        byte(Self::ID).seq(U32ToFixed40LEB128::new(self.count).enclose())
     }
 }
 
@@ -458,7 +485,6 @@ impl Module {
             custom_section_at_the_end: vec![],
         }
     }
-
 }
 
 type HeaderBytes = Seq<Bytes4, Bytes4>;
@@ -497,104 +523,156 @@ impl Encoder for Module {
     fn emit(&self) -> Self::S {
         let header = bytes4(Module::MAGIC).seq(bytes4(Module::VERSION));
 
-        let custom_section_before_type_section =
-            vector(self.custom_section_before_type_section.iter().map(|custom_section| custom_section.emit()).collect());
+        let custom_section_before_type_section = vector(
+            self.custom_section_before_type_section
+                .iter()
+                .map(|custom_section| custom_section.emit())
+                .collect(),
+        );
 
         let type_section = match &self.type_section {
             Some(type_section) => Some(type_section.emit()),
             None => None,
         };
 
-        let custom_section_before_import_section = 
-            vector(self.custom_section_before_import_section.iter().map(|custom_section| custom_section.emit()).collect());
+        let custom_section_before_import_section = vector(
+            self.custom_section_before_import_section
+                .iter()
+                .map(|custom_section| custom_section.emit())
+                .collect(),
+        );
 
         let import_section = match &self.import_section {
             Some(import_section) => Some(import_section.emit()),
             None => None,
         };
 
-        let custom_section_before_function_section = 
-            vector(self.custom_section_before_function_section.iter().map(|custom_section| custom_section.emit()).collect());
+        let custom_section_before_function_section = vector(
+            self.custom_section_before_function_section
+                .iter()
+                .map(|custom_section| custom_section.emit())
+                .collect(),
+        );
 
         let function_section = match &self.function_section {
             Some(type_indices) => Some(type_indices.emit()),
             None => None,
         };
 
-        let custom_section_before_table_section = 
-            vector(self.custom_section_before_table_section.iter().map(|custom_section| custom_section.emit()).collect());
+        let custom_section_before_table_section = vector(
+            self.custom_section_before_table_section
+                .iter()
+                .map(|custom_section| custom_section.emit())
+                .collect(),
+        );
 
         let table_section = match &self.table_section {
             Some(table_section) => Some(table_section.emit()),
             None => None,
         };
 
-        let custom_section_before_memory_section = 
-            vector(self.custom_section_before_memory_section.iter().map(|custom_section| custom_section.emit()).collect());
+        let custom_section_before_memory_section = vector(
+            self.custom_section_before_memory_section
+                .iter()
+                .map(|custom_section| custom_section.emit())
+                .collect(),
+        );
 
         let memory_section = match &self.memory_section {
             Some(memory_section) => Some(memory_section.emit()),
             None => None,
         };
 
-        let custom_section_before_globals_section = 
-            vector(self.custom_section_before_globals_section.iter().map(|custom_section| custom_section.emit()).collect());
+        let custom_section_before_globals_section = vector(
+            self.custom_section_before_globals_section
+                .iter()
+                .map(|custom_section| custom_section.emit())
+                .collect(),
+        );
 
         let globals_section = match &self.globals_section {
             Some(globals_section) => Some(globals_section.emit()),
             None => None,
         };
 
-        let custom_section_before_export_section = 
-            vector(self.custom_section_before_export_section.iter().map(|custom_section| custom_section.emit()).collect());
+        let custom_section_before_export_section = vector(
+            self.custom_section_before_export_section
+                .iter()
+                .map(|custom_section| custom_section.emit())
+                .collect(),
+        );
 
         let export_section = match &self.export_section {
             Some(exports) => Some(exports.emit()),
             None => None,
         };
 
-        let custom_section_before_start_section = 
-            vector(self.custom_section_before_start_section.iter().map(|custom_section| custom_section.emit()).collect());
+        let custom_section_before_start_section = vector(
+            self.custom_section_before_start_section
+                .iter()
+                .map(|custom_section| custom_section.emit())
+                .collect(),
+        );
 
         let start_section = match &self.start_section {
             Some(start_section) => Some(start_section.emit()),
             None => None,
         };
 
-        let custom_section_before_element_section = 
-            vector(self.custom_section_before_element_section.iter().map(|custom_section| custom_section.emit()).collect());
+        let custom_section_before_element_section = vector(
+            self.custom_section_before_element_section
+                .iter()
+                .map(|custom_section| custom_section.emit())
+                .collect(),
+        );
 
         let element_section = match &self.element_section {
             Some(element) => Some(element.emit()),
             None => None,
         };
 
-        let custom_section_before_data_count_section = 
-            vector(self.custom_section_before_data_count_section.iter().map(|custom_section| custom_section.emit()).collect());
+        let custom_section_before_data_count_section = vector(
+            self.custom_section_before_data_count_section
+                .iter()
+                .map(|custom_section| custom_section.emit())
+                .collect(),
+        );
 
         let data_count_section = match &self.data_count_section {
             Some(data_count_section) => Some(data_count_section.emit()),
             None => None,
         };
 
-        let custom_section_before_code_section = 
-            vector(self.custom_section_before_code_section.iter().map(|custom_section| custom_section.emit()).collect());
+        let custom_section_before_code_section = vector(
+            self.custom_section_before_code_section
+                .iter()
+                .map(|custom_section| custom_section.emit())
+                .collect(),
+        );
 
         let code_section = match &self.code_section {
             Some(code) => Some(code.emit()),
             None => None,
         };
 
-        let custom_section_before_data_section = 
-            vector(self.custom_section_before_data_section.iter().map(|custom_section| custom_section.emit()).collect());
+        let custom_section_before_data_section = vector(
+            self.custom_section_before_data_section
+                .iter()
+                .map(|custom_section| custom_section.emit())
+                .collect(),
+        );
 
         let data_section = match &self.data_section {
             Some(data_section) => Some(data_section.emit()),
             None => None,
         };
 
-        let custom_section_at_the_end = 
-            vector(self.custom_section_at_the_end.iter().map(|custom_section| { custom_section.emit() }).collect());
+        let custom_section_at_the_end = vector(
+            self.custom_section_at_the_end
+                .iter()
+                .map(|custom_section| custom_section.emit())
+                .collect(),
+        );
 
         header
             .seq(custom_section_before_type_section)
@@ -627,7 +705,7 @@ impl Encoder for Module {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::base::types::{ValueType, NumType};
+    use crate::base::types::{NumType, ValueType};
 
     #[test]
     fn empty_module() {
@@ -635,42 +713,90 @@ mod tests {
 
         let bytes = module.emit().to_vec();
 
-        assert!(bytes == vec![0x00, 0x61, 0x73, 0x6d,   0x01, 0x00, 0x00, 0x00]);
+        assert!(bytes == vec![0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
     }
 
     #[test]
     fn module_with_empty_type_section() {
         let mut module = Module::empty();
-        module.type_section = Some(TypeSection { function_types: vec![] });
+        module.type_section = Some(TypeSection {
+            function_types: vec![],
+        });
 
         let bytes = module.emit().to_vec();
         assert!(
-            bytes ==
-            vec![
-                0x00, 0x61, 0x73, 0x6d,   0x01, 0x00, 0x00, 0x00,
-                1,  128 + 5, 128, 128, 128, 0,      128, 128, 128, 128, 0,
-            ]
+            bytes
+                == vec![
+                    0x00,
+                    0x61,
+                    0x73,
+                    0x6d,
+                    0x01,
+                    0x00,
+                    0x00,
+                    0x00,
+                    1,
+                    128 + 5,
+                    128,
+                    128,
+                    128,
+                    0,
+                    128,
+                    128,
+                    128,
+                    128,
+                    0,
+                ]
         );
     }
 
     #[test]
     fn module_with_single_type() {
         let mut module = Module::empty();
-        module.type_section = Some(TypeSection { function_types: vec![
-            FunctionType { domain: vec![ ValueType::NumType(NumType::I32) ], codomain: vec![ ValueType::NumType(NumType::I32) ] },
-        ]});
+        module.type_section = Some(TypeSection {
+            function_types: vec![FunctionType {
+                domain: vec![ValueType::NumType(NumType::I32)],
+                codomain: vec![ValueType::NumType(NumType::I32)],
+            }],
+        });
 
         let bytes = module.emit().to_vec();
         assert!(
-            bytes ==
-            vec![
-                0x00, 0x61, 0x73, 0x6d,   0x01, 0x00, 0x00, 0x00,
-                1,  128 + 18, 128, 128, 128, 0,      128 + 1, 128, 128, 128, 0,
-                            0x60,
-                                128 + 1, 128, 128, 128, 0,   0x7F,
-                                128 + 1, 128, 128, 128, 0,   0x7F,
-            ]
+            bytes
+                == vec![
+                    0x00,
+                    0x61,
+                    0x73,
+                    0x6d,
+                    0x01,
+                    0x00,
+                    0x00,
+                    0x00,
+                    1,
+                    128 + 18,
+                    128,
+                    128,
+                    128,
+                    0,
+                    128 + 1,
+                    128,
+                    128,
+                    128,
+                    0,
+                    0x60,
+                    128 + 1,
+                    128,
+                    128,
+                    128,
+                    0,
+                    0x7F,
+                    128 + 1,
+                    128,
+                    128,
+                    128,
+                    0,
+                    0x7F,
+                ]
         );
     }
-
 }

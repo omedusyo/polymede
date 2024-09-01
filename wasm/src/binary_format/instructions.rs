@@ -1,12 +1,12 @@
-use crate::binary_format::primitives::byte_stream::{ByteStream, Response, EVec, evector, byte, Byte, Seq, I64ToSignedLEB128, I32ToSignedLEB128, U32ToVariableLEB128, F32ToIEEE754LittleEndian};
-use crate::binary_format::primitives::encoder::Encoder;
 use crate::binary_format::indices::IndexStream;
+use crate::binary_format::primitives::byte_stream::{
+    byte, evector, Byte, ByteStream, EVec, F32ToIEEE754LittleEndian, I32ToSignedLEB128,
+    I64ToSignedLEB128, Response, Seq, U32ToVariableLEB128,
+};
+use crate::binary_format::primitives::encoder::Encoder;
 
 use crate::base::{
-    indices::Index,
-    types::BlockType,
-    instructions::Instruction,
-    memory::MemoryArgument,
+    indices::Index, instructions::Instruction, memory::MemoryArgument, types::BlockType,
 };
 
 impl Instruction {
@@ -87,7 +87,6 @@ impl Instruction {
     pub const I32_ROTL: u8 = 0x77;
     pub const I32_ROTR: u8 = 0x78;
 
-
     // i64
     pub const I64_CONST: u8 = 0x42;
     pub const I64_ADD: u8 = 0x7c;
@@ -105,14 +104,13 @@ pub enum InstructionStream {
     SimpleWithIndex(Seq<Byte, IndexStream>),
     SimpleWithDoubleIndex(Seq<Byte, Seq<IndexStream, IndexStream>>),
     // Not just a block instruction, but also if-then, loop
-    BlockExpr(Seq<
-        Seq<Byte, <BlockType as Encoder>::S>,
-        EVec<InstructionStream, Byte>
-    >),
-    IfThenElseExpr(Seq<
-        Seq<Byte, <BlockType as Encoder>::S>,
-        Seq<EVec<InstructionStream, Byte>, EVec<InstructionStream, Byte>>
-    >),
+    BlockExpr(Seq<Seq<Byte, <BlockType as Encoder>::S>, EVec<InstructionStream, Byte>>),
+    IfThenElseExpr(
+        Seq<
+            Seq<Byte, <BlockType as Encoder>::S>,
+            Seq<EVec<InstructionStream, Byte>, EVec<InstructionStream, Byte>>,
+        >,
+    ),
     InstructionWithMemoryArgument(Seq<Byte, <MemoryArgument as Encoder>::S>),
     MemoryInit(Seq<Seq<Seq<Byte, U32ToVariableLEB128>, IndexStream>, Byte>),
     DataDrop(Seq<Seq<Byte, U32ToVariableLEB128>, IndexStream>),
@@ -154,18 +152,30 @@ impl InstructionStream {
 
     fn block_expr(opcode: u8, block_type: &BlockType, instructions: &[Instruction]) -> Self {
         let header = byte(opcode).seq(block_type.emit());
-        let instructions = instructions.iter().map(|instruction| instruction.emit()).collect();
+        let instructions = instructions
+            .iter()
+            .map(|instruction| instruction.emit())
+            .collect();
         let s = header.seq(evector(instructions, byte(Instruction::END)));
         Self::BlockExpr(s)
     }
 
-    fn if_then_else_expr(block_type: &BlockType, instructions_then: &[Instruction], instructions_else: &[Instruction]) -> Self {
+    fn if_then_else_expr(
+        block_type: &BlockType,
+        instructions_then: &[Instruction],
+        instructions_else: &[Instruction],
+    ) -> Self {
         let header = byte(Instruction::IF).seq(block_type.emit());
-        let instructions_then = instructions_then.iter().map(|instruction| instruction.emit()).collect();
-        let instructions_else = instructions_else.iter().map(|instruction| instruction.emit()).collect();
-        let instructions =
-            evector(instructions_then, byte(Instruction::ELSE))
-                .seq(evector(instructions_else, byte(Instruction::END)));
+        let instructions_then = instructions_then
+            .iter()
+            .map(|instruction| instruction.emit())
+            .collect();
+        let instructions_else = instructions_else
+            .iter()
+            .map(|instruction| instruction.emit())
+            .collect();
+        let instructions = evector(instructions_then, byte(Instruction::ELSE))
+            .seq(evector(instructions_else, byte(Instruction::END)));
 
         let s = header.seq(instructions);
         Self::IfThenElseExpr(s)
@@ -208,17 +218,35 @@ impl Encoder for Instruction {
             Nop => InstructionStream::simple(Self::NOP),
 
             // ===Control Instructions===
-            Block(block_type, instructions) => InstructionStream::block_expr(Instruction::BLOCK, block_type, instructions),
-            Loop(block_type, instructions) => InstructionStream::block_expr(Instruction::LOOP, block_type, instructions),
-            IfThen(block_type, instructions) => InstructionStream::block_expr(Instruction::IF, block_type, instructions),
-            IfThenElse(block_type, instructions_then, instructions_else) => InstructionStream::if_then_else_expr(block_type, instructions_then, instructions_else),
+            Block(block_type, instructions) => {
+                InstructionStream::block_expr(Instruction::BLOCK, block_type, instructions)
+            }
+            Loop(block_type, instructions) => {
+                InstructionStream::block_expr(Instruction::LOOP, block_type, instructions)
+            }
+            IfThen(block_type, instructions) => {
+                InstructionStream::block_expr(Instruction::IF, block_type, instructions)
+            }
+            IfThenElse(block_type, instructions_then, instructions_else) => {
+                InstructionStream::if_then_else_expr(
+                    block_type,
+                    instructions_then,
+                    instructions_else,
+                )
+            }
 
             Br(i) => InstructionStream::simple_with_index(Self::BR, *i),
             BrIf(i) => InstructionStream::simple_with_index(Self::BR_IF, *i),
             Call(i) => InstructionStream::simple_with_index(Self::CALL, *i),
             ReturnCall(i) => InstructionStream::simple_with_index(Self::RETURN_CALL, *i),
-            CallIndirect(type_i, table_i) => InstructionStream::simple_with_double_index(Self::CALL_INDIRECT, *type_i, *table_i),
-            ReturnCallIndirect(type_i, table_i) => InstructionStream::simple_with_double_index(Self::RETURN_CALL_INDIRECT, *type_i, *table_i),
+            CallIndirect(type_i, table_i) => {
+                InstructionStream::simple_with_double_index(Self::CALL_INDIRECT, *type_i, *table_i)
+            }
+            ReturnCallIndirect(type_i, table_i) => InstructionStream::simple_with_double_index(
+                Self::RETURN_CALL_INDIRECT,
+                *type_i,
+                *table_i,
+            ),
             Return => InstructionStream::simple(Self::RETURN),
 
             // ===Variables Instructions===
@@ -231,21 +259,63 @@ impl Encoder for Instruction {
             // ===Memory Instructions===
             MemorySize => InstructionStream::simple2(Self::MEMORY_SIZE, 0x00),
             MemoryGrow => InstructionStream::simple2(Self::MEMORY_GROW, 0x00),
-            MemoryInit(index) => InstructionStream::MemoryInit(byte(Self::MEMORY_VARIOUS_PREFIX).seq(U32ToVariableLEB128::new(8)).seq(index.emit()).seq(byte(0x00))),
-            DataDrop(index) => InstructionStream::DataDrop(byte(Self::MEMORY_VARIOUS_PREFIX).seq(U32ToVariableLEB128::new(9)).seq(index.emit())),
-            MemoryCopy => InstructionStream::MemoryCopy(byte(Self::MEMORY_VARIOUS_PREFIX).seq(U32ToVariableLEB128::new(10)).seq(byte(0x00)).seq(byte(0x00))),
-            MemoryFill => InstructionStream::MemoryFill(byte(Self::MEMORY_VARIOUS_PREFIX).seq(U32ToVariableLEB128::new(11)).seq(byte(0x00))),
+            MemoryInit(index) => InstructionStream::MemoryInit(
+                byte(Self::MEMORY_VARIOUS_PREFIX)
+                    .seq(U32ToVariableLEB128::new(8))
+                    .seq(index.emit())
+                    .seq(byte(0x00)),
+            ),
+            DataDrop(index) => InstructionStream::DataDrop(
+                byte(Self::MEMORY_VARIOUS_PREFIX)
+                    .seq(U32ToVariableLEB128::new(9))
+                    .seq(index.emit()),
+            ),
+            MemoryCopy => InstructionStream::MemoryCopy(
+                byte(Self::MEMORY_VARIOUS_PREFIX)
+                    .seq(U32ToVariableLEB128::new(10))
+                    .seq(byte(0x00))
+                    .seq(byte(0x00)),
+            ),
+            MemoryFill => InstructionStream::MemoryFill(
+                byte(Self::MEMORY_VARIOUS_PREFIX)
+                    .seq(U32ToVariableLEB128::new(11))
+                    .seq(byte(0x00)),
+            ),
 
             // i32
-            I32Load(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_LOAD, *memory_argument),
-            I32Load8S(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_LOAD_8_S, *memory_argument),
-            I32Load8U(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_LOAD_8_U, *memory_argument),
-            I32Load16S(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_LOAD_16_S, *memory_argument),
-            I32Load16U(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_LOAD_16_U, *memory_argument),
+            I32Load(memory_argument) => InstructionStream::instruction_with_memory_argument(
+                Self::I32_LOAD,
+                *memory_argument,
+            ),
+            I32Load8S(memory_argument) => InstructionStream::instruction_with_memory_argument(
+                Self::I32_LOAD_8_S,
+                *memory_argument,
+            ),
+            I32Load8U(memory_argument) => InstructionStream::instruction_with_memory_argument(
+                Self::I32_LOAD_8_U,
+                *memory_argument,
+            ),
+            I32Load16S(memory_argument) => InstructionStream::instruction_with_memory_argument(
+                Self::I32_LOAD_16_S,
+                *memory_argument,
+            ),
+            I32Load16U(memory_argument) => InstructionStream::instruction_with_memory_argument(
+                Self::I32_LOAD_16_U,
+                *memory_argument,
+            ),
 
-            I32Store(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_STORE, *memory_argument),
-            I32Store8(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_STORE_8, *memory_argument),
-            I32Store16(memory_argument) => InstructionStream::instruction_with_memory_argument(Self::I32_STORE_16, *memory_argument),
+            I32Store(memory_argument) => InstructionStream::instruction_with_memory_argument(
+                Self::I32_STORE,
+                *memory_argument,
+            ),
+            I32Store8(memory_argument) => InstructionStream::instruction_with_memory_argument(
+                Self::I32_STORE_8,
+                *memory_argument,
+            ),
+            I32Store16(memory_argument) => InstructionStream::instruction_with_memory_argument(
+                Self::I32_STORE_16,
+                *memory_argument,
+            ),
 
             // ===Numeric Instructions===
             // i32

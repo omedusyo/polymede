@@ -17,21 +17,20 @@ enum ComputeType {
 
 struct FunctionType {
     parameters: Vec<ComputeType>,
-    result: ComputeType
+    result: ComputeType,
 }
 
 // ===Type Environment===
 struct TypeVarMapping {
-    mapping: BTreeMap<TypeVar, String>
+    mapping: BTreeMap<TypeVar, String>,
 }
 
 struct TypeEnvironment {
     // env
 }
 
-
 // ======User Defined Types=======
-// 
+//
 // ind Bool {
 // | T
 // | F
@@ -42,7 +41,7 @@ struct TypeEnvironment {
 // | S Nat
 // }
 //
-// type Nat = Ind { L . 
+// type Nat = Ind { L .
 //
 // ind List[A] {
 // | Nil
@@ -56,11 +55,8 @@ struct TypeEnvironment {
 
 // ======Terms=========
 
-
 enum ValueTerms {
     Int(i32),
     Nil,
     Cons(ValueType, Box<ValueTerms>, Box<ValueTerms>),
 }
-
-

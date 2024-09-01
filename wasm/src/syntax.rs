@@ -1,14 +1,19 @@
-use crate::binary_format::sections;
-use crate::binary_format::sections::{TypeSection, FunctionSection, GlobalsSection, ExportSection, ImportSection, CodeSection, TableSection, MemorySection, TableType, ElementSection, Element, DataSection, DataItem};
-use crate::{Encoder, ByteStream};
 use crate::base::{
-    indices::{TypeIndex, LocalIndex, GlobalIndex, LabelIndex, FunctionIndex, TableIndex, MemoryIndex},
-    types::{FunctionType, ValueType, BlockType, NumType, RefType, GlobalType},
     export::{Export, ExportDescription},
     import::{Import, ImportDescription},
+    indices::{
+        FunctionIndex, GlobalIndex, LabelIndex, LocalIndex, MemoryIndex, TableIndex, TypeIndex,
+    },
     instructions,
-    memory::{MemoryArgument, Limit},
+    memory::{Limit, MemoryArgument},
+    types::{BlockType, FunctionType, GlobalType, NumType, RefType, ValueType},
 };
+use crate::binary_format::sections;
+use crate::binary_format::sections::{
+    CodeSection, DataItem, DataSection, Element, ElementSection, ExportSection, FunctionSection,
+    GlobalsSection, ImportSection, MemorySection, TableSection, TableType, TypeSection,
+};
+use crate::{ByteStream, Encoder};
 
 pub struct Module {
     function_types: Vec<FunctionType>,
@@ -87,10 +92,25 @@ pub enum Expression {
     Nop,
 
     // ===Control Instructions===
-    Block { type_: BlockType, body: Box<Expression> },
-    Loop { type_: BlockType, body: Box<Expression> },
-    IfThen { type_: BlockType, test: Box<Expression>, then_body: Box<Expression> },
-    IfThenElse { type_: BlockType, test: Box<Expression>, then_body: Box<Expression>, else_body: Box<Expression> },
+    Block {
+        type_: BlockType,
+        body: Box<Expression>,
+    },
+    Loop {
+        type_: BlockType,
+        body: Box<Expression>,
+    },
+    IfThen {
+        type_: BlockType,
+        test: Box<Expression>,
+        then_body: Box<Expression>,
+    },
+    IfThenElse {
+        type_: BlockType,
+        test: Box<Expression>,
+        then_body: Box<Expression>,
+        else_body: Box<Expression>,
+    },
     Br(LabelIndex),
     Call(FunctionIndex, Vec<Expression>),
     ReturnCall(FunctionIndex, Vec<Expression>),
@@ -106,8 +126,17 @@ pub enum Expression {
     GlobalSet(GlobalIndex, Box<Expression>),
 
     // ===Memory Instructions===
-    LoadInteger { size: Size, arg: MemoryArgument, address: Box<Expression> },
-    StoreInteger { size: Size, arg: MemoryArgument, address: Box<Expression>, value: Box<Expression> },
+    LoadInteger {
+        size: Size,
+        arg: MemoryArgument,
+        address: Box<Expression>,
+    },
+    StoreInteger {
+        size: Size,
+        arg: MemoryArgument,
+        address: Box<Expression>,
+        value: Box<Expression>,
+    },
 
     // ===Numeric Instructions===
     Op0(Op0),
@@ -133,7 +162,7 @@ enum NumberLiteral {
 #[derive(Debug)]
 enum Op1 {
     Int(Size, IntegerOp1),
-    Float(Size, FloatOp1)
+    Float(Size, FloatOp1),
 }
 
 #[derive(Debug)]
@@ -168,7 +197,7 @@ enum IntegerOp2 {
     Shl,
     Shr(Signedness),
     Rotl,
-    Rotr
+    Rotr,
 }
 
 #[derive(Debug)]
@@ -235,10 +264,17 @@ enum FloatRel2 {
     Ge,
 }
 
-
 impl Module {
     pub fn empty() -> Self {
-        Self { function_types: vec![], functions: vec![], exports: vec![], memories: vec![], function_table: vec![], globals: vec![], custom_section_at_the_end: vec![] }
+        Self {
+            function_types: vec![],
+            functions: vec![],
+            exports: vec![],
+            memories: vec![],
+            function_table: vec![],
+            globals: vec![],
+            custom_section_at_the_end: vec![],
+        }
     }
 
     pub fn add_function_type(&mut self, fn_type: FunctionType) -> TypeIndex {
@@ -256,7 +292,11 @@ impl Module {
     pub fn add_typed_function(&mut self, typed_function: TypedFunction) -> FunctionIndex {
         let type_ = typed_function.type_;
         let type_index = self.add_function_type(type_);
-        let fn_index = self.add_function(Function { type_index, locals: typed_function.locals, body: typed_function.body });
+        let fn_index = self.add_function(Function {
+            type_index,
+            locals: typed_function.locals,
+            body: typed_function.body,
+        });
         fn_index
     }
 
@@ -291,7 +331,11 @@ impl Module {
     pub fn add_typed_function_import(&mut self, fn_import: TypedFunctionImport) -> FunctionIndex {
         let type_ = fn_import.type_;
         let type_index = self.add_function_type(type_);
-        self.add_function_import(FunctionImport { module_name: fn_import.module_name, name: fn_import.name, type_index })
+        self.add_function_import(FunctionImport {
+            module_name: fn_import.module_name,
+            name: fn_import.name,
+            type_index,
+        })
     }
 
     pub fn add_custom_section_at_the_end(&mut self, custom_section: CustomSection) {
@@ -305,21 +349,33 @@ impl Module {
     pub fn binary_format(self) -> sections::Module {
         let mut bin_module = sections::Module::empty();
 
-        bin_module.type_section = Some(TypeSection { function_types: self.function_types });
+        bin_module.type_section = Some(TypeSection {
+            function_types: self.function_types,
+        });
 
         bin_module.function_section = {
-            let function_types_map: Vec<TypeIndex> = self.functions.iter().filter_map(|fn_| match fn_ {
-                FunctionOrImport::Fn(fn_) => Some(fn_.type_index),
-                FunctionOrImport::Import(_) => None,
-            }).collect();
-            Some(FunctionSection { type_indices: function_types_map })
+            let function_types_map: Vec<TypeIndex> = self
+                .functions
+                .iter()
+                .filter_map(|fn_| match fn_ {
+                    FunctionOrImport::Fn(fn_) => Some(fn_.type_index),
+                    FunctionOrImport::Import(_) => None,
+                })
+                .collect();
+            Some(FunctionSection {
+                type_indices: function_types_map,
+            })
         };
 
         bin_module.memory_section = {
-            let memory_types = self.memories.iter().filter_map(|memory| match memory {
-                MemoryOrImport::Memory(limit) => Some(*limit),
-                MemoryOrImport::Import(_) => None,
-            }).collect();
+            let memory_types = self
+                .memories
+                .iter()
+                .filter_map(|memory| match memory {
+                    MemoryOrImport::Memory(limit) => Some(*limit),
+                    MemoryOrImport::Import(_) => None,
+                })
+                .collect();
             Some(MemorySection { memory_types })
         };
 
@@ -327,27 +383,39 @@ impl Module {
             let number_of_closures = self.function_table.len() as u32;
             let table_type = TableType {
                 reftype: RefType::FuncRef,
-                limit: Limit::MinMax { min: number_of_closures, max: number_of_closures },
+                limit: Limit::MinMax {
+                    min: number_of_closures,
+                    max: number_of_closures,
+                },
             };
-            Some(TableSection { table_types: vec![table_type] })
+            Some(TableSection {
+                table_types: vec![table_type],
+            })
         };
 
         bin_module.import_section = {
             // TODO: Can this be done without cloning of strings?
-            let mut imports: Vec<Import> = self.functions.iter().filter_map(|fn_| match fn_ {
-                FunctionOrImport::Import(fn_import) => Some(Import {
-                    module_name: fn_import.module_name.clone(),
-                    name: fn_import.name.clone(),
-                    import_description: ImportDescription::FunctionTypeIndex(fn_import.type_index) }),
-                FunctionOrImport::Fn(_) => None,
-            }).collect();
+            let mut imports: Vec<Import> = self
+                .functions
+                .iter()
+                .filter_map(|fn_| match fn_ {
+                    FunctionOrImport::Import(fn_import) => Some(Import {
+                        module_name: fn_import.module_name.clone(),
+                        name: fn_import.name.clone(),
+                        import_description: ImportDescription::FunctionTypeIndex(
+                            fn_import.type_index,
+                        ),
+                    }),
+                    FunctionOrImport::Fn(_) => None,
+                })
+                .collect();
 
             // TODO: Can this be done without cloning of strings?
             imports.extend(self.memories.into_iter().filter_map(|memory| match memory {
                 MemoryOrImport::Import(memory_import) => Some(Import {
-                    module_name: memory_import.module_name.clone(), 
-                    name: memory_import.name.clone(), 
-                    import_description: ImportDescription::MemoryType(memory_import.limit)
+                    module_name: memory_import.module_name.clone(),
+                    name: memory_import.name.clone(),
+                    import_description: ImportDescription::MemoryType(memory_import.limit),
                 }),
                 MemoryOrImport::Memory(_) => None,
             }));
@@ -356,29 +424,43 @@ impl Module {
         };
 
         bin_module.element_section = {
-            Some(ElementSection { elements: vec![Element {
-                offset_expression: sections::Expression { instructions: vec![instructions::Instruction::I32Const(0)] },
-                function_references: self.function_table,
-            }]})
+            Some(ElementSection {
+                elements: vec![Element {
+                    offset_expression: sections::Expression {
+                        instructions: vec![instructions::Instruction::I32Const(0)],
+                    },
+                    function_references: self.function_table,
+                }],
+            })
         };
 
         bin_module.code_section = {
-            let codes: Vec<sections::Code> = self.functions.into_iter().filter_map(|fn_| match fn_ {
-                FunctionOrImport::Fn(fn_) => Some(fn_.binary_format()),
-                FunctionOrImport::Import(_) => None,
-            }).collect();
+            let codes: Vec<sections::Code> = self
+                .functions
+                .into_iter()
+                .filter_map(|fn_| match fn_ {
+                    FunctionOrImport::Fn(fn_) => Some(fn_.binary_format()),
+                    FunctionOrImport::Import(_) => None,
+                })
+                .collect();
             Some(CodeSection { codes })
         };
 
         bin_module.globals_section = {
-            let globals = self.globals.into_iter().map(|global| sections::Global {
+            let globals = self
+                .globals
+                .into_iter()
+                .map(|global| sections::Global {
                     global_type: global.global_type,
                     expression: global.expression.binary_format(),
-            }).collect();
+                })
+                .collect();
             Some(GlobalsSection { globals })
         };
 
-        bin_module.export_section = Some(ExportSection { exports: self.exports });
+        bin_module.export_section = Some(ExportSection {
+            exports: self.exports,
+        });
 
         bin_module.custom_section_at_the_end = self.custom_section_at_the_end;
 
@@ -396,19 +478,25 @@ impl Module {
 
 impl Function {
     pub fn binary_format(self) -> sections::Code {
-        let locals: Vec<sections::LocalDeclaration> = self.locals.into_iter().map(|value_type| sections::LocalDeclaration { count: 1, type_: value_type }).collect();
+        let locals: Vec<sections::LocalDeclaration> = self
+            .locals
+            .into_iter()
+            .map(|value_type| sections::LocalDeclaration {
+                count: 1,
+                type_: value_type,
+            })
+            .collect();
         let expression: sections::Expression = self.body.binary_format();
-        sections::Code {
-            locals,
-            expression,
-        }
+        sections::Code { locals, expression }
     }
 }
 
 impl Expression {
     pub fn binary_format(self) -> sections::Expression {
-
-        fn binary_format_instructions(expr: Expression, instructions: &mut Vec<instructions::Instruction>)  {
+        fn binary_format_instructions(
+            expr: Expression,
+            instructions: &mut Vec<instructions::Instruction>,
+        ) {
             match expr {
                 Expression::Seq(expressions) => {
                     if expressions.is_empty() {
@@ -418,9 +506,11 @@ impl Expression {
                             binary_format_instructions(expr, instructions);
                         }
                     }
-                },
+                }
 
-                Expression::Unreachable => instructions.push(instructions::Instruction::Unreachable),
+                Expression::Unreachable => {
+                    instructions.push(instructions::Instruction::Unreachable)
+                }
                 Expression::Nop => instructions.push(instructions::Instruction::Nop),
 
                 // ===Control Instructions===
@@ -428,20 +518,32 @@ impl Expression {
                     let mut body_instructions = vec![];
                     binary_format_instructions(*body, &mut body_instructions);
                     instructions.push(instructions::Instruction::Block(type_, body_instructions))
-                },
+                }
                 Expression::Loop { type_, body } => {
                     let mut body_instructions = vec![];
                     binary_format_instructions(*body, &mut body_instructions);
                     instructions.push(instructions::Instruction::Loop(type_, body_instructions))
-                },
-                Expression::IfThen { type_, test, then_body } => {
+                }
+                Expression::IfThen {
+                    type_,
+                    test,
+                    then_body,
+                } => {
                     binary_format_instructions(*test, instructions);
                     let mut then_body_instructions = vec![];
                     binary_format_instructions(*then_body, &mut then_body_instructions);
 
-                    instructions.push(instructions::Instruction::IfThen(type_, then_body_instructions))
-                },
-                Expression::IfThenElse { type_, test, then_body, else_body } => {
+                    instructions.push(instructions::Instruction::IfThen(
+                        type_,
+                        then_body_instructions,
+                    ))
+                }
+                Expression::IfThenElse {
+                    type_,
+                    test,
+                    then_body,
+                    else_body,
+                } => {
                     binary_format_instructions(*test, instructions);
 
                     let mut then_body_instructions = vec![];
@@ -450,79 +552,106 @@ impl Expression {
                     let mut else_body_instructions = vec![];
                     binary_format_instructions(*else_body, &mut else_body_instructions);
 
-                    instructions.push(instructions::Instruction::IfThenElse(type_, then_body_instructions, else_body_instructions))
-                },
+                    instructions.push(instructions::Instruction::IfThenElse(
+                        type_,
+                        then_body_instructions,
+                        else_body_instructions,
+                    ))
+                }
                 Expression::Br(index) => instructions.push(instructions::Instruction::Br(index)),
                 Expression::Call(index, args) => {
                     for arg in args {
                         binary_format_instructions(arg, instructions);
                     }
                     instructions.push(instructions::Instruction::Call(index))
-                },
+                }
                 Expression::ReturnCall(index, args) => {
                     for arg in args {
                         binary_format_instructions(arg, instructions);
                     }
                     instructions.push(instructions::Instruction::ReturnCall(index))
-                },
+                }
                 Expression::CallIndirect(type_index, table_index, args) => {
                     for arg in args {
                         binary_format_instructions(arg, instructions);
                     }
-                    instructions.push(instructions::Instruction::CallIndirect(type_index, table_index))
-                },
+                    instructions.push(instructions::Instruction::CallIndirect(
+                        type_index,
+                        table_index,
+                    ))
+                }
                 Expression::ReturnCallIndirect(type_index, table_index, args) => {
                     for arg in args {
                         binary_format_instructions(arg, instructions);
                     }
-                    instructions.push(instructions::Instruction::ReturnCallIndirect(type_index, table_index))
-                },
+                    instructions.push(instructions::Instruction::ReturnCallIndirect(
+                        type_index,
+                        table_index,
+                    ))
+                }
                 Expression::Return(expr) => {
                     binary_format_instructions(*expr, instructions);
                     instructions.push(instructions::Instruction::Return)
-                },
+                }
 
                 // ===Variable Instructions====
-                Expression::LocalGet(index) => instructions.push(instructions::Instruction::LocalGet(index)),
+                Expression::LocalGet(index) => {
+                    instructions.push(instructions::Instruction::LocalGet(index))
+                }
                 Expression::LocalSet(var, value) => {
                     binary_format_instructions(*value, instructions);
                     instructions.push(instructions::Instruction::LocalSet(var));
-                },
-                Expression::LocalTee(index) => instructions.push(instructions::Instruction::LocalTee(index)),
-                Expression::GlobalGet(index) => instructions.push(instructions::Instruction::GlobalGet(index)),
+                }
+                Expression::LocalTee(index) => {
+                    instructions.push(instructions::Instruction::LocalTee(index))
+                }
+                Expression::GlobalGet(index) => {
+                    instructions.push(instructions::Instruction::GlobalGet(index))
+                }
                 Expression::GlobalSet(var, value) => {
                     binary_format_instructions(*value, instructions);
                     instructions.push(instructions::Instruction::GlobalSet(var));
-                },
+                }
 
                 // ===Memory Instructions===
                 Expression::LoadInteger { size, arg, address } => {
                     binary_format_instructions(*address, instructions);
                     instructions.push(match size {
                         Size::X32 => instructions::Instruction::I32Load(arg),
-                        Size::X64 =>  {
+                        Size::X64 => {
                             todo!()
                             // instructions::Instruction::I64Load(arg)
-                        },
+                        }
                     })
-                },
+                }
 
-                Expression::StoreInteger { size, arg, address, value } => {
+                Expression::StoreInteger {
+                    size,
+                    arg,
+                    address,
+                    value,
+                } => {
                     binary_format_instructions(*address, instructions);
                     binary_format_instructions(*value, instructions);
                     instructions.push(match size {
                         Size::X32 => instructions::Instruction::I32Store(arg),
-                        Size::X64 =>  {
+                        Size::X64 => {
                             todo!()
                             // instructions::Instruction::I64Load(arg)
-                        },
+                        }
                     })
-                },
+                }
 
                 // ===Numeric Instructions===
-                Expression::Op0(Op0::Const(NumberLiteral::I32(x))) => instructions.push(instructions::Instruction::I32Const(x)),
-                Expression::Op0(Op0::Const(NumberLiteral::I64(x))) => instructions.push(instructions::Instruction::I64Const(x)),
-                Expression::Op0(Op0::Const(NumberLiteral::F32(x))) => instructions.push(instructions::Instruction::F32Const(x)),
+                Expression::Op0(Op0::Const(NumberLiteral::I32(x))) => {
+                    instructions.push(instructions::Instruction::I32Const(x))
+                }
+                Expression::Op0(Op0::Const(NumberLiteral::I64(x))) => {
+                    instructions.push(instructions::Instruction::I64Const(x))
+                }
+                Expression::Op0(Op0::Const(NumberLiteral::F32(x))) => {
+                    instructions.push(instructions::Instruction::F32Const(x))
+                }
                 Expression::Op0(Op0::Const(NumberLiteral::F64(_x))) => todo!(),
 
                 Expression::Op1(op1, arg) => {
@@ -536,11 +665,11 @@ impl Expression {
                         },
                         _ => todo!(),
                     }
-                },
+                }
                 Expression::Op2(op2, arg0, arg1) => {
                     binary_format_instructions(*arg0, instructions);
                     binary_format_instructions(*arg1, instructions);
-                    
+
                     match op2 {
                         Op2::Int(Size::X32, int_op) => match int_op {
                             IntegerOp2::Add => instructions.push(instructions::Instruction::I32Add),
@@ -550,7 +679,7 @@ impl Expression {
                         },
                         _ => todo!(),
                     }
-                },
+                }
 
                 Expression::Rel2(rel2, arg0, arg1) => {
                     binary_format_instructions(*arg0, instructions);
@@ -563,7 +692,7 @@ impl Expression {
                         },
                         _ => todo!(),
                     }
-                },
+                }
 
                 _ => todo!(),
             }
@@ -581,11 +710,24 @@ pub fn seq(expressions: Vec<Expression>) -> Expression {
 }
 
 pub fn typed_loop(type_: ValueType, body: Expression) -> Expression {
-    Expression::Loop { type_: BlockType::ValueType(type_), body: Box::new(body) }
+    Expression::Loop {
+        type_: BlockType::ValueType(type_),
+        body: Box::new(body),
+    }
 }
 
-pub fn typed_if_then_else(type_: ValueType, test: Expression, then_body: Expression, else_body: Expression) -> Expression {
-    Expression::IfThenElse { type_: BlockType::ValueType(type_), test: Box::new(test), then_body: Box::new(then_body), else_body: Box::new(else_body) }
+pub fn typed_if_then_else(
+    type_: ValueType,
+    test: Expression,
+    then_body: Expression,
+    else_body: Expression,
+) -> Expression {
+    Expression::IfThenElse {
+        type_: BlockType::ValueType(type_),
+        test: Box::new(test),
+        then_body: Box::new(then_body),
+        else_body: Box::new(else_body),
+    }
 }
 
 pub fn i32_const(x: i32) -> Expression {
@@ -597,19 +739,35 @@ pub fn f32_const(x: f32) -> Expression {
 }
 
 pub fn i32_add(e0: Expression, e1: Expression) -> Expression {
-    Expression::Op2(Op2::Int(Size::X32, IntegerOp2::Add), Box::new(e0), Box::new(e1))
+    Expression::Op2(
+        Op2::Int(Size::X32, IntegerOp2::Add),
+        Box::new(e0),
+        Box::new(e1),
+    )
 }
 
 pub fn i32_mul(e0: Expression, e1: Expression) -> Expression {
-    Expression::Op2(Op2::Int(Size::X32, IntegerOp2::Mul), Box::new(e0), Box::new(e1))
+    Expression::Op2(
+        Op2::Int(Size::X32, IntegerOp2::Mul),
+        Box::new(e0),
+        Box::new(e1),
+    )
 }
 
 pub fn i32_sub(e0: Expression, e1: Expression) -> Expression {
-    Expression::Op2(Op2::Int(Size::X32, IntegerOp2::Sub), Box::new(e0), Box::new(e1))
+    Expression::Op2(
+        Op2::Int(Size::X32, IntegerOp2::Sub),
+        Box::new(e0),
+        Box::new(e1),
+    )
 }
 
 pub fn i32_eq(e0: Expression, e1: Expression) -> Expression {
-    Expression::Rel2(Rel2::Int(Size::X32, IntegerRel2::Eq), Box::new(e0), Box::new(e1))
+    Expression::Rel2(
+        Rel2::Int(Size::X32, IntegerRel2::Eq),
+        Box::new(e0),
+        Box::new(e1),
+    )
 }
 
 pub fn local_get(i: u32) -> Expression {
@@ -632,28 +790,66 @@ pub fn return_call(fn_index: FunctionIndex, args: Vec<Expression>) -> Expression
     Expression::ReturnCall(fn_index, args)
 }
 
-pub fn call_indirect(type_index: TypeIndex, table_index: TableIndex, args: Vec<Expression>) -> Expression {
+pub fn call_indirect(
+    type_index: TypeIndex,
+    table_index: TableIndex,
+    args: Vec<Expression>,
+) -> Expression {
     Expression::CallIndirect(type_index, table_index, args)
 }
 
-pub fn return_call_indirect(type_index: TypeIndex, table_index: TableIndex, args: Vec<Expression>) -> Expression {
+pub fn return_call_indirect(
+    type_index: TypeIndex,
+    table_index: TableIndex,
+    args: Vec<Expression>,
+) -> Expression {
     Expression::ReturnCallIndirect(type_index, table_index, args)
 }
 
 pub fn i32_memory_get(address: Expression) -> Expression {
-    Expression::LoadInteger { size: Size::X32, arg: MemoryArgument { align: 2, offset: 0 }, address: Box::new(address) }
+    Expression::LoadInteger {
+        size: Size::X32,
+        arg: MemoryArgument {
+            align: 2,
+            offset: 0,
+        },
+        address: Box::new(address),
+    }
 }
 
 pub fn i64_memory_get(address: Expression) -> Expression {
-    Expression::LoadInteger { size: Size::X64, arg: MemoryArgument { align: 3, offset: 0 }, address: Box::new(address) }
+    Expression::LoadInteger {
+        size: Size::X64,
+        arg: MemoryArgument {
+            align: 3,
+            offset: 0,
+        },
+        address: Box::new(address),
+    }
 }
 
 pub fn i32_memory_set(address: Expression, value: Expression) -> Expression {
-    Expression::StoreInteger { size: Size::X32, arg: MemoryArgument { align: 2, offset: 0 }, address: Box::new(address), value: Box::new(value) }
+    Expression::StoreInteger {
+        size: Size::X32,
+        arg: MemoryArgument {
+            align: 2,
+            offset: 0,
+        },
+        address: Box::new(address),
+        value: Box::new(value),
+    }
 }
 
 pub fn i64_memory_set(address: Expression, value: Expression) -> Expression {
-    Expression::StoreInteger { size: Size::X64, arg: MemoryArgument { align: 3, offset: 0 }, address: Box::new(address), value: Box::new(value) }
+    Expression::StoreInteger {
+        size: Size::X64,
+        arg: MemoryArgument {
+            align: 3,
+            offset: 0,
+        },
+        address: Box::new(address),
+        value: Box::new(value),
+    }
 }
 
 pub const TYPE_I32: ValueType = ValueType::NumType(NumType::I32);
@@ -667,15 +863,18 @@ pub fn fn_type(domain: Vec<ValueType>, codomain: Vec<ValueType>) -> FunctionType
 // ===Examples===
 
 pub fn example0() -> Module {
-    use NumType::*;
     use Expression::*;
+    use NumType::*;
 
     let mut module = Module::empty();
 
     // (func (param i32)
     // )
     module.add_typed_function(TypedFunction {
-        type_: FunctionType { domain: vec![ValueType::NumType(I32)], codomain: vec![], },
+        type_: FunctionType {
+            domain: vec![ValueType::NumType(I32)],
+            codomain: vec![],
+        },
         locals: vec![],
         body: Nop,
     });
@@ -701,7 +900,10 @@ pub fn example1() -> Module {
         locals: vec![],
         body: i32_mul(local_get(0), local_get(0)),
     });
-    module.add_export(Export { name: "square".to_string(), export_description: ExportDescription::Function(square) });
+    module.add_export(Export {
+        name: "square".to_string(),
+        export_description: ExportDescription::Function(square),
+    });
 
     // (func (param $x i32) (param $y i32) (result i32)
     //   (i32.add (call $square (local.get $x)) (call $square (local.get $y)))
@@ -709,9 +911,15 @@ pub fn example1() -> Module {
     let pyth = module.add_typed_function(TypedFunction {
         type_: fn_type(vec![TYPE_I32, TYPE_I32], vec![TYPE_I32]),
         locals: vec![],
-        body: i32_add(call(square, vec![local_get(0)]), call(square, vec![local_get(1)])),
+        body: i32_add(
+            call(square, vec![local_get(0)]),
+            call(square, vec![local_get(1)]),
+        ),
     });
-    module.add_export(Export { name: "pyth".to_string(), export_description: ExportDescription::Function(pyth) });
+    module.add_export(Export {
+        name: "pyth".to_string(),
+        export_description: ExportDescription::Function(pyth),
+    });
 
     module
 }
@@ -719,28 +927,44 @@ pub fn example1() -> Module {
 pub fn example2() -> Module {
     let mut module = Module::empty();
 
-    let log = module.add_typed_function_import(TypedFunctionImport { module_name: "console".to_string(), name: "log".to_string(), type_: fn_type(vec![TYPE_I32], vec![]) });
+    let log = module.add_typed_function_import(TypedFunctionImport {
+        module_name: "console".to_string(),
+        name: "log".to_string(),
+        type_: fn_type(vec![TYPE_I32], vec![]),
+    });
 
     let square = module.add_typed_function(TypedFunction {
         type_: fn_type(vec![TYPE_I32], vec![TYPE_I32]),
         locals: vec![],
         body: i32_mul(local_get(0), local_get(0)),
     });
-    module.add_export(Export { name: "square".to_string(), export_description: ExportDescription::Function(square) });
+    module.add_export(Export {
+        name: "square".to_string(),
+        export_description: ExportDescription::Function(square),
+    });
 
     let pyth = module.add_typed_function(TypedFunction {
         type_: fn_type(vec![TYPE_I32, TYPE_I32], vec![TYPE_I32]),
         locals: vec![],
-        body: i32_add(call(square, vec![local_get(0)]), call(square, vec![local_get(1)])),
+        body: i32_add(
+            call(square, vec![local_get(0)]),
+            call(square, vec![local_get(1)]),
+        ),
     });
-    module.add_export(Export { name: "pyth".to_string(), export_description: ExportDescription::Function(pyth) });
+    module.add_export(Export {
+        name: "pyth".to_string(),
+        export_description: ExportDescription::Function(pyth),
+    });
 
     let log_pyth = module.add_typed_function(TypedFunction {
         type_: fn_type(vec![], vec![]),
         locals: vec![],
         body: call(log, vec![i32_const(512)]),
     });
-    module.add_export(Export { name: "log_pyth".to_string(), export_description: ExportDescription::Function(log_pyth) });
+    module.add_export(Export {
+        name: "log_pyth".to_string(),
+        export_description: ExportDescription::Function(log_pyth),
+    });
 
     module
 }
@@ -770,21 +994,25 @@ pub fn example_factorial() -> Module {
         locals: vec![TYPE_I32],
         body: seq(vec![
             local_set(1, i32_const(1)),
-            typed_loop(TYPE_I32,
-                typed_if_then_else(TYPE_I32,
+            typed_loop(
+                TYPE_I32,
+                typed_if_then_else(
+                    TYPE_I32,
                     i32_eq(local_get(0), i32_const(0)),
-
                     local_get(1),
                     seq(vec![
                         local_set(1, i32_mul(local_get(1), local_get(0))),
                         local_set(0, i32_sub(local_get(0), i32_const(1))),
                         branch(1),
                     ]),
-                )
-            )
+                ),
+            ),
         ]),
     });
-    module.add_export(Export { name: "fct".to_string(), export_description: ExportDescription::Function(fct) });
+    module.add_export(Export {
+        name: "fct".to_string(),
+        export_description: ExportDescription::Function(fct),
+    });
 
     module
 }
@@ -793,7 +1021,10 @@ pub fn example_memory0() -> Module {
     let mut module = Module::empty();
 
     let memory = module.add_memory(Limit::MinMax { min: 1, max: 1 });
-    module.add_export(Export { name: "main_memory".to_string(), export_description: ExportDescription::Memory(memory) });
+    module.add_export(Export {
+        name: "main_memory".to_string(),
+        export_description: ExportDescription::Memory(memory),
+    });
 
     let some_fn = module.add_typed_function(TypedFunction {
         type_: fn_type(vec![], vec![TYPE_I32]),
@@ -801,21 +1032,31 @@ pub fn example_memory0() -> Module {
         body: seq(vec![
             i32_memory_set(i32_const(0), i32_const(123)),
             i32_memory_get(i32_const(0)),
-        ])
+        ]),
     });
 
-    module.add_export(Export { name: "some_fn".to_string(), export_description: ExportDescription::Function(some_fn) });
-    
+    module.add_export(Export {
+        name: "some_fn".to_string(),
+        export_description: ExportDescription::Function(some_fn),
+    });
+
     module
 }
 
 pub fn example_memory1() -> Module {
     let mut module = Module::empty();
 
-    let log = module.add_typed_function_import(TypedFunctionImport { module_name: "console".to_string(), name: "log".to_string(), type_: fn_type(vec![TYPE_I32], vec![]) });
+    let log = module.add_typed_function_import(TypedFunctionImport {
+        module_name: "console".to_string(),
+        name: "log".to_string(),
+        type_: fn_type(vec![TYPE_I32], vec![]),
+    });
 
     let memory = module.add_memory(Limit::MinMax { min: 1, max: 1 });
-    module.add_export(Export { name: "main_memory".to_string(), export_description: ExportDescription::Memory(memory) });
+    module.add_export(Export {
+        name: "main_memory".to_string(),
+        export_description: ExportDescription::Memory(memory),
+    });
 
     // pointer <- 0
     // offset <- 1
@@ -838,22 +1079,23 @@ pub fn example_memory1() -> Module {
             seq(vec![
                 local_set(offset, i32_const(4)),
                 local_set(pointer, i32_const(0)),
-
-
                 i32_memory_set(local_get(pointer), i32_const(6)),
-
                 local_set(pointer, i32_add(local_get(pointer), local_get(offset))),
                 i32_memory_set(local_get(pointer), i32_const(7)),
-
                 local_set(pointer, i32_add(local_get(pointer), local_get(offset))),
-                i32_memory_set(local_get(pointer), i32_add(i32_memory_get(i32_const(0)), i32_memory_get(i32_const(4)))),
-
+                i32_memory_set(
+                    local_get(pointer),
+                    i32_add(i32_memory_get(i32_const(0)), i32_memory_get(i32_const(4))),
+                ),
                 i32_memory_get(local_get(pointer)),
             ])
-        }
+        },
     });
 
-    module.add_export(Export { name: "some_fn".to_string(), export_description: ExportDescription::Function(some_fn) });
-    
+    module.add_export(Export {
+        name: "some_fn".to_string(),
+        export_description: ExportDescription::Function(some_fn),
+    });
+
     module
 }

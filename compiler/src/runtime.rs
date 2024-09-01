@@ -1,10 +1,7 @@
 use crate::gmm_compiler::import_runtime_function;
 use wasm::{
-    syntax::{Module, fn_type, TYPE_I32, TYPE_F32},
-    base::{
-        indices::FunctionIndex,
-        types::FunctionType,
-    },
+    base::{indices::FunctionIndex, types::FunctionType},
+    syntax::{fn_type, Module, TYPE_F32, TYPE_I32},
 };
 
 #[derive(Debug)]
@@ -45,7 +42,7 @@ impl Runtime {
         let count = bytes.len() as i32;
         let mut result = Vec::with_capacity((Self::BYTE_ARRAY_HEADER_BYTE_SIZE + count) as usize);
         // Note that WASM encodes ints in little-endian byte order.
-        result.extend_from_slice(&Self::GC_TAG_LIVE.to_le_bytes());  // 1 byte
+        result.extend_from_slice(&Self::GC_TAG_LIVE.to_le_bytes()); // 1 byte
         result.extend_from_slice(&Self::BYTE_ARRAY_TAG.to_le_bytes()); // 1 byte
         result.extend_from_slice(&count.to_le_bytes()); // 4 bytes
         result.extend_from_slice(bytes);
@@ -54,34 +51,149 @@ impl Runtime {
 
     pub fn import(module: &mut Module) -> Self {
         let mut number_of_runtime_functions = 0;
-        fn import(module: &mut Module, fn_name: &str, type_: FunctionType, number_of_runtime_functions: &mut usize) -> FunctionIndex {
+        fn import(
+            module: &mut Module,
+            fn_name: &str,
+            type_: FunctionType,
+            number_of_runtime_functions: &mut usize,
+        ) -> FunctionIndex {
             let fn_index = import_runtime_function(module, fn_name, type_);
             *number_of_runtime_functions += 1;
             fn_index
         }
 
-        let const_= import(module, "const", fn_type(vec![TYPE_I32], vec![]), &mut number_of_runtime_functions);
-        let float32 = import(module, "float32", fn_type(vec![TYPE_F32], vec![]), &mut number_of_runtime_functions);
-        let get_const = import(module, "get_const", fn_type(vec![], vec![TYPE_I32]) , &mut number_of_runtime_functions);
-        let tuple = import(module, "tuple", fn_type(vec![TYPE_I32, TYPE_I32], vec![]), &mut number_of_runtime_functions);
-        let get_tuple_pointer = import(module, "get_tuple_pointer", fn_type(vec![], vec![TYPE_I32]), &mut number_of_runtime_functions);
-        let get_tuple_variant = import(module, "get_tuple_variant", fn_type(vec![], vec![TYPE_I32]), &mut number_of_runtime_functions);
-        let tuple_project = import(module, "tuple_project", fn_type(vec![TYPE_I32], vec![]), &mut number_of_runtime_functions);
-        let read_tag = import(module, "read_tag", fn_type(vec![], vec![TYPE_I32]), &mut number_of_runtime_functions);
-        let get_variant = import(module, "get_variant", fn_type(vec![], vec![TYPE_I32]), &mut number_of_runtime_functions);
-        let make_env = import(module, "make_env", fn_type(vec![TYPE_I32], vec![]), &mut number_of_runtime_functions);
-        let make_env_from = import(module, "make_env_from", fn_type(vec![TYPE_I32, TYPE_I32], vec![]), &mut number_of_runtime_functions);
-        let copy_and_extend_env = import(module, "copy_and_extend_env", fn_type(vec![TYPE_I32], vec![]), &mut number_of_runtime_functions);
-        let extend_env = import(module, "extend_env", fn_type(vec![TYPE_I32], vec![]), &mut number_of_runtime_functions);
-        let var = import(module, "var", fn_type(vec![TYPE_I32], vec![]), &mut number_of_runtime_functions);
-        let drop_env = import(module, "drop_env", fn_type(vec![], vec![]), &mut number_of_runtime_functions);
-        let drop_env_then_shift = import(module, "drop_env_then_shift", fn_type(vec![], vec![]), &mut number_of_runtime_functions);
-        let partial_apply = import(module, "partial_apply", fn_type(vec![TYPE_I32, TYPE_I32], vec![]), &mut number_of_runtime_functions);
-        let make_env_from_closure = import(module, "make_env_from_closure", fn_type(vec![TYPE_I32], vec![TYPE_I32]), &mut number_of_runtime_functions);
-        let pure = import(module, "pure", fn_type(vec![], vec![]), &mut number_of_runtime_functions);
-        let and_then = import(module, "and_then", fn_type(vec![], vec![]), &mut number_of_runtime_functions);
-        let receive = import(module, "receive", fn_type(vec![], vec![]), &mut number_of_runtime_functions);
-        let array_slice = import(module, "array_slice", fn_type(vec![TYPE_I32, TYPE_I32, TYPE_I32], vec![]), &mut number_of_runtime_functions);
+        let const_ = import(
+            module,
+            "const",
+            fn_type(vec![TYPE_I32], vec![]),
+            &mut number_of_runtime_functions,
+        );
+        let float32 = import(
+            module,
+            "float32",
+            fn_type(vec![TYPE_F32], vec![]),
+            &mut number_of_runtime_functions,
+        );
+        let get_const = import(
+            module,
+            "get_const",
+            fn_type(vec![], vec![TYPE_I32]),
+            &mut number_of_runtime_functions,
+        );
+        let tuple = import(
+            module,
+            "tuple",
+            fn_type(vec![TYPE_I32, TYPE_I32], vec![]),
+            &mut number_of_runtime_functions,
+        );
+        let get_tuple_pointer = import(
+            module,
+            "get_tuple_pointer",
+            fn_type(vec![], vec![TYPE_I32]),
+            &mut number_of_runtime_functions,
+        );
+        let get_tuple_variant = import(
+            module,
+            "get_tuple_variant",
+            fn_type(vec![], vec![TYPE_I32]),
+            &mut number_of_runtime_functions,
+        );
+        let tuple_project = import(
+            module,
+            "tuple_project",
+            fn_type(vec![TYPE_I32], vec![]),
+            &mut number_of_runtime_functions,
+        );
+        let read_tag = import(
+            module,
+            "read_tag",
+            fn_type(vec![], vec![TYPE_I32]),
+            &mut number_of_runtime_functions,
+        );
+        let get_variant = import(
+            module,
+            "get_variant",
+            fn_type(vec![], vec![TYPE_I32]),
+            &mut number_of_runtime_functions,
+        );
+        let make_env = import(
+            module,
+            "make_env",
+            fn_type(vec![TYPE_I32], vec![]),
+            &mut number_of_runtime_functions,
+        );
+        let make_env_from = import(
+            module,
+            "make_env_from",
+            fn_type(vec![TYPE_I32, TYPE_I32], vec![]),
+            &mut number_of_runtime_functions,
+        );
+        let copy_and_extend_env = import(
+            module,
+            "copy_and_extend_env",
+            fn_type(vec![TYPE_I32], vec![]),
+            &mut number_of_runtime_functions,
+        );
+        let extend_env = import(
+            module,
+            "extend_env",
+            fn_type(vec![TYPE_I32], vec![]),
+            &mut number_of_runtime_functions,
+        );
+        let var = import(
+            module,
+            "var",
+            fn_type(vec![TYPE_I32], vec![]),
+            &mut number_of_runtime_functions,
+        );
+        let drop_env = import(
+            module,
+            "drop_env",
+            fn_type(vec![], vec![]),
+            &mut number_of_runtime_functions,
+        );
+        let drop_env_then_shift = import(
+            module,
+            "drop_env_then_shift",
+            fn_type(vec![], vec![]),
+            &mut number_of_runtime_functions,
+        );
+        let partial_apply = import(
+            module,
+            "partial_apply",
+            fn_type(vec![TYPE_I32, TYPE_I32], vec![]),
+            &mut number_of_runtime_functions,
+        );
+        let make_env_from_closure = import(
+            module,
+            "make_env_from_closure",
+            fn_type(vec![TYPE_I32], vec![TYPE_I32]),
+            &mut number_of_runtime_functions,
+        );
+        let pure = import(
+            module,
+            "pure",
+            fn_type(vec![], vec![]),
+            &mut number_of_runtime_functions,
+        );
+        let and_then = import(
+            module,
+            "and_then",
+            fn_type(vec![], vec![]),
+            &mut number_of_runtime_functions,
+        );
+        let receive = import(
+            module,
+            "receive",
+            fn_type(vec![], vec![]),
+            &mut number_of_runtime_functions,
+        );
+        let array_slice = import(
+            module,
+            "array_slice",
+            fn_type(vec![TYPE_I32, TYPE_I32, TYPE_I32], vec![]),
+            &mut number_of_runtime_functions,
+        );
 
         Self {
             number_of_runtime_functions,

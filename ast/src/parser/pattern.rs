@@ -3,11 +3,13 @@ use crate::identifier;
 use crate::identifier::Identifier;
 use crate::parser::lex::lexer::Request;
 use crate::parser::{
-    base::{State, Result, Error},
+    base::{Error, Result, State},
+    combinator::{
+        delimited_nonempty_sequence_to_vector, delimited_possibly_empty_sequence_to_vector,
+    },
     identifier::variable,
+    special::{comma, or_separator, start_pattern, StartPattern},
     term::term,
-    special::{StartPattern, comma, or_separator, start_pattern},
-    combinator::{delimited_nonempty_sequence_to_vector, delimited_possibly_empty_sequence_to_vector},
 };
 
 // Parses a non-empty sequence of identifiers separated by comma
@@ -19,7 +21,9 @@ pub fn parameter_non_empty_sequence(state: &mut State) -> Result<Vec<Identifier>
     if duplicate_ids.is_empty() {
         Ok(ids)
     } else {
-        Err(Error::DuplicateVariableNames { duplicates: duplicate_ids })
+        Err(Error::DuplicateVariableNames {
+            duplicates: duplicate_ids,
+        })
     }
 }
 
@@ -29,7 +33,9 @@ pub fn parameter_possibly_empty_sequence(state: &mut State) -> Result<Vec<Identi
     if duplicate_ids.is_empty() {
         Ok(ids)
     } else {
-        Err(Error::DuplicateVariableNames { duplicates: duplicate_ids })
+        Err(Error::DuplicateVariableNames {
+            duplicates: duplicate_ids,
+        })
     }
 }
 
@@ -39,7 +45,8 @@ pub fn parameter_possibly_empty_sequence(state: &mut State) -> Result<Vec<Identi
 pub fn pattern_branches(state: &mut State) -> Result<Vec<PatternBranch>> {
     state.request_token(Request::OpenCurly)?;
     state.consume_optional_or()?;
-    let branches = delimited_possibly_empty_sequence_to_vector( state, pattern_branch, or_separator)?;
+    let branches =
+        delimited_possibly_empty_sequence_to_vector(state, pattern_branch, or_separator)?;
     state.request_token(Request::CloseCurly)?;
     Ok(branches)
 }
@@ -61,13 +68,15 @@ fn pattern(state: &mut State) -> Result<Pattern> {
     fn parser(state: &mut State) -> Result<Pattern> {
         match start_pattern(state)? {
             StartPattern::Variable(variable) => Ok(Pattern::Variable(variable)),
-            StartPattern::ConstructorConstant(constructor_name) => Ok(Pattern::Constructor(constructor_name, vec![])),
+            StartPattern::ConstructorConstant(constructor_name) => {
+                Ok(Pattern::Constructor(constructor_name, vec![]))
+            }
             StartPattern::ConstructorApplication(constructor_name) => {
                 state.request_token(Request::OpenParen)?;
                 let pattern_parameters = pattern_sequence(state)?;
                 state.request_token(Request::CloseParen)?;
                 Ok(Pattern::Constructor(constructor_name, pattern_parameters))
-            },
+            }
             StartPattern::Int(x) => Ok(Pattern::Int(x)),
             StartPattern::Anything(id) => Ok(Pattern::Anything(id)),
         }
@@ -77,6 +86,8 @@ fn pattern(state: &mut State) -> Result<Pattern> {
     if duplicate_ids.is_empty() {
         Ok(pattern)
     } else {
-        Err(Error::DuplicateVariableNames { duplicates: duplicate_ids })
+        Err(Error::DuplicateVariableNames {
+            duplicates: duplicate_ids,
+        })
     }
 }

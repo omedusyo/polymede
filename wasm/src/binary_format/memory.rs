@@ -1,7 +1,9 @@
+use crate::binary_format::primitives::byte_stream::{
+    byte, Byte, ByteStream, Response, Seq, U32ToFixed40LEB128, U32ToVariableLEB128,
+};
 use crate::binary_format::primitives::encoder::Encoder;
-use crate::binary_format::primitives::byte_stream::{ByteStream, byte, Byte, Seq, U32ToFixed40LEB128, U32ToVariableLEB128, Response};
 
-use crate::base::memory::{MemoryArgument, Limit};
+use crate::base::memory::{Limit, MemoryArgument};
 
 // ===MemoryArgument===
 impl Encoder for MemoryArgument {
@@ -31,8 +33,12 @@ impl Encoder for Limit {
     fn emit(&self) -> Self::S {
         use Limit::*;
         match self {
-            MinToInfinity { min } => LimitsStream::MinToInfinity(byte(0x00).seq(U32ToFixed40LEB128::new(*min))),
-            MinMax { min, max } => LimitsStream::MinMax(byte(0x01).seq(U32ToFixed40LEB128::new(*min).seq(U32ToFixed40LEB128::new(*max)))),
+            MinToInfinity { min } => {
+                LimitsStream::MinToInfinity(byte(0x00).seq(U32ToFixed40LEB128::new(*min)))
+            }
+            MinMax { min, max } => LimitsStream::MinMax(
+                byte(0x01).seq(U32ToFixed40LEB128::new(*min).seq(U32ToFixed40LEB128::new(*max))),
+            ),
         }
     }
 }

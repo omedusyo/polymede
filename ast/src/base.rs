@@ -1,4 +1,6 @@
-use crate::identifier::{Interner, interner, Variable, ConstructorName, FunctionName, ExternalName, Identifier};
+use crate::identifier::{
+    interner, ConstructorName, ExternalName, FunctionName, Identifier, Interner, Variable,
+};
 use crate::parser::base::PreTypeDeclaration;
 use std::collections::HashMap;
 
@@ -17,7 +19,7 @@ pub struct Program {
 
 impl Program {
     pub fn new() -> Self {
-        Self { 
+        Self {
             interner: interner(),
             type_declarations: HashMap::new(),
             type_declarations_ordering: vec![],
@@ -41,11 +43,17 @@ impl Program {
         self.type_declarations.get(type_name)
     }
 
-    pub fn get_function_declaration(&self, function_name: &FunctionName) -> Option<&FunctionDeclaration> {
+    pub fn get_function_declaration(
+        &self,
+        function_name: &FunctionName,
+    ) -> Option<&FunctionDeclaration> {
         self.function_declarations.get(function_name)
     }
 
-    pub fn get_type_declaration_of_constructor(&self, constructor_name: &ConstructorName) -> Option<&TypeDeclaration> {
+    pub fn get_type_declaration_of_constructor(
+        &self,
+        constructor_name: &ConstructorName,
+    ) -> Option<&TypeDeclaration> {
         let type_name = self.constructor_to_type_mapping.get(constructor_name)?;
         self.get_type_declaration(type_name)
     }
@@ -59,8 +67,12 @@ impl Program {
     }
 
     pub fn get_msg_type_declaration(&self) -> &TypeDeclaration {
-        let Some(msg_type_name) = &self.msg_type else { unreachable!() };
-        let Some(msg_type_declaration) = self.get_type_declaration(msg_type_name) else { unreachable!() };
+        let Some(msg_type_name) = &self.msg_type else {
+            unreachable!()
+        };
+        let Some(msg_type_declaration) = self.get_type_declaration(msg_type_name) else {
+            unreachable!()
+        };
         msg_type_declaration
     }
 
@@ -69,7 +81,7 @@ impl Program {
         let type_name = decl.name();
         Type::TypeApplication(type_name.clone(), vec![])
     }
-    
+
     pub fn function_declarations_in_source_ordering(&self) -> Vec<&FunctionDeclaration> {
         let mut result = vec![];
         for function_name in &self.function_declarations_ordering {
@@ -78,7 +90,6 @@ impl Program {
         result
     }
 }
-
 
 // ===Declarations===
 #[derive(Debug)]
@@ -165,12 +176,11 @@ pub struct FunctionType {
     pub output_type: Type,
 }
 
-
 // ===Terms===
 #[derive(Debug, Clone)]
 pub struct TypedTerm {
     pub type_: Type,
-    pub term: Term
+    pub term: Term,
 }
 
 #[derive(Debug, Clone)]
@@ -213,14 +223,18 @@ pub enum DoBinding {
 }
 
 impl TypeDeclaration {
-    pub fn new(pre_decl: PreTypeDeclaration, constructor_to_type_mapping: &mut HashMap<ConstructorName, Variable>) -> Self {
+    pub fn new(
+        pre_decl: PreTypeDeclaration,
+        constructor_to_type_mapping: &mut HashMap<ConstructorName, Variable>,
+    ) -> Self {
         match pre_decl {
             PreTypeDeclaration::Enum(pre_decl) => {
                 let mut constructors = HashMap::new();
                 let mut constructors_ordering = vec![];
                 for constructor_decl in pre_decl.constructors {
-                    constructor_to_type_mapping.insert(constructor_decl.name.clone(), pre_decl.name.clone());
-                    constructors_ordering.push(constructor_decl.name.clone()); 
+                    constructor_to_type_mapping
+                        .insert(constructor_decl.name.clone(), pre_decl.name.clone());
+                    constructors_ordering.push(constructor_decl.name.clone());
                     constructors.insert(constructor_decl.name.clone(), constructor_decl);
                 }
                 Self::Enum(EnumDeclaration {
@@ -229,13 +243,14 @@ impl TypeDeclaration {
                     constructors,
                     constructors_ordering,
                 })
-            },
+            }
             PreTypeDeclaration::Ind(pre_decl) => {
                 let mut constructors = HashMap::new();
                 let mut constructors_ordering = vec![];
                 for constructor_decl in pre_decl.constructors {
-                    constructor_to_type_mapping.insert(constructor_decl.name.clone(), pre_decl.name.clone());
-                    constructors_ordering.push(constructor_decl.name.clone()); 
+                    constructor_to_type_mapping
+                        .insert(constructor_decl.name.clone(), pre_decl.name.clone());
+                    constructors_ordering.push(constructor_decl.name.clone());
                     constructors.insert(constructor_decl.name.clone(), constructor_decl);
                 }
                 Self::Ind(IndDeclaration {
@@ -273,11 +288,19 @@ impl TypeDeclaration {
     //   }
     // then type-applying the type arguments [Bool, Int] to the Branch constructor leads to
     //   Branch(Int, Fn(Two -> BinTree(Bool, Int)))
-    pub fn type_apply_constructor(&self, constructor_name: &ConstructorName, type_args: &[Type]) -> Option<(&ConstructorDeclaration, Vec<Type>)> {
+    pub fn type_apply_constructor(
+        &self,
+        constructor_name: &ConstructorName,
+        type_args: &[Type],
+    ) -> Option<(&ConstructorDeclaration, Vec<Type>)> {
         use TypeDeclaration::*;
         match self {
             Enum(decl) => decl.type_apply_constructor(constructor_name, type_args),
-            Ind(decl) => decl.type_apply_constructor(constructor_name, type_args, &Type::TypeApplication(self.name().clone(), type_args.to_vec())),
+            Ind(decl) => decl.type_apply_constructor(
+                constructor_name,
+                type_args,
+                &Type::TypeApplication(self.name().clone(), type_args.to_vec()),
+            ),
         }
     }
 
@@ -310,10 +333,12 @@ impl Type {
                 // information was precomputed. Also you need some sort of loop check for mutually
                 // recursive types.
                 for type_ in types {
-                    if type_.is_value_type() { return false }
+                    if type_.is_value_type() {
+                        return false;
+                    }
                 }
-                return true
-            },
+                return true;
+            }
             Arrow(_) => false,
             I32 => true,
             F32 => true,
@@ -324,16 +349,24 @@ impl Type {
 }
 
 impl EnumDeclaration {
-    pub fn type_apply_constructor(&self, constructor_name: &ConstructorName, type_args: &[Type]) -> Option<(&ConstructorDeclaration, Vec<Type>)> {
+    pub fn type_apply_constructor(
+        &self,
+        constructor_name: &ConstructorName,
+        type_args: &[Type],
+    ) -> Option<(&ConstructorDeclaration, Vec<Type>)> {
         let constructor_decl = self.constructors.get(constructor_name)?;
-        let specialized_constructor_type_arguments: Vec<Type> = constructor_decl.parameters
+        let specialized_constructor_type_arguments: Vec<Type> = constructor_decl
+            .parameters
             .iter()
             .map(|type_body| type_apply(&self.type_parameters, type_body, type_args))
             .collect();
         Some((constructor_decl, specialized_constructor_type_arguments))
     }
 
-    pub fn get_constructor(&self, constructor_name: &ConstructorName) -> Option<&ConstructorDeclaration> {
+    pub fn get_constructor(
+        &self,
+        constructor_name: &ConstructorName,
+    ) -> Option<&ConstructorDeclaration> {
         self.constructors.get(constructor_name)
     }
 
@@ -348,7 +381,12 @@ impl EnumDeclaration {
 }
 
 impl IndDeclaration {
-    pub fn type_apply_constructor(&self, constructor_name: &ConstructorName, type_args: &[Type], recursive_type: &Type) -> Option<(&ConstructorDeclaration, Vec<Type>)> {
+    pub fn type_apply_constructor(
+        &self,
+        constructor_name: &ConstructorName,
+        type_args: &[Type],
+        recursive_type: &Type,
+    ) -> Option<(&ConstructorDeclaration, Vec<Type>)> {
         let constructor_decl = self.constructors.get(constructor_name)?;
 
         // TODO: This assumes that type_parameters + rec_type_var are all unique, and that
@@ -359,14 +397,18 @@ impl IndDeclaration {
         let mut type_args: Vec<Type> = type_args.to_vec();
         type_args.push(recursive_type.clone());
 
-        let specialized_constructor_type_arguments: Vec<Type> = constructor_decl.parameters
+        let specialized_constructor_type_arguments: Vec<Type> = constructor_decl
+            .parameters
             .iter()
             .map(|type_body| type_apply(&type_parameters, type_body, &type_args))
             .collect();
         Some((constructor_decl, specialized_constructor_type_arguments))
     }
 
-    pub fn get_constructor(&self, constructor_name: &ConstructorName) -> Option<&ConstructorDeclaration> {
+    pub fn get_constructor(
+        &self,
+        constructor_name: &ConstructorName,
+    ) -> Option<&ConstructorDeclaration> {
         self.constructors.get(constructor_name)
     }
 
@@ -403,8 +445,18 @@ impl UserFunctionDeclaration {
         // TODO: This can be pretty space-expensive substitution. Consider having proper closures as type
         //       expressions.
         FunctionType {
-            input_types: self.function.type_.input_types.iter().map(|type_| type_apply(&self.type_parameters, type_, type_arguments)).collect(),
-            output_type: type_apply(&self.type_parameters, &self.function.type_.output_type, type_arguments)
+            input_types: self
+                .function
+                .type_
+                .input_types
+                .iter()
+                .map(|type_| type_apply(&self.type_parameters, type_, type_arguments))
+                .collect(),
+            output_type: type_apply(
+                &self.type_parameters,
+                &self.function.type_.output_type,
+                type_arguments,
+            ),
         }
     }
 }
@@ -420,7 +472,7 @@ impl ForeignFunctionDeclaration {
 }
 
 impl ConstructorDeclaration {
-    pub fn arity(&self) -> usize { 
+    pub fn arity(&self) -> usize {
         self.parameters.len()
     }
 }
@@ -437,12 +489,10 @@ impl Pattern {
                     for pattern in patterns {
                         pattern_loop(pattern, vars)
                     }
-                },
-                Variable(variable) => {
-                    vars.push(variable.clone())
-                },
-                Int(_) => {},
-                Anything(_) => {},
+                }
+                Variable(variable) => vars.push(variable.clone()),
+                Int(_) => {}
+                Anything(_) => {}
             }
         }
         pattern_loop(self, &mut vars);
@@ -463,29 +513,44 @@ pub fn type_apply(type_parameters: &[Variable], type_body: &Type, type_arguments
     for (i, var) in type_parameters.iter().enumerate() {
         position_map.insert(var, i);
     }
-    
-    fn traverse(position_map: &HashMap<&Variable, usize>, type_body: &Type, type_arguments: &[Type]) -> Type {
+
+    fn traverse(
+        position_map: &HashMap<&Variable, usize>,
+        type_body: &Type,
+        type_arguments: &[Type],
+    ) -> Type {
         use Type::*;
         match type_body {
-            VariableUse(var) => {
-                match position_map.get(var) {
-                    Some(i) => type_arguments[*i].clone(),
-                    None => unreachable!(),
-                }
+            VariableUse(var) => match position_map.get(var) {
+                Some(i) => type_arguments[*i].clone(),
+                None => unreachable!(),
             },
             TypeApplication(type_name, args) => {
-                let applied_args: Vec<Type> = args.into_iter().map(|type_| traverse(position_map, type_, type_arguments)).collect();
+                let applied_args: Vec<Type> = args
+                    .into_iter()
+                    .map(|type_| traverse(position_map, type_, type_arguments))
+                    .collect();
                 TypeApplication(type_name.clone(), applied_args)
             }
             Arrow(fn_type) => {
-                let applied_input_types: Vec<Type> = fn_type.input_types.iter().map(|type_| traverse(position_map, type_, type_arguments)).collect();
-                let applied_output_type = traverse(position_map, &fn_type.output_type, type_arguments);
-                Arrow(Box::new(FunctionType { input_types: applied_input_types, output_type: applied_output_type }))
-            },
+                let applied_input_types: Vec<Type> = fn_type
+                    .input_types
+                    .iter()
+                    .map(|type_| traverse(position_map, type_, type_arguments))
+                    .collect();
+                let applied_output_type =
+                    traverse(position_map, &fn_type.output_type, type_arguments);
+                Arrow(Box::new(FunctionType {
+                    input_types: applied_input_types,
+                    output_type: applied_output_type,
+                }))
+            }
             I32 => I32,
             F32 => F32,
             String => String,
-            Command(type_body) => Command(Box::new(traverse(position_map, type_body, type_arguments))),
+            Command(type_body) => {
+                Command(Box::new(traverse(position_map, type_body, type_arguments)))
+            }
         }
     }
 

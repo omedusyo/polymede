@@ -1,6 +1,6 @@
+use std::fs;
 use std::io;
 use std::io::Write;
-use std::fs;
 
 use wasm;
 

@@ -1,16 +1,16 @@
+mod gmm_compiler;
 mod graph_memory_machine;
 mod interpreter;
 mod polymede_compiler;
-mod gmm_compiler;
 mod runtime;
 mod show;
 
+use std::fs;
 use std::io;
 use std::io::Write;
-use std::fs;
 
-use clap::Parser;
 use ast::parser;
+use clap::Parser;
 
 type Result<A> = std::result::Result<A, io::Error>;
 
@@ -23,7 +23,9 @@ struct Args {
     out: String,
 }
 
-fn check_program(program: &ast::base::Program) -> core::result::Result<(), Vec<ast::validation::base::ErrorWithLocation>> {
+fn check_program(
+    program: &ast::base::Program,
+) -> core::result::Result<(), Vec<ast::validation::base::ErrorWithLocation>> {
     ast::validation::type_formation::check_program(&program)?;
     ast::validation::term_formation::check_program(&program)?;
     Ok(())
@@ -40,8 +42,8 @@ fn main() -> Result<()> {
             Err(err) => {
                 println!("====PARSING ERROR===");
                 println!("{:?}", err);
-                return Ok(())
-            },
+                return Ok(());
+            }
         }
     };
 
@@ -61,7 +63,7 @@ fn main() -> Result<()> {
             for e in errors {
                 println!("{}\n", e.show(&sh))
             }
-        },
+        }
         _ => {}
     }
 
@@ -83,8 +85,8 @@ fn main() -> Result<()> {
             Err(err) => {
                 println!("===COMPILATION ERROR===");
                 println!("{:?}", err);
-                return Ok(())
-            },
+                return Ok(());
+            }
         }
     };
     let bytes = module.bytes();
@@ -99,7 +101,10 @@ fn main() -> Result<()> {
 }
 
 fn example_compilation0() -> Vec<u8> {
-    use crate::graph_memory_machine::{Program, FunctionOrImport, Function, constant, tuple, project, var, call, call_closure, partial_apply, pattern_match};
+    use crate::graph_memory_machine::{
+        call, call_closure, constant, partial_apply, pattern_match, project, tuple, var, Function,
+        FunctionOrImport, Program,
+    };
 
     // functions
     let singleton = 0;
@@ -117,8 +122,8 @@ fn example_compilation0() -> Vec<u8> {
                 body: {
                     let x = 0;
                     tuple(cons, vec![var(x), constant(nil)])
-                }
-            })
+                },
+            }),
         ],
         // TODO: How to call primitive functions?
         // main: constant(666),
@@ -130,9 +135,7 @@ fn example_compilation0() -> Vec<u8> {
         // main: {
         //     call(standard_primitives.inc, vec![constant(666)])
         // },
-        main: {
-            call(singleton, vec![constant(230)])
-        },
+        main: { call(singleton, vec![constant(230)]) },
     };
 
     let module = gmm_compiler::compile(program).unwrap();
@@ -163,10 +166,13 @@ fn example0() {
                         let x = 1;
                         let y = 2;
                         call(add, vec![var(x), var(y)])
-                    }
-                })
+                    },
+                }),
             ],
-            main: call_closure(partial_apply(another_add, vec![constant(5)]), vec![constant(6)]),
+            main: call_closure(
+                partial_apply(another_add, vec![constant(5)]),
+                vec![constant(6)],
+            ),
         }
     };
 
@@ -185,14 +191,14 @@ fn example0() {
         //    tuple(1, vec![var(x)]),
         //    vec![(Pattern::Variant(0), var(x)), (Pattern::Variant(1), var(y))]
         //)
-        tuple(5, vec![
-            pattern_match(
+        tuple(
+            5,
+            vec![pattern_match(
                 tuple(1, vec![var(x)]),
-                vec![(Pattern::Variant(0), var(x)), (Pattern::Variant(1), var(y))]
-            )
-        ])
+                vec![(Pattern::Variant(0), var(x)), (Pattern::Variant(1), var(y))],
+            )],
+        )
     };
-
 
     let function = {
         let add = 0;
@@ -203,11 +209,11 @@ fn example0() {
                 let x = 1;
                 let y = 2;
                 call(add, vec![var(x), var(y)])
-            }
+            },
         }
     };
 
-    use show::{show_term, show_function, show_program};
+    use show::{show_function, show_program, show_term};
     //let s = show_term(&term, 3).str();
     //let s = show_function(&function, 54).str();
     let s = show_program(&program).str();

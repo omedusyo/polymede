@@ -1,11 +1,7 @@
 use crate::parser::lex::lexer::Position;
 use std::hash::{Hash, Hasher};
 
-use string_interner::{
-    StringInterner,
-    backend::StringBackend,
-    DefaultSymbol,
-};
+use string_interner::{backend::StringBackend, DefaultSymbol, StringInterner};
 
 pub type Interner = StringInterner<StringBackend>;
 pub type Symbol = DefaultSymbol;
@@ -36,7 +32,7 @@ impl Identifier {
     pub fn str<'interner: 'id, 'id>(&'id self, interner: &'interner Interner) -> &'id str {
         match interner.resolve(self.symbol) {
             Some(str) => str,
-            None => unreachable!()
+            None => unreachable!(),
         }
     }
 
@@ -60,11 +56,14 @@ impl PartialEq for Identifier {
 impl Eq for Identifier {}
 
 impl Hash for Identifier {
-    fn hash<H>(&self, state: &mut H) where H: Hasher {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
         self.symbol.hash(state)
     }
 }
- 
+
 pub fn duplicates(identifiers: &[Identifier]) -> Vec<Identifier> {
     use std::collections::HashSet;
     let mut seen: HashSet<&Identifier> = HashSet::new();

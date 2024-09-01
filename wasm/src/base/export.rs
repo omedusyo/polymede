@@ -1,4 +1,4 @@
-use crate::base::indices::{GlobalIndex, FunctionIndex, TableIndex, MemoryIndex};
+use crate::base::indices::{FunctionIndex, GlobalIndex, MemoryIndex, TableIndex};
 
 #[derive(Debug)]
 pub struct Export {

@@ -1,24 +1,32 @@
-use crate::base::{RunDeclaration, TypedFunction, Function, FunctionType, FunctionDeclaration, ForeignFunctionDeclaration, UserFunctionDeclaration, ConstructorDeclaration};
+use crate::base::{
+    ConstructorDeclaration, ForeignFunctionDeclaration, Function, FunctionDeclaration,
+    FunctionType, RunDeclaration, TypedFunction, UserFunctionDeclaration,
+};
 use crate::identifier;
-use crate::identifier::{Variable, FunctionName};
+use crate::identifier::{FunctionName, Variable};
 use crate::parser::lex::{
-    token::{Token, Keyword},
-    lexer::{Request, LocatedToken, DeclarationKind},
+    lexer::{DeclarationKind, LocatedToken, Request},
+    token::{Keyword, Token},
 };
 use crate::parser::{
-    base::{State, Result, Error, PreProgram, Declaration, PreIndDeclaration, PreEnumDeclaration, PreTypeDeclaration, PreMsgTypeDeclaration},
-    identifier::{variable, constructor_name, function_name, foreign_function_name},
-    term::{term, typed_term},
-    types::{foreign_function_type, type_nonempty_sequence, function_type_annotation},
-    pattern::{parameter_non_empty_sequence, parameter_possibly_empty_sequence},
-    special::{or_separator, do_nothing},
+    base::{
+        Declaration, Error, PreEnumDeclaration, PreIndDeclaration, PreMsgTypeDeclaration,
+        PreProgram, PreTypeDeclaration, Result, State,
+    },
     combinator::delimited_possibly_empty_sequence_to_vector,
+    identifier::{constructor_name, foreign_function_name, function_name, variable},
+    pattern::{parameter_non_empty_sequence, parameter_possibly_empty_sequence},
+    special::{do_nothing, or_separator},
+    term::{term, typed_term},
+    types::{foreign_function_type, function_type_annotation, type_nonempty_sequence},
 };
 
 pub fn pre_program(state: &mut State) -> Result<PreProgram> {
     let mut program = PreProgram::new();
 
-    for declaration in delimited_possibly_empty_sequence_to_vector(state, program_declaration, do_nothing)? {
+    for declaration in
+        delimited_possibly_empty_sequence_to_vector(state, program_declaration, do_nothing)?
+    {
         program.add_declaration(declaration);
     }
     check_program_names_uniqueness(&program)?;
@@ -29,23 +37,26 @@ fn check_program_names_uniqueness(program: &PreProgram) -> Result<()> {
     let type_duplicates = identifier::duplicates(&program.type_names());
     let constructor_duplicates = identifier::duplicates(&program.constructor_names());
     let function_duplicates = identifier::duplicates(&program.function_names());
-    if !(type_duplicates.is_empty() && constructor_duplicates.is_empty() && function_duplicates.is_empty()) {
+    if !(type_duplicates.is_empty()
+        && constructor_duplicates.is_empty()
+        && function_duplicates.is_empty())
+    {
         return Err(Error::DuplicateNames {
             type_duplicates,
             constructor_duplicates,
             function_duplicates,
-        })
+        });
     }
 
     match program.run_declarations.len() {
         0 => return Err(Error::RunDeclarationNotFound),
-        1 => {},
+        1 => {}
         _ => return Err(Error::MoreThanOneRunDeclaration),
     }
 
     match program.msg_types.len() {
         0 => return Err(Error::MsgTypeDeclarationNotFound),
-        1 => {},
+        1 => {}
         _ => return Err(Error::MoreThanOneMsgTypeDeclaration),
     }
 
@@ -57,9 +68,15 @@ fn program_declaration(state: &mut State) -> Result<Declaration> {
     match state.peek_declaration_token()? {
         Type => Ok(Declaration::Type(type_declaration(state)?)),
         Run => Ok(Declaration::Run(run_declaration(state)?)),
-        UserFunction => Ok(Declaration::Function(FunctionDeclaration::User(user_function_declaration(state)?))),
-        ForeignFunction => Ok(Declaration::Function(FunctionDeclaration::Foreign(foreign_function_declaration(state)?))),
-        MsgType => Ok(Declaration::MsgTypeDeclaration(msg_type_declaration(state)?)),
+        UserFunction => Ok(Declaration::Function(FunctionDeclaration::User(
+            user_function_declaration(state)?,
+        ))),
+        ForeignFunction => Ok(Declaration::Function(FunctionDeclaration::Foreign(
+            foreign_function_declaration(state)?,
+        ))),
+        MsgType => Ok(Declaration::MsgTypeDeclaration(msg_type_declaration(
+            state,
+        )?)),
     }
 }
 
@@ -71,25 +88,33 @@ fn constructor_declaration(state: &mut State) -> Result<ConstructorDeclaration> 
         state.request_token(Request::OpenParen)?;
         let parameter_types = type_nonempty_sequence(state)?;
         state.request_token(Request::CloseParen)?;
-        Ok(ConstructorDeclaration { name: constructor_name, parameters: parameter_types, })
+        Ok(ConstructorDeclaration {
+            name: constructor_name,
+            parameters: parameter_types,
+        })
     } else {
         // Constant
-        Ok(ConstructorDeclaration { name: constructor_name, parameters: vec![] })
+        Ok(ConstructorDeclaration {
+            name: constructor_name,
+            parameters: vec![],
+        })
     }
 }
 
 fn constructor_declaration_sequence(state: &mut State) -> Result<Vec<ConstructorDeclaration>> {
     state.consume_optional_or()?;
-    delimited_possibly_empty_sequence_to_vector( state, constructor_declaration, or_separator)
+    delimited_possibly_empty_sequence_to_vector(state, constructor_declaration, or_separator)
 }
 
-static FORBIDDEN_TYPE_NAMES:[&str; 5] = ["Fn", "I32", "F32", "String", "Cmd"];
+static FORBIDDEN_TYPE_NAMES: [&str; 5] = ["Fn", "I32", "F32", "String", "Cmd"];
 
-fn is_type_name_forbidden(name: &str) -> bool { 
+fn is_type_name_forbidden(name: &str) -> bool {
     for forbidden_name in FORBIDDEN_TYPE_NAMES {
-        if forbidden_name == name { return true }
+        if forbidden_name == name {
+            return true;
+        }
     }
-    return false
+    return false;
 }
 
 // TODO: Make sure that for ind type declarations the recursive type-variable doesn't shadow any of
@@ -102,7 +127,9 @@ pub fn type_declaration(state: &mut State) -> Result<PreTypeDeclaration> {
     {
         let constructor_name_str = type_name.str(state.interner());
         if is_type_name_forbidden(constructor_name_str) {
-            return Err(Error::TypeHasForbiddenName { received: constructor_name_str.to_string() })
+            return Err(Error::TypeHasForbiddenName {
+                received: constructor_name_str.to_string(),
+            });
         }
     }
 
@@ -117,16 +144,20 @@ pub fn type_declaration(state: &mut State) -> Result<PreTypeDeclaration> {
 
     state.request_keyword(Keyword::Eq)?;
 
-    let LocatedToken { token: Token::Keyword(keyword), .. } = state.request_token(Request::TypeDeclarationKeyword)? else { unreachable!() };
+    let LocatedToken {
+        token: Token::Keyword(keyword),
+        ..
+    } = state.request_token(Request::TypeDeclarationKeyword)?
+    else {
+        unreachable!()
+    };
     state.request_token(Request::OpenCurly)?;
     let declaration = match keyword {
-        Keyword::Enum => {
-            PreTypeDeclaration::Enum(PreEnumDeclaration {
-                name: type_name,
-                type_parameters,
-                constructors: constructor_declaration_sequence(state)?
-            })
-        },
+        Keyword::Enum => PreTypeDeclaration::Enum(PreEnumDeclaration {
+            name: type_name,
+            type_parameters,
+            constructors: constructor_declaration_sequence(state)?,
+        }),
         Keyword::Ind => {
             let recursive_type_var = variable(state)?;
 
@@ -136,9 +167,9 @@ pub fn type_declaration(state: &mut State) -> Result<PreTypeDeclaration> {
                 name: type_name,
                 type_parameters,
                 recursive_type_var,
-                constructors: constructor_declaration_sequence(state)?
+                constructors: constructor_declaration_sequence(state)?,
             })
-        },
+        }
         _ => unreachable!(),
     };
     state.request_token(Request::CloseCurly)?;
@@ -148,7 +179,7 @@ pub fn type_declaration(state: &mut State) -> Result<PreTypeDeclaration> {
 
 pub fn msg_type_declaration(state: &mut State) -> Result<PreTypeDeclaration> {
     state.request_keyword(Keyword::Msg)?;
-    // TODO: It seems that this will allow `msgtype`. 
+    // TODO: It seems that this will allow `msgtype`.
     let type_declaration = type_declaration(state)?;
     Ok(type_declaration)
 }
@@ -161,7 +192,11 @@ pub fn foreign_function_declaration(state: &mut State) -> Result<ForeignFunction
     let name = function_name(state)?;
     state.request_keyword(Keyword::TypeAnnotationSeparator)?;
     let type_ = foreign_function_type(state)?;
-    Ok(ForeignFunctionDeclaration { name, type_, external_name })
+    Ok(ForeignFunctionDeclaration {
+        name,
+        type_,
+        external_name,
+    })
 }
 
 pub fn user_function_declaration(state: &mut State) -> Result<UserFunctionDeclaration> {
@@ -169,11 +204,18 @@ pub fn user_function_declaration(state: &mut State) -> Result<UserFunctionDeclar
     let function_name = function_name(state)?;
     state.request_keyword(Keyword::Eq)?;
 
-
-    fn inner_function_declaration(state: &mut State, function_name: FunctionName, type_parameters: Vec<Variable>) -> Result<UserFunctionDeclaration> {
+    fn inner_function_declaration(
+        state: &mut State,
+        function_name: FunctionName,
+        type_parameters: Vec<Variable>,
+    ) -> Result<UserFunctionDeclaration> {
         let type_ = function_type_annotation(state)?;
         let function = typed_function(state, type_)?;
-        Ok(UserFunctionDeclaration { name: function_name, type_parameters, function })
+        Ok(UserFunctionDeclaration {
+            name: function_name,
+            type_parameters,
+            function,
+        })
     }
 
     if state.commit_if_next_token_forall()? {
@@ -208,7 +250,12 @@ pub fn typed_function(state: &mut State, type_: FunctionType) -> Result<TypedFun
     let function = function(state)?;
 
     if type_.input_types.len() != function.parameters.len() {
-        Err(Error::FunctionHasDifferentNumberOfParametersThanDeclaredInItsType { declared_in_type: type_.input_types.len(), parameters: function.parameters.len() })
+        Err(
+            Error::FunctionHasDifferentNumberOfParametersThanDeclaredInItsType {
+                declared_in_type: type_.input_types.len(),
+                parameters: function.parameters.len(),
+            },
+        )
     } else {
         Ok(TypedFunction { type_, function })
     }

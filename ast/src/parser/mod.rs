@@ -1,17 +1,16 @@
 pub mod base;
-pub mod identifier;
-pub mod show;
-pub mod lex;
 mod combinator;
+pub mod identifier;
+pub mod lex;
 mod pattern;
 mod program;
+pub mod show;
 mod special;
 mod term;
 mod types;
 
-
 use crate::base::Program;
-use crate::parser:: base::Error;
+use crate::parser::base::Error;
 
 pub fn parse_program(s: &str) -> Result<Program, Error> {
     base::parse_program(s)
@@ -19,12 +18,12 @@ pub fn parse_program(s: &str) -> Result<Program, Error> {
 
 #[cfg(test)]
 mod tests {
-    use crate::base::{Term, Type, UserFunctionDeclaration, RunDeclaration};
+    use crate::base::{RunDeclaration, Term, Type, UserFunctionDeclaration};
     use crate::identifier::interner;
     use crate::parser::{
-        base::{State, Result, Error, PreTypeDeclaration, PreEnumDeclaration, PreIndDeclaration},
+        base::{Error, PreEnumDeclaration, PreIndDeclaration, PreTypeDeclaration, Result, State},
+        program::{pre_program, run_declaration, type_declaration, user_function_declaration},
         types::type_,
-        program::{pre_program, run_declaration, user_function_declaration, type_declaration},
     };
 
     #[test]
@@ -36,18 +35,24 @@ mod tests {
         let result = type_(&mut state);
 
         assert!(matches!(result, Ok(Type::TypeApplication(_, _))));
-        let Ok(Type::TypeApplication(identifier, type_args)) = result else { unreachable!() };
+        let Ok(Type::TypeApplication(identifier, type_args)) = result else {
+            unreachable!()
+        };
         assert_eq!(type_args.len(), 2);
 
         assert_eq!(identifier.str(&mut interner), "Result");
         assert!(matches!(type_args[0], Type::TypeApplication(_, _)));
         assert!(matches!(type_args[1], Type::VariableUse(_)));
 
-        let Type::TypeApplication(ref err_identifier, ref err_type_args) = type_args[0] else { unreachable!() };
+        let Type::TypeApplication(ref err_identifier, ref err_type_args) = type_args[0] else {
+            unreachable!()
+        };
         assert_eq!(err_type_args.len(), 0);
         assert_eq!(err_identifier.str(&mut interner), "Error");
 
-        let Type::VariableUse(ref var_name) = type_args[1] else { unreachable!() };
+        let Type::VariableUse(ref var_name) = type_args[1] else {
+            unreachable!()
+        };
         assert_eq!(var_name.str(&mut interner), "x");
 
         Ok(())
@@ -62,7 +67,9 @@ mod tests {
         let result = type_(&mut state);
 
         assert!(matches!(result, Ok(Type::Arrow(_))));
-        let Ok(Type::Arrow(fn_type)) = result else { unreachable!() };
+        let Ok(Type::Arrow(fn_type)) = result else {
+            unreachable!()
+        };
 
         assert_eq!(fn_type.input_types.len(), 2);
 
@@ -78,7 +85,14 @@ mod tests {
         let result = type_declaration(&mut state);
 
         assert!(matches!(result, Ok(PreTypeDeclaration::Enum(_))));
-        let Ok(PreTypeDeclaration::Enum(PreEnumDeclaration { name, type_parameters: _, constructors })) = result else { unreachable!() };
+        let Ok(PreTypeDeclaration::Enum(PreEnumDeclaration {
+            name,
+            type_parameters: _,
+            constructors,
+        })) = result
+        else {
+            unreachable!()
+        };
         assert_eq!(name.str(&mut interner), "Bool");
 
         assert_eq!(constructors.len(), 2);
@@ -98,7 +112,14 @@ mod tests {
 
         assert!(matches!(result, Ok(PreTypeDeclaration::Enum(_))));
 
-        let Ok(PreTypeDeclaration::Enum(PreEnumDeclaration { name, type_parameters: _, constructors })) = result else { unreachable!() };
+        let Ok(PreTypeDeclaration::Enum(PreEnumDeclaration {
+            name,
+            type_parameters: _,
+            constructors,
+        })) = result
+        else {
+            unreachable!()
+        };
         assert_eq!(name.str(&mut interner), "SomeType");
 
         assert_eq!(constructors.len(), 4);
@@ -124,7 +145,15 @@ mod tests {
         let result = type_declaration(&mut state);
 
         assert!(matches!(result, Ok(PreTypeDeclaration::Ind(_))));
-        let Ok(PreTypeDeclaration::Ind(PreIndDeclaration { name, type_parameters: _, recursive_type_var, constructors })) = result else { unreachable!() };
+        let Ok(PreTypeDeclaration::Ind(PreIndDeclaration {
+            name,
+            type_parameters: _,
+            recursive_type_var,
+            constructors,
+        })) = result
+        else {
+            unreachable!()
+        };
         assert_eq!(name.str(&mut interner), "Nat");
         assert_eq!(recursive_type_var.str(&mut interner), "nat");
 
@@ -147,7 +176,15 @@ mod tests {
         let result = type_declaration(&mut state);
 
         assert!(matches!(result, Ok(PreTypeDeclaration::Ind(_))));
-        let Ok(PreTypeDeclaration::Ind(PreIndDeclaration { name, type_parameters, recursive_type_var, constructors })) = result else { unreachable!() };
+        let Ok(PreTypeDeclaration::Ind(PreIndDeclaration {
+            name,
+            type_parameters,
+            recursive_type_var,
+            constructors,
+        })) = result
+        else {
+            unreachable!()
+        };
         assert_eq!(name.str(&mut interner), "List");
 
         assert_eq!(type_parameters.len(), 2);
@@ -174,8 +211,10 @@ mod tests {
 
         let result = type_declaration(&mut state);
 
-        assert!(matches!(result, Err(Error::DuplicateVariableNames {..})));
-        let Err(Error::DuplicateVariableNames { duplicates }) = result else { unreachable!() };
+        assert!(matches!(result, Err(Error::DuplicateVariableNames { .. })));
+        let Err(Error::DuplicateVariableNames { duplicates }) = result else {
+            unreachable!()
+        };
         assert_eq!(duplicates.len(), 2);
         assert_eq!(duplicates[0].str(&mut interner), "y");
         assert_eq!(duplicates[1].str(&mut interner), "z");
@@ -191,20 +230,33 @@ mod tests {
 
         let result = user_function_declaration(&mut state);
         assert!(matches!(result, Ok(_)));
-        let UserFunctionDeclaration { name, type_parameters, function } = result?;
+        let UserFunctionDeclaration {
+            name,
+            type_parameters,
+            function,
+        } = result?;
 
         assert_eq!(name.str(&mut interner), "square");
         assert_eq!(type_parameters.len(), 0);
 
-        let Type::TypeApplication(ref t0, _) = function.type_.input_types[0] else { unreachable!() };
-        let Type::TypeApplication(ref t, _) = function.type_.output_type else { unreachable!() };
+        let Type::TypeApplication(ref t0, _) = function.type_.input_types[0] else {
+            unreachable!()
+        };
+        let Type::TypeApplication(ref t, _) = function.type_.output_type else {
+            unreachable!()
+        };
         assert_eq!(t0.str(&mut interner), "Nat");
         assert_eq!(t.str(&mut interner), "Nat");
 
-        let Term::FunctionApplication(mul, _, args) = function.function.body else { unreachable!() };
-        let Term::VariableUse(ref arg0) = args[0] else { unreachable!() };
-        let Term::VariableUse(ref arg1) = args[1] else { unreachable!() };
-
+        let Term::FunctionApplication(mul, _, args) = function.function.body else {
+            unreachable!()
+        };
+        let Term::VariableUse(ref arg0) = args[0] else {
+            unreachable!()
+        };
+        let Term::VariableUse(ref arg1) = args[1] else {
+            unreachable!()
+        };
 
         assert_eq!(mul.str(&mut interner), "mul");
         assert_eq!(arg0.str(&mut interner), "x");
@@ -221,17 +273,27 @@ mod tests {
 
         let result = user_function_declaration(&mut state);
         assert!(matches!(result, Ok(_)));
-        let UserFunctionDeclaration { name, type_parameters, function } = result?;
+        let UserFunctionDeclaration {
+            name,
+            type_parameters,
+            function,
+        } = result?;
 
         assert_eq!(name.str(&mut interner), "id");
         assert_eq!(type_parameters.len(), 1);
 
-        let Type::VariableUse(ref t0) = function.type_.input_types[0] else { unreachable!() };
-        let Type::VariableUse(ref t) = function.type_.output_type else { unreachable!() };
+        let Type::VariableUse(ref t0) = function.type_.input_types[0] else {
+            unreachable!()
+        };
+        let Type::VariableUse(ref t) = function.type_.output_type else {
+            unreachable!()
+        };
         assert_eq!(t0.str(&mut interner), "a");
         assert_eq!(t.str(&mut interner), "a");
 
-        let Term::VariableUse(x) = function.function.body else { unreachable!() };
+        let Term::VariableUse(x) = function.function.body else {
+            unreachable!()
+        };
         assert_eq!(x.str(&mut interner), "x");
 
         Ok(())
@@ -245,7 +307,11 @@ mod tests {
 
         let result = user_function_declaration(&mut state);
         assert!(matches!(result, Ok(_)));
-        let UserFunctionDeclaration { name, type_parameters, function: _ } = result?;
+        let UserFunctionDeclaration {
+            name,
+            type_parameters,
+            function: _,
+        } = result?;
 
         assert_eq!(name.str(&mut interner), "map");
         assert_eq!(type_parameters.len(), 2);

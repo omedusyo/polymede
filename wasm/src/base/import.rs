@@ -1,7 +1,7 @@
 use crate::base::{
     indices::TypeIndex,
-    types::{GlobalType, RefType},
     memory::Limit,
+    types::{GlobalType, RefType},
 };
 
 #[derive(Debug)]

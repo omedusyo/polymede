@@ -1,13 +1,12 @@
-mod parser;
-mod validation;
 mod base;
 mod desugared_base;
 mod identifier;
+mod parser;
+mod validation;
 
-use std::io;
-use std::fs;
 use clap::Parser;
-
+use std::fs;
+use std::io;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -35,7 +34,7 @@ fn main() -> Result<(), io::Error> {
             println!("{}", sh.show_program_declarations(&program));
 
             match check_program(&program) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(errors) => {
                     println!("\nTYPE ERROR\n");
                     for e in errors {
@@ -43,10 +42,10 @@ fn main() -> Result<(), io::Error> {
                     }
                 }
             }
-        },
+        }
         Err(err) => {
             println!("{:?}", err);
-        },
+        }
     }
 
     Ok(())

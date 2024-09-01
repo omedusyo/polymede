@@ -1,9 +1,13 @@
+use crate::binary_format::primitives::byte_stream::{
+    byte, cvector, Byte, ByteStream, CVec, Either, Seq,
+};
 use crate::binary_format::primitives::encoder::Encoder;
-use crate::binary_format::primitives::byte_stream::{ByteStream, byte, Byte, CVec, cvector, Either, Seq};
 
 use crate::base::{
     indices::TypeIndex,
-    types::{FunctionType, BlockType, ValueType, NumType, VecType, RefType, Mutability, GlobalType},
+    types::{
+        BlockType, FunctionType, GlobalType, Mutability, NumType, RefType, ValueType, VecType,
+    },
 };
 
 impl Encoder for FunctionType {

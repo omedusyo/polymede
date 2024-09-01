@@ -1,8 +1,10 @@
-use crate::token::{Token, OperatorSymbol};
-
+use crate::token::{OperatorSymbol, Token};
 
 #[derive(Debug, Clone, Copy)]
-pub struct Position { pub column: usize, pub line : usize }
+pub struct Position {
+    pub column: usize,
+    pub line: usize,
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct LocatedToken {
@@ -22,9 +24,8 @@ pub enum Request {
     CloseParen,
     Nat32,
     Operator(OperatorSymbol),
-    End
+    End,
 }
-
 
 #[derive(Debug)]
 // TODO: Introduce Committed vs Recoverable Error
@@ -37,10 +38,10 @@ pub enum Error {
 #[derive(Debug)]
 pub struct State<'a> {
     tokens: &'a str,
-    position: Position
+    position: Position,
 }
 
-impl <'state> State<'state> {
+impl<'state> State<'state> {
     // 'a lives atleast as long as 'state ('a contains 'state)
     pub fn new<'a: 'state>(str: &'a str) -> Self {
         Self {
@@ -88,7 +89,7 @@ impl <'state> State<'state> {
                 self.move_column_by(1);
                 self.consume_by(1);
             } else {
-                return
+                return;
             }
         }
     }
@@ -103,7 +104,7 @@ impl <'state> State<'state> {
     pub fn read_char_or_fail_when_end(&self) -> Result<char, Error> {
         match self.tokens.chars().next() {
             Some(c) => Ok(c),
-            None => Err(Error::UnexpectedEnd) 
+            None => Err(Error::UnexpectedEnd),
         }
     }
 
@@ -116,55 +117,63 @@ impl <'state> State<'state> {
                     let token_position = self.advance();
                     Ok(LocatedToken::new(Token::OpenParen, token_position))
                 } else {
-                    Err(Error::Expected { requested: request, found: c })
+                    Err(Error::Expected {
+                        requested: request,
+                        found: c,
+                    })
                 }
-            },
+            }
             Request::CloseParen => {
                 let c = self.read_char_or_fail_when_end()?;
                 if c == ')' {
                     let token_position = self.advance();
                     Ok(LocatedToken::new(Token::CloseParen, token_position))
                 } else {
-                    Err(Error::Expected { requested: request, found: c })
+                    Err(Error::Expected {
+                        requested: request,
+                        found: c,
+                    })
                 }
-            },
-            Request::Nat32 => {
-                self.nat32(request)
-            },
+            }
+            Request::Nat32 => self.nat32(request),
             Request::Operator(op_symbol) => {
                 let c = self.read_char_or_fail_when_end()?;
                 match op_symbol {
-                    OperatorSymbol::Add => {
-                        match c {
-                            '+' => {
-                                let token_position = self.advance();
-                                Ok(LocatedToken::new(Token::Operator(OperatorSymbol::Add), token_position))
-                            },
-                            _ => {
-                                Err(Error::Expected { requested: request, found: c })
-                            }
+                    OperatorSymbol::Add => match c {
+                        '+' => {
+                            let token_position = self.advance();
+                            Ok(LocatedToken::new(
+                                Token::Operator(OperatorSymbol::Add),
+                                token_position,
+                            ))
                         }
+                        _ => Err(Error::Expected {
+                            requested: request,
+                            found: c,
+                        }),
                     },
-                    OperatorSymbol::Mul => {
-                        match c {
-                            '*' => {
-                                let token_position = self.advance();
-                                Ok(LocatedToken::new(Token::Operator(OperatorSymbol::Mul), token_position))
-                            },
-                            _ => {
-                                Err(Error::Expected { requested: request, found: c })
-                            }
+                    OperatorSymbol::Mul => match c {
+                        '*' => {
+                            let token_position = self.advance();
+                            Ok(LocatedToken::new(
+                                Token::Operator(OperatorSymbol::Mul),
+                                token_position,
+                            ))
                         }
+                        _ => Err(Error::Expected {
+                            requested: request,
+                            found: c,
+                        }),
                     },
                 }
-            },
+            }
             Request::End => {
                 if self.tokens.is_empty() {
                     Ok(LocatedToken::new(Token::End, self.position))
                 } else {
-                    Err(Error::UnexpectedEnd) 
+                    Err(Error::UnexpectedEnd)
                 }
-            },
+            }
         }
     }
 
@@ -194,9 +203,12 @@ impl <'state> State<'state> {
                 token_position = self.advance();
 
                 sum = d;
-            },
+            }
             None => {
-                return Err(Error::Expected { requested: request, found: c })
+                return Err(Error::Expected {
+                    requested: request,
+                    found: c,
+                })
             }
         }
 
@@ -207,9 +219,9 @@ impl <'state> State<'state> {
                 match self.read_char_or_fail_when_end() {
                     Ok('0') => {
                         self.advance();
-                    },
+                    }
                     Ok(_) => break,
-                    Err(_) => return Ok(LocatedToken::new(Token::Nat32(0), token_position))
+                    Err(_) => return Ok(LocatedToken::new(Token::Nat32(0), token_position)),
                 }
             }
         }
@@ -219,31 +231,23 @@ impl <'state> State<'state> {
         while let Ok(c) = self.read_char_or_fail_when_end() {
             match digit(c) {
                 Some(d) => {
-                        self.advance();
+                    self.advance();
 
                     // Watch out for 32 bit overflow.
                     match sum.checked_mul(10) {
-                        Some(mul_10_sum) => {
-                            match mul_10_sum.checked_add(d) {
-                                Some(new_sum) => {
-                                    sum = new_sum
-                                },
-                                None => return Err(Error::Nat32LiteralTooBig)
-                            }
+                        Some(mul_10_sum) => match mul_10_sum.checked_add(d) {
+                            Some(new_sum) => sum = new_sum,
+                            None => return Err(Error::Nat32LiteralTooBig),
                         },
-                        None => return Err(Error::Nat32LiteralTooBig)
+                        None => return Err(Error::Nat32LiteralTooBig),
                     }
-                    
-                },
-                None => {
-                    break
                 }
+                None => break,
             }
         }
-            
+
         Ok(LocatedToken::new(Token::Nat32(sum), token_position))
     }
-
 }
 
 // pub fn example0() {
@@ -302,4 +306,3 @@ pub fn example5() -> Result<(), Error> {
 
     Ok(())
 }
-

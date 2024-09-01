@@ -1,6 +1,6 @@
 use crate::base;
 use crate::base::Type;
-use crate::identifier::{Variable, Identifier, FunctionName, ConstructorName};
+use crate::identifier::{ConstructorName, FunctionName, Identifier, Variable};
 
 use std::collections::HashSet;
 
@@ -39,7 +39,7 @@ pub struct PatternBranch {
 #[derive(Debug, Clone)]
 pub struct TypedTerm {
     pub type_: Type,
-    pub term: Term
+    pub term: Term,
 }
 
 #[derive(Debug, Clone)]
@@ -49,11 +49,17 @@ pub struct Function {
 }
 
 pub fn desugar_typed_term(typed_term: &base::TypedTerm) -> TypedTerm {
-    TypedTerm { type_: typed_term.type_.clone(), term: desugar_term(&typed_term.term) }
+    TypedTerm {
+        type_: typed_term.type_.clone(),
+        term: desugar_term(&typed_term.term),
+    }
 }
 
 pub fn desugar_function(function: &base::Function) -> Function {
-    Function { parameters: function.parameters.clone(), body: desugar_term(&function.body) }
+    Function {
+        parameters: function.parameters.clone(),
+        body: desugar_term(&function.body),
+    }
 }
 
 fn desugar_pattern_branch(pattern_branch: &base::PatternBranch) -> PatternBranch {
@@ -65,17 +71,20 @@ fn desugar_pattern_branch(pattern_branch: &base::PatternBranch) -> PatternBranch
             //       compilation of nested patterns.
             for pattern in patterns {
                 match pattern {
-                    Variable(var) => { desugared_patterns.push(var.clone()) },
+                    Variable(var) => desugared_patterns.push(var.clone()),
                     _ => todo!(),
                 }
             }
             Pattern::Constructor(constructor_name.clone(), desugared_patterns)
-        },
+        }
         Int(x) => Pattern::Int(x.clone()),
         Variable(var) => Pattern::Variable(var.clone()),
         Anything(identifier) => Pattern::Anything(identifier.clone()),
     };
-    PatternBranch { pattern, body: desugar_term(&pattern_branch.body) }
+    PatternBranch {
+        pattern,
+        body: desugar_term(&pattern_branch.body),
+    }
 }
 
 pub fn desugar_term(term: &base::Term) -> Term {
@@ -86,15 +95,37 @@ pub fn desugar_term(term: &base::Term) -> Term {
         Float(x) => Term::Float(*x),
         StringLiteral(s) => Term::StringLiteral(s.clone()), // TODO: the .clone() is very unfortunate
         VariableUse(var) => Term::VariableUse(var.clone()),
-        FunctionApplication(fn_name, type_args, args) => Term::FunctionApplication(fn_name.clone(), type_args.clone(), args.into_iter().map(desugar_term).collect()),
-        ConstructorUse(constructor_name, args) => Term::ConstructorUse(constructor_name.clone(), args.into_iter().map(desugar_term).collect()),
-        Match(arg, pattern_branches) => Term::Match(Box::new(desugar_term(arg)), pattern_branches.into_iter().map(desugar_pattern_branch).collect()),
+        FunctionApplication(fn_name, type_args, args) => Term::FunctionApplication(
+            fn_name.clone(),
+            type_args.clone(),
+            args.into_iter().map(desugar_term).collect(),
+        ),
+        ConstructorUse(constructor_name, args) => Term::ConstructorUse(
+            constructor_name.clone(),
+            args.into_iter().map(desugar_term).collect(),
+        ),
+        Match(arg, pattern_branches) => Term::Match(
+            Box::new(desugar_term(arg)),
+            pattern_branches
+                .into_iter()
+                .map(desugar_pattern_branch)
+                .collect(),
+        ),
         // TODO: Replace fold with a call to anonymous function whose body is match that uses
-        // recursion. 
+        // recursion.
         Fold(_arg, _pattern_branches) => todo!(),
         Lambda(function) => Term::Lambda(Box::new(desugar_function(function))),
-        LambdaApplication(fn_term, args) => Term::LambdaApplication(Box::new(desugar_term(fn_term)), args.into_iter().map(desugar_term).collect()),
-        Let(bindings, body) => Term::Let(bindings.iter().map(|(var, term)| (var.clone(), desugar_term(term))).collect(), Box::new(desugar_term(body))),
+        LambdaApplication(fn_term, args) => Term::LambdaApplication(
+            Box::new(desugar_term(fn_term)),
+            args.into_iter().map(desugar_term).collect(),
+        ),
+        Let(bindings, body) => Term::Let(
+            bindings
+                .iter()
+                .map(|(var, term)| (var.clone(), desugar_term(term)))
+                .collect(),
+            Box::new(desugar_term(body)),
+        ),
         Pure(term) => Term::Pure(Box::new(desugar_term(term))),
         Do(bindings, body) => desugar_do_expression(bindings, body),
         Receive => Term::Receive,
@@ -102,8 +133,10 @@ pub fn desugar_term(term: &base::Term) -> Term {
 }
 
 fn desugar_do_expression(bindings: &[base::DoBinding], body: &base::Term) -> Term {
-
-    fn desugar_neighbouring_binds<'a>(mut bindings: &'a [base::DoBinding], let_bindings: &mut Vec<(Variable, Term)>) -> &'a [base::DoBinding] {
+    fn desugar_neighbouring_binds<'a>(
+        mut bindings: &'a [base::DoBinding],
+        let_bindings: &mut Vec<(Variable, Term)>,
+    ) -> &'a [base::DoBinding] {
         use base::DoBinding::*;
         while let Some(Bind(var, term)) = bindings.get(0) {
             let_bindings.push((var.clone(), desugar_term(term)));
@@ -123,17 +156,19 @@ fn desugar_do_expression(bindings: &[base::DoBinding], body: &base::Term) -> Ter
                     body: desugar_do_expression(&bindings[1..], body),
                 };
                 Term::AndThen(Box::new(desugar_term(term)), Box::new(function))
-            },
+            }
             Bind(_, _) => {
                 let mut let_bindings: Vec<(Variable, Term)> = vec![];
                 // collect all neighbouring Bind(_, _) into one big let expression
                 let bindings = desugar_neighbouring_binds(bindings, &mut let_bindings);
-                Term::Let(let_bindings, Box::new(desugar_do_expression(bindings, body)))
-            },
+                Term::Let(
+                    let_bindings,
+                    Box::new(desugar_do_expression(bindings, body)),
+                )
+            }
         }
     }
 }
-
 
 // ===Free Variables===
 impl Function {
@@ -152,7 +187,11 @@ struct Env {
 
 impl Env {
     fn new() -> Self {
-        Self { scope_stack: vec![], free_vars: vec![], free_vars_set: HashSet::new() }
+        Self {
+            scope_stack: vec![],
+            free_vars: vec![],
+            free_vars_set: HashSet::new(),
+        }
     }
 
     fn open(&mut self) {
@@ -167,7 +206,7 @@ impl Env {
         match self.scope_stack.last_mut() {
             Some(scope) => {
                 let _ = scope.insert(var.clone());
-            },
+            }
             None => unreachable!(),
         }
     }
@@ -178,26 +217,24 @@ impl Env {
         }
     }
 
-    fn extend_pattern(&mut self, pattern: &Pattern) { 
+    fn extend_pattern(&mut self, pattern: &Pattern) {
         use Pattern::*;
         match pattern {
             Constructor(_, vars) => {
                 for var in vars {
                     self.extend_var(var)
                 }
-            },
-            Variable(var) => {
-                self.extend_var(var)
-            },
-            Int(_) => {},
-            Anything(_) => {},
+            }
+            Variable(var) => self.extend_var(var),
+            Int(_) => {}
+            Anything(_) => {}
         }
     }
 
     fn is_bound(&self, var: &Variable) -> bool {
         for scope in self.scope_stack.iter().rev() {
             if scope.contains(var) {
-                return true
+                return true;
             }
         }
         false
@@ -207,7 +244,7 @@ impl Env {
         if !(self.free_vars_set.contains(var) || self.is_bound(var)) {
             self.free_vars.push(var.clone());
             self.free_vars_set.insert(var.clone());
-        } 
+        }
     }
 }
 
@@ -223,22 +260,20 @@ fn free_variables(env: &mut Env, term: &Term) {
 
     match term {
         TypedTerm(typed_term) => free_variables(env, &typed_term.term),
-        VariableUse(var) => {
-            env.attempt_to_register_free(var)
-        },
-        Int(_) => {}, 
-        Float(_) => {}, 
-        StringLiteral(_) => {},
+        VariableUse(var) => env.attempt_to_register_free(var),
+        Int(_) => {}
+        Float(_) => {}
+        StringLiteral(_) => {}
         FunctionApplication(_, _, args) => {
             for arg in args {
                 free_variables(env, arg)
             }
-        },
+        }
         ConstructorUse(_, args) => {
             for arg in args {
                 free_variables(env, arg)
             }
-        },
+        }
         Match(arg, branches) => {
             free_variables(env, arg);
             for branch in branches {
@@ -247,16 +282,14 @@ fn free_variables(env: &mut Env, term: &Term) {
                 free_variables(env, &branch.body);
                 env.close();
             }
-        },
-        Lambda(function) => {
-            free_variables_in_function(env, function)
-        },
+        }
+        Lambda(function) => free_variables_in_function(env, function),
         LambdaApplication(fn_term, args) => {
             free_variables(env, fn_term);
             for arg in args {
                 free_variables(env, arg)
             }
-        },
+        }
         Let(bindings, body) => {
             env.open();
             for (var, term) in bindings {
@@ -265,14 +298,12 @@ fn free_variables(env: &mut Env, term: &Term) {
             }
             free_variables(env, body);
             env.close();
-        },
-        Pure(term) => {
-            free_variables(env, term)
-        },
+        }
+        Pure(term) => free_variables(env, term),
         AndThen(cmd_arg, continuation) => {
             free_variables(env, cmd_arg);
             free_variables_in_function(env, continuation);
-        },
-        Receive => {},
+        }
+        Receive => {}
     }
 }

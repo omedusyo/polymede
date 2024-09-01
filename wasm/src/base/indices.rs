@@ -21,33 +21,49 @@ pub trait Index {
 }
 
 impl Index for LocalIndex {
-    fn get(&self) -> u32 { self.0 }
+    fn get(&self) -> u32 {
+        self.0
+    }
 }
 
 impl Index for GlobalIndex {
-    fn get(&self) -> u32 { self.0 }
+    fn get(&self) -> u32 {
+        self.0
+    }
 }
 
 impl Index for LabelIndex {
-    fn get(&self) -> u32 { self.0 }
+    fn get(&self) -> u32 {
+        self.0
+    }
 }
 
 impl Index for TypeIndex {
-    fn get(&self) -> u32 { self.0 }
+    fn get(&self) -> u32 {
+        self.0
+    }
 }
 
 impl Index for FunctionIndex {
-    fn get(&self) -> u32 { self.0 }
+    fn get(&self) -> u32 {
+        self.0
+    }
 }
 
 impl Index for TableIndex {
-    fn get(&self) -> u32 { self.0 }
+    fn get(&self) -> u32 {
+        self.0
+    }
 }
 
 impl Index for MemoryIndex {
-    fn get(&self) -> u32 { self.0 }
+    fn get(&self) -> u32 {
+        self.0
+    }
 }
 
 impl Index for DataIndex {
-    fn get(&self) -> u32 { self.0 }
+    fn get(&self) -> u32 {
+        self.0
+    }
 }

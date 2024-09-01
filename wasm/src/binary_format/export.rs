@@ -1,6 +1,6 @@
-use crate::binary_format::primitives::encoder::Encoder;
-use crate::binary_format::primitives::byte_stream::{string, UTF8, ByteStream, byte, Byte, Seq};
 use crate::binary_format::indices::IndexStream;
+use crate::binary_format::primitives::byte_stream::{byte, string, Byte, ByteStream, Seq, UTF8};
+use crate::binary_format::primitives::encoder::Encoder;
 
 use crate::base::export::{Export, ExportDescription};
 

@@ -1,20 +1,22 @@
-use crate::identifier::{Variable, ConstructorName};
+use crate::identifier::{ConstructorName, Variable};
 use crate::parser::lex::{
+    lexer::{LocatedToken, Position, Request},
     token::SeparatorSymbol,
-    lexer::{Position, Request, LocatedToken},
 };
 use crate::parser::{
-    base::{State, Result, Error},
+    base::{Error, Result, State},
     identifier::identifier,
 };
 
 pub fn comma(state: &mut State) -> Result<Position> {
-    let LocatedToken { position, .. } = state.request_token(Request::Separator(SeparatorSymbol::Comma))?;
+    let LocatedToken { position, .. } =
+        state.request_token(Request::Separator(SeparatorSymbol::Comma))?;
     Ok(position)
 }
 
 pub fn or_separator(state: &mut State) -> Result<Position> {
-    let LocatedToken { position, .. } = state.request_token(Request::Separator(SeparatorSymbol::Or))?;
+    let LocatedToken { position, .. } =
+        state.request_token(Request::Separator(SeparatorSymbol::Or))?;
     Ok(position)
 }
 
@@ -25,7 +27,7 @@ pub fn do_nothing(state: &mut State) -> Result<()> {
 
 pub enum VariableOrConstructorName {
     Variable(Variable),
-    ConstructorName(ConstructorName)
+    ConstructorName(ConstructorName),
 }
 
 pub fn constructor_name_or_variable(state: &mut State) -> Result<VariableOrConstructorName> {
@@ -72,7 +74,7 @@ pub enum StartPattern {
 pub fn start_pattern(state: &mut State) -> Result<StartPattern> {
     match state.commit_if_next_token_int()? {
         Some(x) => return Ok(StartPattern::Int(x)),
-        None => {},
+        None => {}
     }
     let id = identifier(state)?;
     let c = id.first_char(state.interner());
@@ -100,22 +102,22 @@ pub fn start_pattern(state: &mut State) -> Result<StartPattern> {
 //       that these keywords are valid identifiers)
 pub fn start_term(state: &mut State) -> Result<StartTerm> {
     if state.is_next_token_start_type_annotation()? {
-        return Ok(StartTerm::TypeAnnotation)
-    } 
+        return Ok(StartTerm::TypeAnnotation);
+    }
 
     match state.commit_if_next_token_string_literal()? {
         Some(s) => return Ok(StartTerm::StringLiteral(s)),
-        None => {},
+        None => {}
     }
 
     match state.commit_if_next_token_int()? {
         Some(x) => return Ok(StartTerm::Int(x)),
-        None => {},
+        None => {}
     }
 
     match state.commit_if_next_token_f32()? {
         Some(x) => return Ok(StartTerm::Float(x)),
-        None => {},
+        None => {}
     }
 
     let id = identifier(state)?;
@@ -145,7 +147,7 @@ pub fn start_term(state: &mut State) -> Result<StartTerm> {
                 } else {
                     Ok(StartTerm::VariableUse(id))
                 }
-            },
+            }
         }
     } else {
         Err(Error::ExpectedTerm { received: id })

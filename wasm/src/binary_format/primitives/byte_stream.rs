@@ -38,12 +38,11 @@ impl ByteStream for Byte {
             Some(b) => {
                 self.0 = None;
                 New(b)
-            },
+            }
             None => End,
         }
     }
 }
-
 
 impl Offset {
     // How to encode the Offset?
@@ -96,13 +95,11 @@ pub trait ByteStream {
         let mut pointer_stack: Vec<usize> = vec![];
         loop {
             match self.next() {
-                New(byte) => {
-                    bytes.push(byte)
-                },
+                New(byte) => bytes.push(byte),
                 PrepareForForwardPointer => {
                     pointer_stack.push(bytes.len());
                     bytes.extend_from_slice(&Offset::ZERO);
-                },
+                }
                 Pointer(pointer) => {
                     let offset = pointer_stack.pop().unwrap();
                     let encoded_pointer = pointer.encode().to_vec();
@@ -114,21 +111,25 @@ pub trait ByteStream {
                     bytes[offset + 3] = encoded_pointer[3];
                     bytes[offset + 4] = encoded_pointer[4];
                 }
-                End => {
-                    break
-                }
+                End => break,
             }
         }
         bytes
     }
 
     // fn seq(self, s1: impl ByteStream) -> impl ByteStream where Self: Sized {
-    fn seq<S: ByteStream>(self, s1: S) -> Seq<Self, S> where Self: Sized {
+    fn seq<S: ByteStream>(self, s1: S) -> Seq<Self, S>
+    where
+        Self: Sized,
+    {
         concat(self, s1)
     }
 
     // fn enclose(self) -> impl ByteStream where Self: Sized {
-    fn enclose(self) -> Enclose<Self> where Self: Sized {
+    fn enclose(self) -> Enclose<Self>
+    where
+        Self: Sized,
+    {
         Enclose::new(self)
     }
 }
@@ -136,20 +137,20 @@ pub trait ByteStream {
 // ===Sequence===
 pub enum Seq<S0, S1> {
     DoFirst(S0, Option<S1>), // Second one is optional because when the first is
-                             // optional, we need to move the second one into a new
-                             // branch. This is impossible without ownership. But with
-                             // Option we can gain ownership by exchaning Nothing for
-                             // the second stream.
+    // optional, we need to move the second one into a new
+    // branch. This is impossible without ownership. But with
+    // Option we can gain ownership by exchaning Nothing for
+    // the second stream.
     DoSecond(S1),
 }
 
-impl <S0, S1> Seq<S0, S1> {
+impl<S0, S1> Seq<S0, S1> {
     fn new(s0: S0, s1: S1) -> Self {
         Self::DoFirst(s0, Some(s1))
     }
 }
 
-impl <S0: ByteStream, S1: ByteStream> ByteStream for Seq<S0, S1> {
+impl<S0: ByteStream, S1: ByteStream> ByteStream for Seq<S0, S1> {
     fn next(&mut self) -> Response {
         use Response::*;
         use Seq::*;
@@ -188,31 +189,31 @@ pub enum Enclose<S> {
     Done,
 }
 
-impl <S> Enclose<S> {
+impl<S> Enclose<S> {
     fn new(s: S) -> Self {
         Self::NotYetStarted(Some(s))
     }
 }
 
-impl <S: ByteStream> ByteStream for Enclose<S> {
+impl<S: ByteStream> ByteStream for Enclose<S> {
     fn next(&mut self) -> Response {
-        use Response::*;
         use Enclose::*;
+        use Response::*;
         match self {
             NotYetStarted(s) => {
                 // SAFETY: s in NotYetStarted(s) is always Some(_) by construction.
                 *self = Do(0, s.take().unwrap());
                 PrepareForForwardPointer
-            },
+            }
             Do(count, s) => match s.next() {
                 New(byte) => {
                     *count += 1;
                     New(byte)
-                },
+                }
                 PrepareForForwardPointer => {
                     *count += Offset::SIZE;
                     PrepareForForwardPointer
-                },
+                }
                 Pointer(pointer) => Pointer(pointer),
                 End => {
                     let count = *count;
@@ -241,16 +242,19 @@ pub fn cvector<S: ByteStream>(ss: Vec<S>) -> CVec<S> {
     CVec::NotYetStarted { ss: Some(ss) }
 }
 
-impl <S: ByteStream> ByteStream for CVec<S> {
+impl<S: ByteStream> ByteStream for CVec<S> {
     fn next(&mut self) -> Response {
-        use Response::*;
         use CVec::*;
+        use Response::*;
         match self {
             NotYetStarted { ss } => {
                 // SAFETY: ss in NotYetStarted { ss } is always Some(_) by construction.
-                *self = Do { index: 0, ss: ss.take().unwrap() };
+                *self = Do {
+                    index: 0,
+                    ss: ss.take().unwrap(),
+                };
                 PrepareForForwardPointer
-            },
+            }
             Do { index, ss } => {
                 if *index < ss.len() {
                     match ss[*index].next() {
@@ -260,14 +264,14 @@ impl <S: ByteStream> ByteStream for CVec<S> {
                         End => {
                             *index += 1;
                             self.next()
-                        },
+                        }
                     }
                 } else {
                     let count = ss.len();
                     *self = Done;
                     Pointer(Offset::new(count as u32))
                 }
-            },
+            }
             Done => End,
         }
     }
@@ -276,18 +280,28 @@ impl <S: ByteStream> ByteStream for CVec<S> {
 // ===Ending Vector===
 // A vector s.t. we encode some ending delimiter at the end.
 pub enum EVec<S, E> {
-    Do { index: usize, ss: Vec<S>, end: Option<E> },
-    DoEnding { end: E },
+    Do {
+        index: usize,
+        ss: Vec<S>,
+        end: Option<E>,
+    },
+    DoEnding {
+        end: E,
+    },
 }
 
 pub fn evector<S: ByteStream, E: ByteStream>(ss: Vec<S>, e: E) -> EVec<S, E> {
-    EVec::Do { index: 0, ss, end: Some(e) }
+    EVec::Do {
+        index: 0,
+        ss,
+        end: Some(e),
+    }
 }
 
-impl <S: ByteStream, E: ByteStream> ByteStream for EVec<S, E> {
+impl<S: ByteStream, E: ByteStream> ByteStream for EVec<S, E> {
     fn next(&mut self) -> Response {
-        use Response::*;
         use EVec::*;
+        use Response::*;
         match self {
             Do { index, ss, end } => {
                 if *index < ss.len() {
@@ -298,21 +312,20 @@ impl <S: ByteStream, E: ByteStream> ByteStream for EVec<S, E> {
                         End => {
                             *index += 1;
                             self.next()
-                        },
+                        }
                     }
                 } else {
                     // SAFETY: end in Do { end } is always Some(_) by construction.
-                    *self = DoEnding { end: end.take().unwrap() };
+                    *self = DoEnding {
+                        end: end.take().unwrap(),
+                    };
                     self.next()
                 }
-            },
-            DoEnding { end } => {
-                end.next()
             }
+            DoEnding { end } => end.next(),
         }
     }
 }
-
 
 // ====Or====
 pub enum Either<A, B> {
@@ -320,7 +333,7 @@ pub enum Either<A, B> {
     Right(B),
 }
 
-impl <S0: ByteStream, S1: ByteStream> ByteStream for Either<S0, S1> {
+impl<S0: ByteStream, S1: ByteStream> ByteStream for Either<S0, S1> {
     fn next(&mut self) -> Response {
         use Either::*;
         match self {
@@ -331,13 +344,11 @@ impl <S0: ByteStream, S1: ByteStream> ByteStream for Either<S0, S1> {
 }
 
 // ====Option===
-impl <S: ByteStream> ByteStream for Option<S> {
+impl<S: ByteStream> ByteStream for Option<S> {
     fn next(&mut self) -> Response {
         use Response::*;
         match self {
-            Some(s) => {
-                s.next()
-            },
+            Some(s) => s.next(),
             None => End,
         }
     }
@@ -351,10 +362,10 @@ pub enum Vector<S> {
 }
 
 pub fn vector<S: ByteStream>(ss: Vec<S>) -> Vector<S> {
-    Vector::Do { index:0, ss }
+    Vector::Do { index: 0, ss }
 }
 
-impl <S: ByteStream> ByteStream for Vector<S> {
+impl<S: ByteStream> ByteStream for Vector<S> {
     fn next(&mut self) -> Response {
         use Response::*;
         use Vector::*;
@@ -368,18 +379,17 @@ impl <S: ByteStream> ByteStream for Vector<S> {
                         End => {
                             *index += 1;
                             self.next()
-                        },
+                        }
                     }
                 } else {
                     *self = Done;
                     End
                 }
-            },
+            }
             Done => End,
         }
     }
 }
-
 
 // ====constant bytes===
 pub struct Bytes {
@@ -410,7 +420,6 @@ impl ByteStream for Bytes {
     }
 }
 
-
 // ====0, 1, 2, ..., 255===
 pub struct EnumerateByteValues {
     state: Option<u8>,
@@ -433,12 +442,11 @@ impl ByteStream for EnumerateByteValues {
                     self.state = Some(byte + 1)
                 }
                 New(byte)
-            },
+            }
             None => End,
         }
     }
 }
-
 
 // ====LEB128====
 
@@ -460,14 +468,14 @@ impl ByteStream for U32ToVariableLEB128 {
             Some(x) if x < 128 => {
                 self.state = None;
                 New(x as u8)
-            },
+            }
             Some(x) => {
                 // Suppose x == ..._ _ _ _   _ b6 b5 b4 b3 b2 b1 b0
                 // Then    y == 1 b6 b5 b4 b3 b2 b1 b0
                 let y: u8 = ((x as u8) & 127) + 128;
                 self.state = Some(x >> 7); // Forget about the first 7 bits by shifting.
                 New(y)
-            },
+            }
             None => End,
         }
     }
@@ -482,7 +490,10 @@ pub enum U32ToFixed40LEB128 {
 
 impl U32ToFixed40LEB128 {
     pub fn new(x: u32) -> Self {
-        Self::Continue { bytes_emmited: 0, x }
+        Self::Continue {
+            bytes_emmited: 0,
+            x,
+        }
     }
 }
 
@@ -501,12 +512,15 @@ impl ByteStream for U32ToFixed40LEB128 {
                     *self = Pad { bytes_emmited };
                     New((x + 128) as u8)
                 }
-            },
+            }
             Continue { bytes_emmited, x } => {
                 let y: u8 = ((*x as u8) & 127) + 128;
-                *self = Continue { bytes_emmited: *bytes_emmited + 1, x: *x >> 7 };
+                *self = Continue {
+                    bytes_emmited: *bytes_emmited + 1,
+                    x: *x >> 7,
+                };
                 New(y)
-            },
+            }
             Pad { bytes_emmited } => {
                 let bytes_emmited = *bytes_emmited + 1;
                 if bytes_emmited == 5 {
@@ -516,12 +530,11 @@ impl ByteStream for U32ToFixed40LEB128 {
                     *self = Pad { bytes_emmited };
                     New(128)
                 }
-            },
+            }
             Done => End,
         }
     }
 }
-
 
 // ===Signed LEB128===
 // Fixed stream is always 5 bytes (40 bits).
@@ -537,32 +550,36 @@ pub enum I64ToSignedLEB128 {
 }
 
 impl I32ToSignedLEB128 {
-    pub fn new(x: i32) -> Self { Self::Continue { x } }
+    pub fn new(x: i32) -> Self {
+        Self::Continue { x }
+    }
 }
 
 impl I64ToSignedLEB128 {
-    pub fn new(x: i64) -> Self { Self::Continue { x } }
+    pub fn new(x: i64) -> Self {
+        Self::Continue { x }
+    }
 }
 
 impl ByteStream for I32ToSignedLEB128 {
     fn next(&mut self) -> Response {
-        use Response::*;
         use I32ToSignedLEB128::*;
+        use Response::*;
         // This is adapted from the js code in https://en.wikipedia.org/wiki/LEB128
         match self {
             Continue { x } => {
                 let mut val = *x;
                 let byte = (val & 0x7f) as u8; // Last 7 bits.
                 val = val >> 7; // Get rid of the last 7 bits.
-                *x = val; 
+                *x = val;
                 // Note that byte & 0x40 is basically the 7th bit of byte.
-                if (val == 0 && (byte & 0x40) == 0) || (val == -1 && (byte &0x40) != 0) {
+                if (val == 0 && (byte & 0x40) == 0) || (val == -1 && (byte & 0x40) != 0) {
                     *self = Done;
                     New(byte)
                 } else {
                     New(byte | 0x80)
                 }
-            },
+            }
             Done => End,
         }
     }
@@ -570,23 +587,23 @@ impl ByteStream for I32ToSignedLEB128 {
 
 impl ByteStream for I64ToSignedLEB128 {
     fn next(&mut self) -> Response {
-        use Response::*;
         use I64ToSignedLEB128::*;
+        use Response::*;
         // This is adapted from the js code in https://en.wikipedia.org/wiki/LEB128
         match self {
             Continue { x } => {
                 let mut val = *x;
                 let byte = (val & 0x7f) as u8; // Last 7 bits.
                 val = val >> 7; // Get rid of the last 7 bits.
-                *x = val; 
+                *x = val;
                 // Note that byte & 0x40 is basically the 7th bit of byte.
-                if (val == 0 && (byte & 0x40) == 0) || (val == -1 && (byte &0x40) != 0) {
+                if (val == 0 && (byte & 0x40) == 0) || (val == -1 && (byte & 0x40) != 0) {
                     *self = Done;
                     New(byte)
                 } else {
                     New(byte | 0x80)
                 }
-            },
+            }
             Done => End,
         }
     }
@@ -603,7 +620,9 @@ impl F32ToIEEE754LittleEndian {
 }
 
 impl ByteStream for F32ToIEEE754LittleEndian {
-    fn next(&mut self) -> Response { self.0.next() }
+    fn next(&mut self) -> Response {
+        self.0.next()
+    }
 }
 
 // ===Strings===
@@ -620,7 +639,6 @@ impl ByteStream for UTF8 {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -636,12 +654,13 @@ mod tests {
         assert!(v[2] == 2);
 
         assert!(v[255] == 255);
-
     }
 
     #[test]
     fn seq0() {
-        let mut s = EnumerateByteValues::new().seq(EnumerateByteValues::new()).seq(EnumerateByteValues::new());
+        let mut s = EnumerateByteValues::new()
+            .seq(EnumerateByteValues::new())
+            .seq(EnumerateByteValues::new());
         let v = s.to_vec();
 
         assert!(v.len() == 256 + 256 + 256);
@@ -712,28 +731,27 @@ mod tests {
         assert!([0xc0, 0xbb, 0x78].to_vec() == v);
     }
 
-
     #[test]
     fn enclose0() {
-        let mut s = bytes(vec![1,2,3,4,5,6,7,8,9]).enclose();
+        let mut s = bytes(vec![1, 2, 3, 4, 5, 6, 7, 8, 9]).enclose();
         let v = s.to_vec();
 
-        assert!(v == [ 137,128,128,128,0,  1,2,3,4,5,6,7,8,9 ].to_vec());
+        assert!(v == [137, 128, 128, 128, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9].to_vec());
     }
 
     #[test]
-    fn enclose1()  {
+    fn enclose1() {
         let mut s = bytes(vec![]).enclose();
         let v = s.to_vec();
 
-        assert!(v == [ 128,128,128,128,0, ].to_vec());
+        assert!(v == [128, 128, 128, 128, 0,].to_vec());
     }
 
     #[test]
     fn enclosure_of_single_byte() {
         let bytes = byte(9).enclose().to_vec();
 
-        assert!(bytes == vec![128 + 1, 128, 128, 128, 0,    9]);
+        assert!(bytes == vec![128 + 1, 128, 128, 128, 0, 9]);
     }
 
     #[test]
@@ -748,14 +766,28 @@ mod tests {
     fn enclosure_of_multiple_bytes0() {
         let bytes = bytes(vec![0, 0, 0, 0, 0]).enclose().to_vec();
 
-        assert!(bytes == vec![128 + 4 + 1, 128 + 0, 128 + 0, 128 + 0, 0,     0, 0, 0, 0, 0]);
+        assert!(bytes == vec![128 + 4 + 1, 128 + 0, 128 + 0, 128 + 0, 0, 0, 0, 0, 0, 0]);
     }
 
     #[test]
     fn enclosure_of_multiple_bytes1() {
         let bytes = bytes(vec![128, 128, 128, 128, 0]).enclose().to_vec();
 
-        assert!(bytes == vec![128 + 4 + 1, 128 + 0, 128 + 0, 128 + 0, 0,     128, 128, 128, 128, 0]);
+        assert!(
+            bytes
+                == vec![
+                    128 + 4 + 1,
+                    128 + 0,
+                    128 + 0,
+                    128 + 0,
+                    0,
+                    128,
+                    128,
+                    128,
+                    128,
+                    0
+                ]
+        );
     }
 
     #[test]
@@ -763,8 +795,22 @@ mod tests {
         let mut s = byte(9).enclose().enclose();
         let bytes = s.to_vec();
 
-        assert!(bytes == vec![128 + 6, 128 + 0, 128 + 0, 128 + 0, 0,     128 + 1, 128, 128, 128, 0,      9]);
-
+        assert!(
+            bytes
+                == vec![
+                    128 + 6,
+                    128 + 0,
+                    128 + 0,
+                    128 + 0,
+                    0,
+                    128 + 1,
+                    128,
+                    128,
+                    128,
+                    0,
+                    9
+                ]
+        );
     }
 
     #[test]
@@ -772,7 +818,21 @@ mod tests {
         let vs: Vec<Byte> = vec![];
         let bytes = cvector(vs).enclose().to_vec();
 
-        assert!(bytes == vec![128 + 4 + 1, 128 + 0, 128 + 0, 128 + 0, 0,     128 + 0, 128 + 0, 128 + 0, 128 + 0, 0]);
+        assert!(
+            bytes
+                == vec![
+                    128 + 4 + 1,
+                    128 + 0,
+                    128 + 0,
+                    128 + 0,
+                    0,
+                    128 + 0,
+                    128 + 0,
+                    128 + 0,
+                    128 + 0,
+                    0
+                ]
+        );
     }
 
     #[test]
@@ -780,6 +840,6 @@ mod tests {
         let mut s = string("f");
         let bytes = s.to_vec();
 
-        assert!(bytes == vec![128 + 1, 128, 128, 128, 0,    102]);
+        assert!(bytes == vec![128 + 1, 128, 128, 128, 0, 102]);
     }
 }
