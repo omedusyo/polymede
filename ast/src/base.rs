@@ -168,6 +168,7 @@ pub struct RunDeclaration {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Type {
     VariableUse(Variable),
+    #[allow(clippy::enum_variant_names)]
     TypeApplication(Variable, Vec<Type>),
     Arrow(Box<FunctionType>),
     I32,
@@ -191,7 +192,7 @@ pub struct TypedTerm {
 
 #[derive(Debug, Clone)]
 pub enum Term {
-    TypedTerm(Box<TypedTerm>),
+    Typed(Box<TypedTerm>),
     Int(i32),
     Float(f32),
     StringLiteral(String),

@@ -122,10 +122,10 @@ pub enum Error {
 }
 
 #[derive(Debug)]
-pub enum ErrorWithLocation {
-    TypeDeclaration(Variable, Error),
-    FunctionDeclaration(FunctionName, Error),
-    RunDeclaration(Error),
+pub enum ErrorInDeclaration {
+    Type(Variable, Error),
+    Function(FunctionName, Error),
+    Run(Error),
 }
 
 impl Error {
@@ -308,16 +308,16 @@ impl Error {
     }
 }
 
-impl ErrorWithLocation {
+impl ErrorInDeclaration {
     pub fn show(&self, sh: &Show) -> String {
         match self {
-            Self::TypeDeclaration(name, e) => {
+            Self::Type(name, e) => {
                 format!("In type {} = ...: {}", sh.show_identifier(name), e.show(sh))
             }
-            Self::FunctionDeclaration(name, e) => {
+            Self::Function(name, e) => {
                 format!("In fn {} = ...: {}", sh.show_identifier(name), e.show(sh))
             }
-            Self::RunDeclaration(e) => format!("In run ...: {}", e.show(sh)),
+            Self::Run(e) => format!("In run ...: {}", e.show(sh)),
         }
     }
 }

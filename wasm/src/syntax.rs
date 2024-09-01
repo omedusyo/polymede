@@ -10,8 +10,8 @@ use crate::base::{
 };
 use crate::binary_format::sections;
 use crate::binary_format::sections::{
-    CodeSection, Element, ElementSection, ExportSection, FunctionSection,
-    GlobalsSection, ImportSection, MemorySection, TableSection, TableType, TypeSection,
+    CodeSection, Element, ElementSection, ExportSection, FunctionSection, GlobalsSection,
+    ImportSection, MemorySection, TableSection, TableType, TypeSection,
 };
 use crate::{ByteStream, Encoder};
 

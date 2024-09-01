@@ -25,9 +25,9 @@ struct Args {
 
 fn check_program(
     program: &ast::base::Program,
-) -> core::result::Result<(), Vec<ast::validation::base::ErrorWithLocation>> {
-    ast::validation::type_formation::check_program(&program)?;
-    ast::validation::term_formation::check_program(&program)?;
+) -> core::result::Result<(), Vec<ast::validation::base::ErrorInDeclaration>> {
+    ast::validation::type_formation::check_program(program)?;
+    ast::validation::term_formation::check_program(program)?;
     Ok(())
 }
 
@@ -47,24 +47,21 @@ fn main() -> Result<()> {
         }
     };
 
-    let sh = parser::show::Show::new(&program.interner());
+    let sh = parser::show::Show::new(program.interner());
     let interface_str = sh.show_program_declarations(&program);
     let mut out_interface_file = fs::OpenOptions::new()
         .create(true)
         .write(true)
         .truncate(true)
-        .open(&format!("{}.pmdi", args.out))?;
-    out_interface_file.write(interface_str.as_bytes())?;
+        .open(format!("{}.pmdi", args.out))?;
+    out_interface_file.write_all(interface_str.as_bytes())?;
 
     // ===Type Checking===
-    match check_program(&program) {
-        Err(errors) => {
-            println!("===TYPE ERROR===");
-            for e in errors {
-                println!("{}\n", e.show(&sh))
-            }
+    if let Err(errors) = check_program(&program) {
+        println!("===TYPE ERROR===");
+        for e in errors {
+            println!("{}\n", e.show(&sh))
         }
-        _ => {}
     }
 
     // ===.pmd ~> .gmm compiler===
@@ -75,8 +72,8 @@ fn main() -> Result<()> {
         .create(true)
         .write(true)
         .truncate(true)
-        .open(&format!("{}.gmm", args.out))?;
-    out_gmm_file.write(gmm_str.as_bytes())?;
+        .open(format!("{}.gmm", args.out))?;
+    out_gmm_file.write_all(gmm_str.as_bytes())?;
 
     // ===.gmm ~> .wasm compiler===
     let module = {
@@ -94,8 +91,8 @@ fn main() -> Result<()> {
         .create(true)
         .write(true)
         .truncate(true)
-        .open(&format!("{}.wasm", args.out))?;
-    wasm_file.write(&bytes)?;
+        .open(format!("{}.wasm", args.out))?;
+    wasm_file.write_all(&bytes)?;
 
     Ok(())
 }
@@ -139,8 +136,7 @@ fn example_compilation0() -> Vec<u8> {
     };
 
     let module = gmm_compiler::compile(program).unwrap();
-    let bytes = module.bytes();
-    bytes
+    module.bytes()
 }
 
 // TODO: Fix or get rid of this.

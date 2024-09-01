@@ -15,9 +15,9 @@ struct Args {
     file: String,
 }
 
-fn check_program(program: &base::Program) -> Result<(), Vec<validation::base::ErrorWithLocation>> {
-    validation::type_formation::check_program(&program)?;
-    validation::term_formation::check_program(&program)?;
+fn check_program(program: &base::Program) -> Result<(), Vec<validation::base::ErrorInDeclaration>> {
+    validation::type_formation::check_program(program)?;
+    validation::term_formation::check_program(program)?;
     Ok(())
 }
 
@@ -30,7 +30,7 @@ fn main() -> Result<(), io::Error> {
     let str = fs::read_to_string(args.file)?;
     match parser::parse_program(&str) {
         Ok(program) => {
-            let sh = parser::show::Show::new(&program.interner());
+            let sh = parser::show::Show::new(program.interner());
             println!("{}", sh.show_program_declarations(&program));
 
             match check_program(&program) {

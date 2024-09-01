@@ -191,7 +191,7 @@ impl FunctionEnvironment {
                 Err(RuntimeError::NoMatchesFound)
             }
             Seq(terms) => {
-                if terms.len() == 0 {
+                if terms.is_empty() {
                     return Err(RuntimeError::EmptySequenceOfTerms);
                 }
 

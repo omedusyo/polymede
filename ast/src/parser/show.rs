@@ -1,6 +1,6 @@
 use crate::base::{
-    ConstructorDeclaration, EnumDeclaration, FunctionDeclaration,
-    FunctionType, IndDeclaration, Program, RunDeclaration, Type, TypeDeclaration,
+    ConstructorDeclaration, EnumDeclaration, FunctionDeclaration, FunctionType, IndDeclaration,
+    Program, RunDeclaration, Type, TypeDeclaration,
 };
 use crate::identifier::{Identifier, Interner};
 

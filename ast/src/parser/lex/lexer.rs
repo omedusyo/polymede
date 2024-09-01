@@ -24,7 +24,7 @@ pub enum Error {
     Expected { requested: Request, found: String },
     ExpectedI32 { found: String },
     ExpectedF32 { found: String },
-    ExpectedF32ParseFloatError { error: std::num::ParseFloatError },
+    ExpectedF32FailedToParse { error: std::num::ParseFloatError },
     ExpectedValidCharacterAfterEscapeSequenceInStringLiteral { found: String },
     ExpectedValidUnicodeSequenceInStringLiteral { found: String },
     ExpectedOpeningBraceForUnicodeSequenceInStringLiteral { found: String },
@@ -125,7 +125,7 @@ impl<'state> State<'state> {
         })
     }
 
-    pub fn clone(&self) -> Self {
+    pub fn save_copy(&self) -> Self {
         Self {
             chars: self.chars.clone(),
             position: self.position,
@@ -388,7 +388,7 @@ impl<'state> State<'state> {
             'r' => Ok(DeclarationKind::Run),
             'm' => Ok(DeclarationKind::MsgType),
             'f' => {
-                let saved_state = self.clone();
+                let saved_state = self.save_copy();
                 self.advance();
                 let c = self.read_char_or_fail_when_end()?;
                 *self = saved_state;
@@ -600,7 +600,7 @@ impl<'state> State<'state> {
         fn make_float(state: &State, chars: Vec<char>) -> Result<Option<f32>> {
             match chars.into_iter().collect::<String>().parse::<f32>() {
                 Ok(float) => Ok(Some(float)),
-                Err(error) => state.error(Error::ExpectedF32ParseFloatError { error }),
+                Err(error) => state.error(Error::ExpectedF32FailedToParse { error }),
             }
         }
 

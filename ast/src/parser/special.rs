@@ -72,7 +72,9 @@ pub enum StartPattern {
 }
 
 pub fn start_pattern(state: &mut State) -> Result<StartPattern> {
-    if let Some(x) = state.commit_if_next_token_int()? { return Ok(StartPattern::Int(x)) }
+    if let Some(x) = state.commit_if_next_token_int()? {
+        return Ok(StartPattern::Int(x));
+    }
 
     let id = identifier(state)?;
     let c = id.first_char(state.interner());
@@ -103,9 +105,15 @@ pub fn start_term(state: &mut State) -> Result<StartTerm> {
         return Ok(StartTerm::TypeAnnotation);
     }
 
-    if let Some(s) = state.commit_if_next_token_string_literal()? { return Ok(StartTerm::StringLiteral(s)) }
-    if let Some(x) = state.commit_if_next_token_int()? { return Ok(StartTerm::Int(x)) }
-    if let Some(x) = state.commit_if_next_token_f32()? { return Ok(StartTerm::Float(x)) }
+    if let Some(s) = state.commit_if_next_token_string_literal()? {
+        return Ok(StartTerm::StringLiteral(s));
+    }
+    if let Some(x) = state.commit_if_next_token_int()? {
+        return Ok(StartTerm::Int(x));
+    }
+    if let Some(x) = state.commit_if_next_token_f32()? {
+        return Ok(StartTerm::Float(x));
+    }
 
     let id = identifier(state)?;
     let c = id.first_char(state.interner());

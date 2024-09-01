@@ -1,6 +1,10 @@
 
 # ===Basics===
 
+cargo fmt
+
+cargo clippy -- -D warnings
+
 cargo build
 
 cargo test

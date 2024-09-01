@@ -4,7 +4,7 @@ use crate::base::{
 };
 use crate::identifier::{ConstructorName, FunctionName, Variable};
 use crate::validation::{
-    base::{Error, ErrorWithLocation, Result},
+    base::{Error, ErrorInDeclaration, Result},
     type_formation,
     type_formation::TypeScope,
 };
@@ -17,23 +17,20 @@ struct Environment<'a> {
     bindings_stack: Vec<HashMap<Variable, Type>>,
 }
 
-pub fn check_program(program: &Program) -> core::result::Result<(), Vec<ErrorWithLocation>> {
+pub fn check_program(program: &Program) -> core::result::Result<(), Vec<ErrorInDeclaration>> {
     let mut errors = vec![];
 
     for decl in program.function_declarations.values() {
         match check_function_declaration(program, decl) {
             Ok(_) => {}
-            Err(e) => errors.push(ErrorWithLocation::FunctionDeclaration(
-                decl.name().clone(),
-                e,
-            )),
+            Err(e) => errors.push(ErrorInDeclaration::Function(decl.name().clone(), e)),
         }
     }
 
     for decl in &program.run_declaration {
         match check_run_declaration(program, decl) {
             Ok(_) => {}
-            Err(e) => errors.push(ErrorWithLocation::RunDeclaration(e)),
+            Err(e) => errors.push(ErrorInDeclaration::Run(e)),
         }
     }
 
@@ -85,7 +82,9 @@ impl<'env> Environment<'env> {
 
     pub fn get_type(&self, var: &Variable) -> Option<&Type> {
         for bindings in self.bindings_stack.iter().rev() {
-            if let Some(type_) = bindings.get(var) { return Some(type_) }
+            if let Some(type_) = bindings.get(var) {
+                return Some(type_);
+            }
         }
         None
     }
@@ -111,7 +110,10 @@ impl<'env> Environment<'env> {
     }
 
     pub fn is_ind_type_declaration(&self, type_name: &Variable) -> bool {
-        matches!(self.program.get_type_declaration(type_name), Some(TypeDeclaration::Ind(_)))
+        matches!(
+            self.program.get_type_declaration(type_name),
+            Some(TypeDeclaration::Ind(_))
+        )
     }
 
     pub fn get_function_declaration(
@@ -154,7 +156,7 @@ fn eq_type(type0: &Type, type1: &Type) -> bool {
 fn type_infer(env: &mut Environment, term: &Term) -> Result<Type> {
     use Term::*;
     match term {
-        TypedTerm(typed_term) => {
+        Typed(typed_term) => {
             let type_ = &typed_term.type_;
             let term = &typed_term.term;
             env.check_type_formation(type_)?;
@@ -324,7 +326,7 @@ fn type_infer(env: &mut Environment, term: &Term) -> Result<Type> {
 fn type_check(env: &mut Environment, term: &Term, expected_type: &Type) -> Result<()> {
     use Term::*;
     match term {
-        TypedTerm(typed_term) => {
+        Typed(typed_term) => {
             let type_annotation = &typed_term.type_;
             env.check_type_formation(type_annotation)?;
             if eq_type(type_annotation, expected_type) {

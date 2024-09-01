@@ -10,8 +10,8 @@ use crate::parser::lex::{
 };
 use crate::parser::{
     base::{
-        Declaration, Error, PreEnumDeclaration, PreIndDeclaration,
-        PreProgram, PreTypeDeclaration, Result, State,
+        Declaration, Error, PreEnumDeclaration, PreIndDeclaration, PreProgram, PreTypeDeclaration,
+        Result, State,
     },
     combinator::delimited_possibly_empty_sequence_to_vector,
     identifier::{constructor_name, foreign_function_name, function_name, variable},
@@ -74,9 +74,7 @@ fn program_declaration(state: &mut State) -> Result<Declaration> {
         ForeignFunction => Ok(Declaration::Function(FunctionDeclaration::Foreign(
             foreign_function_declaration(state)?,
         ))),
-        MsgType => Ok(Declaration::MsgTypeDeclaration(msg_type_declaration(
-            state,
-        )?)),
+        MsgType => Ok(Declaration::MsgType(msg_type_declaration(state)?)),
     }
 }
 

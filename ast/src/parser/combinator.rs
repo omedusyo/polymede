@@ -14,7 +14,7 @@ fn delimited_nonempty_sequence<S, A, D>(
     s = combine(s, a);
 
     loop {
-        let saved_state = state.clone();
+        let saved_state = state.save_copy();
         match delim(state) {
             Ok(_d) => {
                 let a = p(state)?;
@@ -38,7 +38,7 @@ fn delimited_possibly_empty_sequence<S, A, D>(
     combine: fn(S, A) -> S,
 ) -> Result<S> {
     let a = {
-        let saved_state = state.clone();
+        let saved_state = state.save_copy();
         match p(state) {
             Ok(a) => a,
             Err(_err) => {
@@ -51,7 +51,7 @@ fn delimited_possibly_empty_sequence<S, A, D>(
     s = combine(s, a);
 
     loop {
-        let saved_state = state.clone();
+        let saved_state = state.save_copy();
         match delim(state) {
             Ok(_d) => {
                 let a = p(state)?;

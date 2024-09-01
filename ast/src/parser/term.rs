@@ -18,7 +18,7 @@ pub fn term(state: &mut State) -> Result<Term> {
         StartTerm::TypeAnnotation => {
             let type_ = type_annotation(state)?;
             let term = term(state)?;
-            Ok(Term::TypedTerm(Box::new(TypedTerm { type_, term })))
+            Ok(Term::Typed(Box::new(TypedTerm { type_, term })))
         }
         StartTerm::Int(x) => Ok(Term::Int(x)),
         StartTerm::Float(x) => Ok(Term::Float(x)),

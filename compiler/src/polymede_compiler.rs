@@ -102,9 +102,8 @@ impl Env {
 
     fn get(&self, var: &Variable) -> Option<&VariableIndex> {
         for scope in self.scopes.iter().rev() {
-            match scope.map.get(var) {
-                Some(var_index) => return Some(var_index),
-                None => {}
+            if let Some(var_index) = scope.map.get(var) {
+                return Some(var_index);
             }
         }
         None
@@ -122,9 +121,7 @@ impl State {
     }
 
     fn reset_env(&mut self) -> Env {
-        use std::mem;
-        let old_env = mem::replace(&mut self.env, Env::new());
-        old_env
+        std::mem::replace(&mut self.env, Env::new())
     }
 
     fn restore_env(&mut self, env: Env) {
@@ -178,25 +175,26 @@ pub fn compile(program: &polymede::Program) -> gmm::Program {
     let mut state = State::new();
     // ===Constructor Name ~> Constructor Index===
     for decl in program.type_declarations_in_source_ordering() {
-        let mut count: ConstructorIndex = 0;
-
-        for constructor in decl.constructors_in_source_ordering() {
+        for (count, constructor) in decl
+            .constructors_in_source_ordering()
+            .into_iter()
+            .enumerate()
+        {
             state
                 .constructor_mapping
-                .insert(constructor.name.clone(), count);
-            count += 1;
+                .insert(constructor.name.clone(), count as ConstructorIndex);
         }
     }
 
     // ===Function Name ~> Function Index===
+    for (next_function_index, decl) in program
+        .function_declarations_in_source_ordering()
+        .into_iter()
+        .enumerate()
     {
-        let mut next_function_index: FunctionIndex = 0;
-        for decl in program.function_declarations_in_source_ordering() {
-            state
-                .function_mapping
-                .insert(decl.name(), next_function_index);
-            next_function_index += 1;
-        }
+        state
+            .function_mapping
+            .insert(decl.name(), next_function_index);
     }
 
     // ===Main===
@@ -264,7 +262,7 @@ fn compile_typed_term(state: &mut State, typed_term: &desugared_polymede::TypedT
 fn compile_term(state: &mut State, term: &desugared_polymede::Term) -> gmm::Term {
     use desugared_polymede::Term::*;
     match term {
-        TypedTerm(typed_term) => compile_typed_term(state, &typed_term),
+        Typed(typed_term) => compile_typed_term(state, typed_term),
         VariableUse(var) => compile_var(state, var),
         Int(x) => gmm::Term::Const(*x),
         Float(x) => gmm::Term::Float32(*x),

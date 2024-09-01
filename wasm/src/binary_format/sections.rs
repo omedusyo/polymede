@@ -530,7 +530,10 @@ impl Encoder for Module {
                 .collect(),
         );
 
-        let type_section = self.type_section.as_ref().map(|type_section| type_section.emit());
+        let type_section = self
+            .type_section
+            .as_ref()
+            .map(|type_section| type_section.emit());
 
         let custom_section_before_import_section = vector(
             self.custom_section_before_import_section
@@ -539,7 +542,10 @@ impl Encoder for Module {
                 .collect(),
         );
 
-        let import_section = self.import_section.as_ref().map(|import_section| import_section.emit());
+        let import_section = self
+            .import_section
+            .as_ref()
+            .map(|import_section| import_section.emit());
 
         let custom_section_before_function_section = vector(
             self.custom_section_before_function_section
@@ -548,7 +554,10 @@ impl Encoder for Module {
                 .collect(),
         );
 
-        let function_section = self.function_section.as_ref().map(|type_indices| type_indices.emit());
+        let function_section = self
+            .function_section
+            .as_ref()
+            .map(|type_indices| type_indices.emit());
 
         let custom_section_before_table_section = vector(
             self.custom_section_before_table_section
@@ -557,7 +566,10 @@ impl Encoder for Module {
                 .collect(),
         );
 
-        let table_section = self.table_section.as_ref().map(|table_section| table_section.emit());
+        let table_section = self
+            .table_section
+            .as_ref()
+            .map(|table_section| table_section.emit());
 
         let custom_section_before_memory_section = vector(
             self.custom_section_before_memory_section
@@ -566,7 +578,10 @@ impl Encoder for Module {
                 .collect(),
         );
 
-        let memory_section = self.memory_section.as_ref().map(|memory_section| memory_section.emit());
+        let memory_section = self
+            .memory_section
+            .as_ref()
+            .map(|memory_section| memory_section.emit());
 
         let custom_section_before_globals_section = vector(
             self.custom_section_before_globals_section
@@ -575,7 +590,10 @@ impl Encoder for Module {
                 .collect(),
         );
 
-        let globals_section = self.globals_section.as_ref().map(|globals_section| globals_section.emit());
+        let globals_section = self
+            .globals_section
+            .as_ref()
+            .map(|globals_section| globals_section.emit());
 
         let custom_section_before_export_section = vector(
             self.custom_section_before_export_section
@@ -593,7 +611,10 @@ impl Encoder for Module {
                 .collect(),
         );
 
-        let start_section = self.start_section.as_ref().map(|start_section| start_section.emit());
+        let start_section = self
+            .start_section
+            .as_ref()
+            .map(|start_section| start_section.emit());
 
         let custom_section_before_element_section = vector(
             self.custom_section_before_element_section
@@ -611,7 +632,10 @@ impl Encoder for Module {
                 .collect(),
         );
 
-        let data_count_section = self.data_count_section.as_ref().map(|data_count_section| data_count_section.emit());
+        let data_count_section = self
+            .data_count_section
+            .as_ref()
+            .map(|data_count_section| data_count_section.emit());
 
         let custom_section_before_code_section = vector(
             self.custom_section_before_code_section
@@ -629,7 +653,10 @@ impl Encoder for Module {
                 .collect(),
         );
 
-        let data_section = self.data_section.as_ref().map(|data_section| data_section.emit());
+        let data_section = self
+            .data_section
+            .as_ref()
+            .map(|data_section| data_section.emit());
 
         let custom_section_at_the_end = vector(
             self.custom_section_at_the_end

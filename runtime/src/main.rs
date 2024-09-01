@@ -1,8 +1,4 @@
-use std::fs;
 use std::io;
-use std::io::Write;
-
-use wasm;
 
 type Result<A> = std::result::Result<A, io::Error>;
 

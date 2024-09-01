@@ -6,7 +6,7 @@ use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
 pub enum Term {
-    TypedTerm(Box<TypedTerm>),
+    Typed(Box<TypedTerm>),
     Int(i32),
     Float(f32),
     StringLiteral(String),
@@ -90,7 +90,7 @@ fn desugar_pattern_branch(pattern_branch: &base::PatternBranch) -> PatternBranch
 pub fn desugar_term(term: &base::Term) -> Term {
     use base::Term::*;
     match term {
-        TypedTerm(typed_term) => Term::TypedTerm(Box::new(desugar_typed_term(typed_term))),
+        Typed(typed_term) => Term::Typed(Box::new(desugar_typed_term(typed_term))),
         Int(x) => Term::Int(*x),
         Float(x) => Term::Float(*x),
         StringLiteral(s) => Term::StringLiteral(s.clone()), // TODO: the .clone() is very unfortunate
@@ -259,7 +259,7 @@ fn free_variables(env: &mut Env, term: &Term) {
     use Term::*;
 
     match term {
-        TypedTerm(typed_term) => free_variables(env, &typed_term.term),
+        Typed(typed_term) => free_variables(env, &typed_term.term),
         VariableUse(var) => env.attempt_to_register_free(var),
         Int(_) => {}
         Float(_) => {}

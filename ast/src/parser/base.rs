@@ -19,7 +19,7 @@ pub type Parser<A> = fn(&mut State) -> Result<A>;
 
 #[derive(Debug)]
 pub enum Error {
-    LexError(lexer::ErrorWithPosition),
+    Lex(lexer::ErrorWithPosition),
     ExpectedTypeConstructorOrTypeVar {
         received: Identifier,
     },
@@ -93,7 +93,7 @@ pub enum Declaration {
     Type(PreTypeDeclaration),
     Run(RunDeclaration),
     Function(FunctionDeclaration),
-    MsgTypeDeclaration(PreTypeDeclaration),
+    MsgType(PreTypeDeclaration),
 }
 
 #[derive(Debug)]
@@ -161,7 +161,7 @@ impl PreProgram {
             Type(type_declaration) => self.type_declarations.push(type_declaration),
             Run(run_declaration) => self.run_declarations.push(run_declaration),
             Function(function_declaration) => self.function_declarations.push(function_declaration),
-            MsgTypeDeclaration(type_declaration) => {
+            MsgType(type_declaration) => {
                 self.msg_types.push(type_declaration.name().clone());
                 self.type_declarations.push(type_declaration);
             }
@@ -215,7 +215,7 @@ impl<'lex_state, 'interner> State<'lex_state, 'interner> {
     }
 
     pub fn request_token(&mut self, request: Request) -> Result<LocatedToken> {
-        self.lexer_state.request(request).map_err(Error::LexError)
+        self.lexer_state.request(request).map_err(Error::Lex)
     }
 
     pub fn request_keyword(&mut self, keyword: Keyword) -> Result<LocatedToken> {
@@ -223,89 +223,87 @@ impl<'lex_state, 'interner> State<'lex_state, 'interner> {
     }
 
     pub fn consume_optional_or(&mut self) -> Result<()> {
-        self.lexer_state
-            .consume_optional_or()
-            .map_err(Error::LexError)
+        self.lexer_state.consume_optional_or().map_err(Error::Lex)
     }
 
     pub fn consume_whitespace_or_fail_when_end(&mut self) -> Result<()> {
         self.lexer_state
             .consume_whitespace_or_fail_when_end()
-            .map_err(Error::LexError)
+            .map_err(Error::Lex)
     }
 
     pub fn consume_optional_comma(&mut self) -> Result<()> {
         self.lexer_state
             .consume_optional_comma()
-            .map_err(Error::LexError)
+            .map_err(Error::Lex)
     }
 
     pub fn is_next_token_open_paren(&mut self) -> Result<bool> {
         self.lexer_state
             .is_next_token_open_paren()
-            .map_err(Error::LexError)
+            .map_err(Error::Lex)
     }
 
     pub fn is_next_token_open_angle(&mut self) -> Result<bool> {
         self.lexer_state
             .is_next_token_open_angle()
-            .map_err(Error::LexError)
+            .map_err(Error::Lex)
     }
 
     pub fn is_next_token_eq(&mut self) -> Result<bool> {
-        self.lexer_state.is_next_token_eq().map_err(Error::LexError)
+        self.lexer_state.is_next_token_eq().map_err(Error::Lex)
     }
 
     pub fn is_next_token_start_type_annotation(&mut self) -> Result<bool> {
         self.lexer_state
             .is_next_token_start_type_annotation()
-            .map_err(Error::LexError)
+            .map_err(Error::Lex)
     }
 
     pub fn commit_if_next_token_int(&mut self) -> Result<Option<i32>> {
         self.lexer_state
             .commit_if_next_token_int()
-            .map_err(Error::LexError)
+            .map_err(Error::Lex)
     }
 
     pub fn commit_if_next_token_f32(&mut self) -> Result<Option<f32>> {
         self.lexer_state
             .commit_if_next_token_f32()
-            .map_err(Error::LexError)
+            .map_err(Error::Lex)
     }
 
     pub fn commit_if_next_token_string_literal(&mut self) -> Result<Option<String>> {
         self.lexer_state
             .commit_if_next_token_string_literal()
-            .map_err(Error::LexError)
+            .map_err(Error::Lex)
     }
 
     pub fn commit_if_next_token_forall(&mut self) -> Result<bool> {
         self.lexer_state
             .commit_if_next_token_forall()
-            .map_err(Error::LexError)
+            .map_err(Error::Lex)
     }
 
     pub fn peek_declaration_token(&mut self) -> Result<DeclarationKind> {
         self.lexer_state
             .peek_declaration_token()
-            .map_err(Error::LexError)
+            .map_err(Error::Lex)
     }
 
-    pub fn clone(&self) -> lexer::State<'lex_state> {
-        self.lexer_state.clone()
+    pub fn save_copy(&self) -> lexer::State<'lex_state> {
+        self.lexer_state.save_copy()
     }
 
     pub fn read_char_or_fail_when_end(&mut self) -> Result<char> {
         self.lexer_state
             .read_char_or_fail_when_end()
-            .map_err(Error::LexError)
+            .map_err(Error::Lex)
     }
 
     pub fn consume_char_or_fail_when_end(&mut self) -> Result<char> {
         self.lexer_state
             .consume_char_or_fail_when_end()
-            .map_err(Error::LexError)
+            .map_err(Error::Lex)
     }
 
     pub fn restore(&mut self, lexer_state: lexer::State<'lex_state>) {

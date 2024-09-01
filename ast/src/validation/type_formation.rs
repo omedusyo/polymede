@@ -1,17 +1,17 @@
 use crate::base::{
-    ConstructorDeclaration, FunctionDeclaration, FunctionType, Program,
-    RunDeclaration, Type, TypeDeclaration,
+    ConstructorDeclaration, FunctionDeclaration, FunctionType, Program, RunDeclaration, Type,
+    TypeDeclaration,
 };
 use crate::identifier::Variable;
-use crate::validation::base::{Error, ErrorWithLocation, Result};
+use crate::validation::base::{Error, ErrorInDeclaration, Result};
 use std::collections::HashSet;
 
-pub fn check_program(program: &Program) -> core::result::Result<(), Vec<ErrorWithLocation>> {
+pub fn check_program(program: &Program) -> core::result::Result<(), Vec<ErrorInDeclaration>> {
     let mut errors = vec![];
     for decl in program.type_declarations.values() {
         match check_type_declaration(program, decl) {
             Ok(_) => {}
-            Err(e) => errors.push(ErrorWithLocation::TypeDeclaration(decl.name().clone(), e)),
+            Err(e) => errors.push(ErrorInDeclaration::Type(decl.name().clone(), e)),
         }
     }
 
@@ -19,27 +19,21 @@ pub fn check_program(program: &Program) -> core::result::Result<(), Vec<ErrorWit
         let msg_type_decl = program.get_msg_type_declaration();
         match check_msg_type_declaration(msg_type_decl) {
             Ok(_) => {}
-            Err(e) => errors.push(ErrorWithLocation::TypeDeclaration(
-                msg_type_decl.name().clone(),
-                e,
-            )),
+            Err(e) => errors.push(ErrorInDeclaration::Type(msg_type_decl.name().clone(), e)),
         }
     }
 
     for decl in program.function_declarations.values() {
         match check_types_in_function_declaration(program, decl) {
             Ok(_) => {}
-            Err(e) => errors.push(ErrorWithLocation::FunctionDeclaration(
-                decl.name().clone(),
-                e,
-            )),
+            Err(e) => errors.push(ErrorInDeclaration::Function(decl.name().clone(), e)),
         }
     }
 
     for decl in &program.run_declaration {
         match check_types_in_run_declaration(program, decl) {
             Ok(_) => {}
-            Err(e) => errors.push(ErrorWithLocation::RunDeclaration(e)),
+            Err(e) => errors.push(ErrorInDeclaration::Run(e)),
         }
     }
 
