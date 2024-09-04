@@ -2,7 +2,7 @@ use crate::base::{
     DoBinding, FunctionDeclaration, Pattern, PatternBranch, Program, RunDeclaration, Term, Type,
     TypeDeclaration,
 };
-use crate::identifier::{ConstructorName, FunctionName, Variable};
+use crate::identifier::{ConstructorName, FunctionName, TypeName, Variable};
 use crate::validation::{
     base::{Error, ErrorInDeclaration, Result},
     type_formation,
@@ -93,7 +93,7 @@ impl<'env> Environment<'env> {
         type_formation::check_type(self.program, self.type_env, type_)
     }
 
-    pub fn get_type_declaration(&self, type_name: &Variable) -> Option<&TypeDeclaration> {
+    pub fn get_type_declaration(&self, type_name: &TypeName) -> Option<&TypeDeclaration> {
         self.program.get_type_declaration(type_name)
     }
 
@@ -109,7 +109,7 @@ impl<'env> Environment<'env> {
             .get_type_declaration_of_constructor(constructor_name)
     }
 
-    pub fn is_ind_type_declaration(&self, type_name: &Variable) -> bool {
+    pub fn is_ind_type_declaration(&self, type_name: &TypeName) -> bool {
         matches!(
             self.program.get_type_declaration(type_name),
             Some(TypeDeclaration::Ind(_))
@@ -662,7 +662,7 @@ fn check_pattern_branch(
     env: &mut Environment,
     match_or_fold: MatchOrFold,
     branch: &PatternBranch,
-    type_name: &Variable,
+    type_name: &TypeName,
     type_args: &[Type],
     expected_type: &Type,
 ) -> Result<()> {

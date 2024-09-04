@@ -3,7 +3,7 @@ use crate::base::{
     FunctionType, RunDeclaration, TypedFunction, UserFunctionDeclaration,
 };
 use crate::identifier;
-use crate::identifier::{FunctionName, Identifier, Variable};
+use crate::identifier::{FunctionName, Identifier, TypeVariable};
 use crate::parser::lex::{
     lexer::{DeclarationKind, LocatedToken, Request},
     token::{Keyword, Token},
@@ -14,8 +14,10 @@ use crate::parser::{
         Result, State,
     },
     combinator::delimited_possibly_empty_sequence_to_vector,
-    identifier::{constructor_name, foreign_function_name, function_name, variable},
-    pattern::{parameter_non_empty_sequence, parameter_possibly_empty_sequence},
+    identifier::{
+        constructor_name, foreign_function_name, function_name, parameter_non_empty_sequence,
+        parameter_possibly_empty_sequence, type_name, type_variable,
+    },
     special::{do_nothing, or_separator},
     term::{term, typed_term},
     types::{foreign_function_type, function_type_annotation, type_nonempty_sequence},
@@ -120,7 +122,7 @@ fn is_type_name_forbidden(name: &str) -> bool {
 pub fn type_declaration(state: &mut State) -> Result<PreTypeDeclaration> {
     state.request_keyword(Keyword::Type_)?;
 
-    let type_name = constructor_name(state)?;
+    let type_name = type_name(state)?;
 
     {
         let constructor_name_str = type_name.str(state.interner());
@@ -131,9 +133,12 @@ pub fn type_declaration(state: &mut State) -> Result<PreTypeDeclaration> {
         }
     }
 
-    let type_parameters: Vec<Variable> = if state.is_next_token_open_paren()? {
+    let type_parameters: Vec<TypeVariable> = if state.is_next_token_open_paren()? {
         state.request_token(Request::OpenParen)?;
-        let params = parameter_non_empty_sequence(state)?;
+        let params = parameter_non_empty_sequence(state)?
+            .into_iter()
+            .map(TypeVariable)
+            .collect();
         state.request_token(Request::CloseParen)?;
         params
     } else {
@@ -157,7 +162,7 @@ pub fn type_declaration(state: &mut State) -> Result<PreTypeDeclaration> {
             constructors: constructor_declaration_sequence(state)?,
         }),
         Keyword::Ind => {
-            let recursive_type_var = variable(state)?;
+            let recursive_type_var = type_variable(state)?;
 
             state.request_token(Request::BindingSeparator)?;
 
@@ -205,7 +210,7 @@ pub fn user_function_declaration(state: &mut State) -> Result<UserFunctionDeclar
     fn inner_function_declaration(
         state: &mut State,
         function_name: FunctionName,
-        type_parameters: Vec<Variable>,
+        type_parameters: Vec<TypeVariable>,
     ) -> Result<UserFunctionDeclaration> {
         let type_ = function_type_annotation(state)?;
         let function = typed_function(state, type_)?;

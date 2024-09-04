@@ -2,7 +2,7 @@ use crate::base::{
     ConstructorDeclaration, FunctionDeclaration, FunctionType, Program, RunDeclaration, Type,
     TypeDeclaration,
 };
-use crate::identifier::Variable;
+use crate::identifier::TypeVariable;
 use crate::validation::base::{Error, ErrorInDeclaration, Result};
 use std::collections::HashSet;
 
@@ -98,7 +98,7 @@ fn check_constructor_declaration(
     program: &Program,
     type_env: &TypeScope,
     decl: &ConstructorDeclaration,
-    rec_var: Option<&Variable>,
+    rec_var: Option<&TypeVariable>,
 ) -> Result<()> {
     for type_ in &decl.parameters {
         check_type(program, type_env, type_)?;
@@ -136,11 +136,11 @@ fn check_types_in_run_declaration(program: &Program, decl: &RunDeclaration) -> R
 }
 
 pub struct TypeScope {
-    variables: HashSet<Variable>,
+    variables: HashSet<TypeVariable>,
 }
 
 impl TypeScope {
-    pub fn new(vars: &[Variable]) -> Self {
+    pub fn new(vars: &[TypeVariable]) -> Self {
         let mut set = HashSet::new();
         for var in vars {
             set.insert(var.clone());
@@ -148,11 +148,11 @@ impl TypeScope {
         Self { variables: set }
     }
 
-    pub fn add(&mut self, var: &Variable) {
+    pub fn add(&mut self, var: &TypeVariable) {
         self.variables.insert(var.clone());
     }
 
-    pub fn exists(&self, variable: &Variable) -> bool {
+    pub fn exists(&self, variable: &TypeVariable) -> bool {
         self.variables.contains(variable)
     }
 }
@@ -164,31 +164,29 @@ pub fn check_type(program: &Program, type_env: &TypeScope, type_: &Type) -> Resu
             if type_env.exists(type_var) {
                 Ok(())
             } else {
-                Err(Error::UndefinedTypeVaraible {
+                Err(Error::UndefinedTypeVariable {
                     variable: type_var.clone(),
                 })
             }
         }
-        TypeApplication(type_constructor_name, types) => {
-            match program.get_type_declaration(type_constructor_name) {
-                Some(decl) => {
-                    if decl.arity() == types.len() {
-                        for type_ in types {
-                            check_type(program, type_env, type_)?;
-                        }
-                        Ok(())
-                    } else {
-                        Err(Error::TypeConstructorIsApplliedToWrongNumberOfArguments {
-                            expected: decl.arity(),
-                            received: types.len(),
-                        })
+        TypeApplication(type_name, types) => match program.get_type_declaration(type_name) {
+            Some(decl) => {
+                if decl.arity() == types.len() {
+                    for type_ in types {
+                        check_type(program, type_env, type_)?;
                     }
+                    Ok(())
+                } else {
+                    Err(Error::TypeConstructorIsApplliedToWrongNumberOfArguments {
+                        expected: decl.arity(),
+                        received: types.len(),
+                    })
                 }
-                None => Err(Error::TypeConstructorDoesntExist {
-                    type_name: type_constructor_name.clone(),
-                }),
             }
-        }
+            None => Err(Error::TypeConstructorDoesntExist {
+                type_name: type_name.clone(),
+            }),
+        },
         Arrow(function_type) => check_function_type(program, type_env, function_type),
         I32 => Ok(()),
         F32 => Ok(()),
@@ -228,8 +226,8 @@ impl Polarity {
 // Fn(x -> a)          negative occurance of x
 // Fn(Fn(x -> a) -> b) positive occurance of x
 // Fn(x, a -> x)          has both positive and negative occurance of x
-fn check_positive_occurance(type_var0: &Variable, type_: &Type) -> Result<()> {
-    fn check(type_var0: &Variable, type_: &Type, polarity: Polarity) -> Result<()> {
+fn check_positive_occurance(type_var0: &TypeVariable, type_: &Type) -> Result<()> {
+    fn check(type_var0: &TypeVariable, type_: &Type, polarity: Polarity) -> Result<()> {
         use Type::*;
         match type_ {
             VariableUse(type_var) => {

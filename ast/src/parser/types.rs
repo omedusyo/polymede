@@ -6,7 +6,7 @@ use crate::parser::{
     combinator::{
         delimited_nonempty_sequence_to_vector, delimited_possibly_empty_sequence_to_vector,
     },
-    special::{comma, constructor_name_or_variable, VariableOrConstructorName},
+    special::{comma, type_name_or_type_variable, TypeNameOrConstructorName},
 };
 
 // Parses
@@ -17,9 +17,9 @@ use crate::parser::{
 //   I32
 //   String
 pub fn type_(state: &mut State) -> Result<Type> {
-    match constructor_name_or_variable(state)? {
-        VariableOrConstructorName::Variable(variable) => Ok(Type::VariableUse(variable)),
-        VariableOrConstructorName::ConstructorName(constructor_name) => {
+    match type_name_or_type_variable(state)? {
+        TypeNameOrConstructorName::Variable(variable) => Ok(Type::VariableUse(variable)),
+        TypeNameOrConstructorName::TypeName(constructor_name) => {
             if state.is_next_token_open_paren()? {
                 // A type constructor with multiple parameters.
                 state.request_token(Request::OpenParen)?;

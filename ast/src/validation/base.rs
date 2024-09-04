@@ -1,5 +1,5 @@
 use crate::base::Type;
-use crate::identifier::{ConstructorName, FunctionName, Variable};
+use crate::identifier::{ConstructorName, FunctionName, TypeName, TypeVariable, Variable};
 use crate::parser::show::Show;
 
 pub type Result<A> = std::result::Result<A, Error>;
@@ -7,17 +7,17 @@ pub type Result<A> = std::result::Result<A, Error>;
 #[derive(Debug)]
 pub enum Error {
     TypeConstructorDoesntExist {
-        type_name: Variable,
+        type_name: TypeName,
     },
     TypeConstructorIsApplliedToWrongNumberOfArguments {
         expected: usize,
         received: usize,
     },
-    UndefinedTypeVaraible {
-        variable: Variable,
+    UndefinedTypeVariable {
+        variable: TypeVariable,
     },
     NegativeOccuranceOfRecursiveTypeVariableInInductiveDeclaration {
-        variable: Variable,
+        variable: TypeVariable,
     },
     MsgTypeIsNotValueType {
         received_type: Type,
@@ -51,7 +51,7 @@ pub enum Error {
     },
     ConstructorDoesntBelongToExpectedTypeDeclaration {
         constructor_name: ConstructorName,
-        type_name: Variable,
+        type_name: TypeName,
     },
     ConstructorDoesntExist {
         constructor_name: ConstructorName,
@@ -123,7 +123,7 @@ pub enum Error {
 
 #[derive(Debug)]
 pub enum ErrorInDeclaration {
-    Type(Variable, Error),
+    Type(TypeName, Error),
     Function(FunctionName, Error),
     Run(Error),
 }
@@ -140,7 +140,7 @@ impl Error {
                 "Type Constructor is applied to {} arguments but expects {}.",
                 received, expected
             ),
-            UndefinedTypeVaraible { variable } => format!(
+            UndefinedTypeVariable { variable } => format!(
                 "Undefined type variable '{}'.",
                 sh.show_identifier(variable)
             ),

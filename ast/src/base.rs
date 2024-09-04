@@ -1,5 +1,6 @@
 use crate::identifier::{
-    interner, ConstructorName, ExternalName, FunctionName, Interner, RawIdentifier, Variable,
+    interner, ConstructorName, ExternalName, FunctionName, Interner, RawIdentifier, TypeName,
+    TypeVariable, Variable,
 };
 use crate::parser::base::PreTypeDeclaration;
 use std::collections::HashMap;
@@ -8,13 +9,13 @@ use std::collections::HashMap;
 #[derive(Debug)]
 pub struct Program {
     interner: Interner,
-    pub type_declarations: HashMap<Variable, TypeDeclaration>,
-    pub type_declarations_ordering: Vec<Variable>,
+    pub type_declarations: HashMap<TypeName, TypeDeclaration>,
+    pub type_declarations_ordering: Vec<TypeName>,
     pub function_declarations: HashMap<FunctionName, FunctionDeclaration>,
     pub function_declarations_ordering: Vec<FunctionName>,
     pub run_declaration: Option<RunDeclaration>,
-    pub constructor_to_type_mapping: HashMap<ConstructorName, Variable>,
-    pub msg_type: Option<Variable>,
+    pub constructor_to_type_mapping: HashMap<ConstructorName, TypeName>,
+    pub msg_type: Option<TypeName>,
 }
 
 impl Default for Program {
@@ -45,7 +46,7 @@ impl Program {
         &mut self.interner
     }
 
-    pub fn get_type_declaration(&self, type_name: &Variable) -> Option<&TypeDeclaration> {
+    pub fn get_type_declaration(&self, type_name: &TypeName) -> Option<&TypeDeclaration> {
         self.type_declarations.get(type_name)
     }
 
@@ -100,23 +101,23 @@ impl Program {
 // ===Declarations===
 #[derive(Debug)]
 pub struct ConstructorDeclaration {
-    pub name: RawIdentifier,
+    pub name: ConstructorName,
     pub parameters: Vec<Type>,
 }
 
 #[derive(Debug)]
 pub struct EnumDeclaration {
-    pub name: ConstructorName,
-    pub type_parameters: Vec<Variable>,
+    pub name: TypeName,
+    pub type_parameters: Vec<TypeVariable>,
     pub constructors: HashMap<ConstructorName, ConstructorDeclaration>,
     pub constructors_ordering: Vec<ConstructorName>,
 }
 
 #[derive(Debug)]
 pub struct IndDeclaration {
-    pub name: ConstructorName,
-    pub type_parameters: Vec<Variable>,
-    pub recursive_type_var: Variable,
+    pub name: TypeName,
+    pub type_parameters: Vec<TypeVariable>,
+    pub recursive_type_var: TypeVariable,
     pub constructors: HashMap<ConstructorName, ConstructorDeclaration>,
     pub constructors_ordering: Vec<ConstructorName>,
 }
@@ -136,7 +137,7 @@ pub enum FunctionDeclaration {
 #[derive(Debug)]
 pub struct UserFunctionDeclaration {
     pub name: FunctionName,
-    pub type_parameters: Vec<Variable>,
+    pub type_parameters: Vec<TypeVariable>,
     pub function: TypedFunction,
 }
 
@@ -167,9 +168,9 @@ pub struct RunDeclaration {
 // ===Types===
 #[derive(Debug, PartialEq, Clone)]
 pub enum Type {
-    VariableUse(Variable),
+    VariableUse(TypeVariable),
     #[allow(clippy::enum_variant_names)]
-    TypeApplication(Variable, Vec<Type>),
+    TypeApplication(TypeName, Vec<Type>),
     Arrow(Box<FunctionType>),
     I32,
     F32,
@@ -232,7 +233,7 @@ pub enum DoBinding {
 impl TypeDeclaration {
     pub fn new(
         pre_decl: PreTypeDeclaration,
-        constructor_to_type_mapping: &mut HashMap<ConstructorName, Variable>,
+        constructor_to_type_mapping: &mut HashMap<ConstructorName, TypeName>,
     ) -> Self {
         match pre_decl {
             PreTypeDeclaration::Enum(pre_decl) => {
@@ -271,7 +272,7 @@ impl TypeDeclaration {
         }
     }
 
-    pub fn name(&self) -> &ConstructorName {
+    pub fn name(&self) -> &TypeName {
         use TypeDeclaration::*;
         match self {
             Enum(decl) => &decl.name,
@@ -398,7 +399,7 @@ impl IndDeclaration {
 
         // TODO: This assumes that type_parameters + rec_type_var are all unique, and that
         // the rec_type_var doesn't shadow anything. But I don't yet check this!
-        let mut type_parameters: Vec<Variable> = self.type_parameters.to_vec();
+        let mut type_parameters: Vec<TypeVariable> = self.type_parameters.to_vec();
         type_parameters.push(self.recursive_type_var.clone());
 
         let mut type_args: Vec<Type> = type_args.to_vec();
@@ -509,20 +510,24 @@ impl Pattern {
 }
 
 // ===Type Application===
-pub fn type_apply(type_parameters: &[Variable], type_body: &Type, type_arguments: &[Type]) -> Type {
+pub fn type_apply(
+    type_parameters: &[TypeVariable],
+    type_body: &Type,
+    type_arguments: &[Type],
+) -> Type {
     // TODO: What are the assumptions? Am I responsible for checking the arities are correct here?
     //
     // given a variable in type_body, I need to know which argument to substitute...
     // So I actually need to have Variable ~> index mapping...
     //
     // This is not very efficient.
-    let mut position_map: HashMap<&Variable, usize> = HashMap::new();
+    let mut position_map: HashMap<&TypeVariable, usize> = HashMap::new();
     for (i, var) in type_parameters.iter().enumerate() {
         position_map.insert(var, i);
     }
 
     fn traverse(
-        position_map: &HashMap<&Variable, usize>,
+        position_map: &HashMap<&TypeVariable, usize>,
         type_body: &Type,
         type_arguments: &[Type],
     ) -> Type {

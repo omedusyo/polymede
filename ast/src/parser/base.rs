@@ -1,7 +1,9 @@
 use crate::base::{
     ConstructorDeclaration, FunctionDeclaration, Program, RunDeclaration, Type, TypeDeclaration,
 };
-use crate::identifier::{ConstructorName, FunctionName, Interner, RawIdentifier, Variable};
+use crate::identifier::{
+    ConstructorName, FunctionName, Interner, RawIdentifier, TypeName, TypeVariable,
+};
 use crate::parser::lex::{
     lexer,
     lexer::{DeclarationKind, LocatedToken, Request},
@@ -29,7 +31,7 @@ pub enum Error {
     ExpectedTerm {
         received: RawIdentifier,
     },
-    ExpectedTypeConstructor {
+    ExpectedVariable {
         received: RawIdentifier,
     },
     ExpectedPrimitiveType {
@@ -41,9 +43,9 @@ pub enum Error {
     ExpectedEqualsOrAssignmentSymbol,
     // Atleast one vector is non-empty.
     DuplicateNames {
-        type_duplicates: Vec<RawIdentifier>,
-        constructor_duplicates: Vec<RawIdentifier>,
-        function_duplicates: Vec<RawIdentifier>,
+        type_duplicates: Vec<TypeName>,
+        constructor_duplicates: Vec<ConstructorName>,
+        function_duplicates: Vec<FunctionName>,
     },
     TypeHasForbiddenName {
         received: String,
@@ -101,21 +103,21 @@ pub struct PreProgram {
     pub type_declarations: Vec<PreTypeDeclaration>,
     pub function_declarations: Vec<FunctionDeclaration>,
     pub run_declarations: Vec<RunDeclaration>,
-    pub msg_types: Vec<Variable>,
+    pub msg_types: Vec<TypeName>,
 }
 
 #[derive(Debug)]
 pub struct PreEnumDeclaration {
-    pub name: Variable,
-    pub type_parameters: Vec<Variable>,
+    pub name: TypeName,
+    pub type_parameters: Vec<TypeVariable>,
     pub constructors: Vec<ConstructorDeclaration>,
 }
 
 #[derive(Debug)]
 pub struct PreIndDeclaration {
-    pub name: Variable,
-    pub type_parameters: Vec<Variable>,
-    pub recursive_type_var: Variable,
+    pub name: TypeName,
+    pub type_parameters: Vec<TypeVariable>,
+    pub recursive_type_var: TypeVariable,
     pub constructors: Vec<ConstructorDeclaration>,
 }
 
@@ -131,7 +133,7 @@ pub enum PreTypeDeclaration {
 }
 
 impl PreTypeDeclaration {
-    fn name(&self) -> &Variable {
+    fn name(&self) -> &TypeName {
         match self {
             Self::Enum(decl) => &decl.name,
             Self::Ind(decl) => &decl.name,
@@ -168,7 +170,7 @@ impl PreProgram {
         }
     }
 
-    pub fn type_names(&self) -> Vec<Variable> {
+    pub fn type_names(&self) -> Vec<TypeName> {
         let mut names = vec![];
         for declaration in &self.type_declarations {
             match declaration {

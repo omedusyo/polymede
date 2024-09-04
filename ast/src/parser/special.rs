@@ -1,4 +1,6 @@
-use crate::identifier::{ConstructorName, Identifier, Variable};
+use crate::identifier::{
+    ConstructorName, FunctionName, Identifier, RawIdentifier, TypeName, TypeVariable, Variable,
+};
 use crate::parser::lex::{
     lexer::{LocatedToken, Position, Request},
     token::SeparatorSymbol,
@@ -25,20 +27,20 @@ pub fn do_nothing(state: &mut State) -> Result<()> {
     state.consume_whitespace_or_fail_when_end()
 }
 
-pub enum VariableOrConstructorName {
-    Variable(Variable),
-    ConstructorName(ConstructorName),
+pub enum TypeNameOrConstructorName {
+    Variable(TypeVariable),
+    TypeName(TypeName),
 }
 
-pub fn constructor_name_or_variable(state: &mut State) -> Result<VariableOrConstructorName> {
-    let id = identifier(state)?;
+pub fn type_name_or_type_variable(state: &mut State) -> Result<TypeNameOrConstructorName> {
+    let id: RawIdentifier = identifier(state)?;
     let c = id.first_char(state.interner());
     if c.is_ascii_uppercase() {
         // constructor
-        Ok(VariableOrConstructorName::ConstructorName(id))
+        Ok(TypeNameOrConstructorName::TypeName(TypeName(id)))
     } else if c.is_ascii_lowercase() {
         // variable
-        Ok(VariableOrConstructorName::Variable(id))
+        Ok(TypeNameOrConstructorName::Variable(TypeVariable(id)))
     } else {
         Err(Error::ExpectedTypeConstructorOrTypeVar { received: id })
     }
@@ -50,7 +52,7 @@ pub enum StartTerm {
     Float(f32),
     StringLiteral(String),
     VariableUse(Variable),
-    FunctionApplication(Variable),
+    FunctionApplication(FunctionName),
     ConstructorConstant(ConstructorName),
     ConstructorApplication(ConstructorName),
     Match,
@@ -68,7 +70,7 @@ pub enum StartPattern {
     ConstructorConstant(ConstructorName),
     ConstructorApplication(ConstructorName),
     Int(i32),
-    Anything(Variable),
+    Anything(RawIdentifier),
 }
 
 pub fn start_pattern(state: &mut State) -> Result<StartPattern> {
@@ -76,19 +78,19 @@ pub fn start_pattern(state: &mut State) -> Result<StartPattern> {
         return Ok(StartPattern::Int(x));
     }
 
-    let id = identifier(state)?;
+    let id: RawIdentifier = identifier(state)?;
     let c = id.first_char(state.interner());
     if c.is_ascii_uppercase() {
         // constructor
         if state.is_next_token_open_paren()? {
-            Ok(StartPattern::ConstructorApplication(id))
+            Ok(StartPattern::ConstructorApplication(ConstructorName(id)))
         } else {
             // constructor constant
-            Ok(StartPattern::ConstructorConstant(id))
+            Ok(StartPattern::ConstructorConstant(ConstructorName(id)))
         }
     } else if c.is_ascii_lowercase() {
         // variable
-        Ok(StartPattern::Variable(id))
+        Ok(StartPattern::Variable(Variable(id)))
     } else if c == '_' {
         Ok(StartPattern::Anything(id))
     } else {
@@ -115,15 +117,15 @@ pub fn start_term(state: &mut State) -> Result<StartTerm> {
         return Ok(StartTerm::Float(x));
     }
 
-    let id = identifier(state)?;
+    let id: RawIdentifier = identifier(state)?;
     let c = id.first_char(state.interner());
     if c.is_ascii_uppercase() {
         // constructor
         if state.is_next_token_open_paren()? {
-            Ok(StartTerm::ConstructorApplication(id))
+            Ok(StartTerm::ConstructorApplication(ConstructorName(id)))
         } else {
             // constructor constant
-            Ok(StartTerm::ConstructorConstant(id))
+            Ok(StartTerm::ConstructorConstant(ConstructorName(id)))
         }
     } else if c.is_ascii_lowercase() {
         // TODO: Checking for fold/match here is really wrong. This should be the job for the lexer.
@@ -138,9 +140,9 @@ pub fn start_term(state: &mut State) -> Result<StartTerm> {
             "receive" => Ok(StartTerm::Receive),
             _ => {
                 if state.is_next_token_open_paren()? || state.is_next_token_open_angle()? {
-                    Ok(StartTerm::FunctionApplication(id))
+                    Ok(StartTerm::FunctionApplication(FunctionName(id)))
                 } else {
-                    Ok(StartTerm::VariableUse(id))
+                    Ok(StartTerm::VariableUse(Variable(id)))
                 }
             }
         }
