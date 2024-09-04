@@ -1,6 +1,6 @@
 use crate::base::{Pattern, PatternBranch};
 use crate::identifier;
-use crate::identifier::Identifier;
+use crate::identifier::RawIdentifier;
 use crate::parser::lex::lexer::Request;
 use crate::parser::{
     base::{Error, Result, State},
@@ -15,7 +15,7 @@ use crate::parser::{
 // Parses a non-empty sequence of identifiers separated by comma
 //   x1, x2, x3
 // Also checks that no two identifiers are equal.
-pub fn parameter_non_empty_sequence(state: &mut State) -> Result<Vec<Identifier>> {
+pub fn parameter_non_empty_sequence(state: &mut State) -> Result<Vec<RawIdentifier>> {
     let ids = delimited_nonempty_sequence_to_vector(state, variable, comma)?;
     let duplicate_ids = identifier::duplicates(&ids);
     if duplicate_ids.is_empty() {
@@ -27,7 +27,7 @@ pub fn parameter_non_empty_sequence(state: &mut State) -> Result<Vec<Identifier>
     }
 }
 
-pub fn parameter_possibly_empty_sequence(state: &mut State) -> Result<Vec<Identifier>> {
+pub fn parameter_possibly_empty_sequence(state: &mut State) -> Result<Vec<RawIdentifier>> {
     let ids = delimited_possibly_empty_sequence_to_vector(state, variable, comma)?;
     let duplicate_ids = identifier::duplicates(&ids);
     if duplicate_ids.is_empty() {

@@ -1,5 +1,5 @@
 use crate::identifier::{
-    interner, ConstructorName, ExternalName, FunctionName, Identifier, Interner, Variable,
+    interner, ConstructorName, ExternalName, FunctionName, Interner, RawIdentifier, Variable,
 };
 use crate::parser::base::PreTypeDeclaration;
 use std::collections::HashMap;
@@ -100,7 +100,7 @@ impl Program {
 // ===Declarations===
 #[derive(Debug)]
 pub struct ConstructorDeclaration {
-    pub name: Identifier,
+    pub name: RawIdentifier,
     pub parameters: Vec<Type>,
 }
 
@@ -220,7 +220,7 @@ pub enum Pattern {
     Constructor(ConstructorName, Vec<Pattern>),
     Variable(Variable),
     Int(i32),
-    Anything(Identifier),
+    Anything(RawIdentifier),
 }
 
 #[derive(Debug, Clone)]

@@ -1,7 +1,7 @@
 use crate::graph_memory_machine as gmm;
 use ast::base as polymede;
 use ast::desugared_base as desugared_polymede;
-use ast::identifier::{ConstructorName, FunctionName, Variable};
+use ast::identifier::{ConstructorName, FunctionName, Identifier, Variable};
 
 use std::collections::HashMap;
 

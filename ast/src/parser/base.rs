@@ -1,7 +1,7 @@
 use crate::base::{
     ConstructorDeclaration, FunctionDeclaration, Program, RunDeclaration, Type, TypeDeclaration,
 };
-use crate::identifier::{ConstructorName, FunctionName, Identifier, Interner, Variable};
+use crate::identifier::{ConstructorName, FunctionName, Interner, RawIdentifier, Variable};
 use crate::parser::lex::{
     lexer,
     lexer::{DeclarationKind, LocatedToken, Request},
@@ -21,29 +21,29 @@ pub type Parser<A> = fn(&mut State) -> Result<A>;
 pub enum Error {
     Lex(lexer::ErrorWithPosition),
     ExpectedTypeConstructorOrTypeVar {
-        received: Identifier,
+        received: RawIdentifier,
     },
     ExpectedTypeConstructorOrTypeVarOrAnythingInPattern {
-        received: Identifier,
+        received: RawIdentifier,
     },
     ExpectedTerm {
-        received: Identifier,
+        received: RawIdentifier,
     },
     ExpectedTypeConstructor {
-        received: Identifier,
+        received: RawIdentifier,
     },
     ExpectedPrimitiveType {
         received: Type,
     },
     DuplicateVariableNames {
-        duplicates: Vec<Identifier>,
+        duplicates: Vec<RawIdentifier>,
     },
     ExpectedEqualsOrAssignmentSymbol,
     // Atleast one vector is non-empty.
     DuplicateNames {
-        type_duplicates: Vec<Identifier>,
-        constructor_duplicates: Vec<Identifier>,
-        function_duplicates: Vec<Identifier>,
+        type_duplicates: Vec<RawIdentifier>,
+        constructor_duplicates: Vec<RawIdentifier>,
+        function_duplicates: Vec<RawIdentifier>,
     },
     TypeHasForbiddenName {
         received: String,

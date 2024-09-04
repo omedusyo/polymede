@@ -19,7 +19,7 @@ pub fn parse_program(s: &str) -> Result<Program, Error> {
 #[cfg(test)]
 mod tests {
     use crate::base::{RunDeclaration, Term, Type, UserFunctionDeclaration};
-    use crate::identifier::interner;
+    use crate::identifier::{interner, Identifier};
     use crate::parser::{
         base::{Error, PreEnumDeclaration, PreIndDeclaration, PreTypeDeclaration, Result, State},
         program::{pre_program, run_declaration, type_declaration, user_function_declaration},

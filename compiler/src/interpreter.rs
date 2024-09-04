@@ -197,7 +197,7 @@ impl FunctionEnvironment {
     }
 }
 
-fn run(program: Program) -> Result<Value> {
+pub fn run(program: Program) -> Result<Value> {
     let mut functions = vec![];
     for function in program.functions {
         match function {

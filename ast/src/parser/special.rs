@@ -1,4 +1,4 @@
-use crate::identifier::{ConstructorName, Variable};
+use crate::identifier::{ConstructorName, Identifier, Variable};
 use crate::parser::lex::{
     lexer::{LocatedToken, Position, Request},
     token::SeparatorSymbol,

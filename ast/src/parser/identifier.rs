@@ -1,4 +1,6 @@
-use crate::identifier::{ConstructorName, ExternalName, FunctionName, Identifier, Variable};
+use crate::identifier::{
+    ConstructorName, ExternalName, FunctionName, Identifier, RawIdentifier, Variable,
+};
 use crate::parser::base::{Error, Result, State};
 use crate::parser::lex::{
     lexer::{LocatedToken, Request},
@@ -6,7 +8,7 @@ use crate::parser::lex::{
 };
 
 // TODO: These are more appropriate for lexer.
-pub fn identifier(state: &mut State) -> Result<Identifier> {
+pub fn identifier(state: &mut State) -> Result<RawIdentifier> {
     let LocatedToken {
         token: Token::Identifier(str),
         position,
@@ -14,7 +16,7 @@ pub fn identifier(state: &mut State) -> Result<Identifier> {
     else {
         unreachable!()
     };
-    let identifier = Identifier::new(str, position, state.interner());
+    let identifier = RawIdentifier::new(str, position, state.interner());
     Ok(identifier)
 }
 

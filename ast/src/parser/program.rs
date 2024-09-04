@@ -3,7 +3,7 @@ use crate::base::{
     FunctionType, RunDeclaration, TypedFunction, UserFunctionDeclaration,
 };
 use crate::identifier;
-use crate::identifier::{FunctionName, Variable};
+use crate::identifier::{FunctionName, Identifier, Variable};
 use crate::parser::lex::{
     lexer::{DeclarationKind, LocatedToken, Request},
     token::{Keyword, Token},

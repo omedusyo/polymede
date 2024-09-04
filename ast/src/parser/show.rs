@@ -2,7 +2,7 @@ use crate::base::{
     ConstructorDeclaration, EnumDeclaration, FunctionDeclaration, FunctionType, IndDeclaration,
     Program, RunDeclaration, Type, TypeDeclaration,
 };
-use crate::identifier::{Identifier, Interner};
+use crate::identifier::{Identifier, Interner, RawIdentifier};
 
 pub struct Show<'a> {
     interner: &'a Interner,
@@ -100,7 +100,7 @@ impl<'show> Show<'show> {
         }
     }
 
-    fn show_sequence_of_identifiers(&self, identifiers: &[Identifier]) -> String {
+    fn show_sequence_of_identifiers(&self, identifiers: &[RawIdentifier]) -> String {
         identifiers
             .iter()
             .map(|id| id.str(self.interner()).to_string())
@@ -173,7 +173,7 @@ impl<'show> Show<'show> {
         format!("{input_types} -> {output_type}")
     }
 
-    pub fn show_identifier(&self, var: &Identifier) -> String {
+    pub fn show_identifier(&self, var: &RawIdentifier) -> String {
         format!(
             "{}@(line={}, column={})",
             var.str(self.interner),

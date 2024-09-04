@@ -1,6 +1,6 @@
 use crate::base;
 use crate::base::Type;
-use crate::identifier::{ConstructorName, FunctionName, Identifier, Variable};
+use crate::identifier::{ConstructorName, FunctionName, RawIdentifier, Variable};
 
 use std::collections::HashSet;
 
@@ -27,7 +27,7 @@ pub enum Pattern {
     Constructor(ConstructorName, Vec<Variable>),
     Variable(Variable),
     Int(i32),
-    Anything(Identifier),
+    Anything(RawIdentifier),
 }
 
 #[derive(Debug, Clone)]

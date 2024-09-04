@@ -8,9 +8,8 @@ use wasm::{
         types::{BlockType, FunctionType, GlobalType, Mutability, NumType, ValueType},
     },
     syntax::{
-        call, call_indirect, f32_const, fn_type, i32_const, i32_eq, return_call,
-        seq, CustomSection, Expression, Global, Module,
-        TypedFunction, TypedFunctionImport,
+        call, call_indirect, f32_const, fn_type, i32_const, i32_eq, return_call, seq,
+        CustomSection, Expression, Global, Module, TypedFunction, TypedFunctionImport,
     },
 };
 
