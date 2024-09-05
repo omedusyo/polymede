@@ -25,6 +25,10 @@ pub struct TypeVariable(pub RawIdentifier);
 pub struct FunctionName(pub RawIdentifier);
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ExternalName(pub RawIdentifier);
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct ModuleName(pub RawIdentifier);
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct ModuleVariable(pub RawIdentifier);
 
 // Identifier that starts with uppercase letter.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -155,6 +159,24 @@ impl Identifier for ConstructorName {
     }
 }
 
+impl Identifier for ModuleName {
+    fn symbol(&self) -> Symbol {
+        self.0.symbol
+    }
+    fn position(&self) -> Position {
+        self.0.position
+    }
+}
+
+impl Identifier for ModuleVariable {
+    fn symbol(&self) -> Symbol {
+        self.0.symbol
+    }
+    fn position(&self) -> Position {
+        self.0.position
+    }
+}
+
 // ===Into===
 impl From<Variable> for RawIdentifier {
     fn from(id: Variable) -> RawIdentifier {
@@ -192,6 +214,19 @@ impl From<ConstructorName> for RawIdentifier {
     }
 }
 
+impl From<ModuleName> for RawIdentifier {
+    fn from(id: ModuleName) -> RawIdentifier {
+        id.0
+    }
+}
+
+impl From<ModuleVariable> for RawIdentifier {
+    fn from(id: ModuleVariable) -> RawIdentifier {
+        id.0
+    }
+}
+
+
 // ===From===
 impl From<RawIdentifier> for Variable {
     fn from(id: RawIdentifier) -> Variable {
@@ -226,5 +261,11 @@ impl From<RawIdentifier> for TypeName {
 impl From<RawIdentifier> for ConstructorName {
     fn from(id: RawIdentifier) -> ConstructorName {
         ConstructorName(id)
+    }
+}
+
+impl From<RawIdentifier> for ModuleName {
+    fn from(id: RawIdentifier) -> ModuleName {
+        ModuleName(id)
     }
 }

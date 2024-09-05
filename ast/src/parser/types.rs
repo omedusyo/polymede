@@ -107,7 +107,7 @@ pub fn foreign_function_type(state: &mut State) -> Result<FunctionType> {
 // Parses
 //    # type :
 // where `:` can be optional when newline is present.
-// TODO: Consider having the `:` completely optional for function declarations.
+// TODO: Consider having the `:` completely optional for function definitions.
 pub fn function_type_annotation(state: &mut State) -> Result<FunctionType> {
     state.request_keyword(Keyword::TypeAnnotationStart)?;
     let type_ = function_type(state)?;

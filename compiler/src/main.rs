@@ -25,7 +25,7 @@ struct Args {
 
 fn check_program(
     program: &ast::base::Program,
-) -> core::result::Result<(), Vec<ast::validation::base::ErrorInDeclaration>> {
+) -> core::result::Result<(), Vec<ast::validation::base::ErrorInDefinition>> {
     ast::validation::type_formation::check_program(program)?;
     ast::validation::term_formation::check_program(program)?;
     Ok(())
@@ -48,7 +48,7 @@ fn main() -> Result<()> {
     };
 
     let sh = parser::show::Show::new(program.interner());
-    let interface_str = sh.show_program_declarations(&program);
+    let interface_str = sh.show_program_definitions(&program);
     let mut out_interface_file = fs::OpenOptions::new()
         .create(true)
         .write(true)

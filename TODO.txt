@@ -8,7 +8,7 @@ and you can get unnecessary out of memory crash.
 
 ====In runtime environments use Display instead of copying everything====
 
-====Proper scoping for the recursive type-variable in inductive type declarations====
+====Proper scoping for the recursive type-variable in inductive type definitions====
 
 ====Compilation of nested patterns====
 See e.g. Simon Peyton Jone's book, The Implementation of Functional Programming Languages for how to do this well.
@@ -55,5 +55,5 @@ type WideTree(a) = ind { x .
 | WBranch(NonemptyList(x))
 }
 
-Should all type declarations have functoriality implemented?
+Should all type definitions have functoriality implemented?
 Should I add syntax for functors? Seems like I would also need to express holes of multivariable functors.

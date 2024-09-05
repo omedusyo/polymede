@@ -1,16 +1,16 @@
 use crate::base::{
-    ConstructorDeclaration, ForeignFunctionDeclaration, Function, FunctionDeclaration,
-    FunctionType, RunDeclaration, TypedFunction, UserFunctionDeclaration,
+    ConstructorDefinition, ForeignFunctionBinding, Function, FunctionDefinition,
+    FunctionType, RunDefinition, TypedFunction, UserFunctionBinding,
 };
 use crate::identifier;
 use crate::identifier::{FunctionName, Identifier, TypeVariable};
 use crate::parser::lex::{
-    lexer::{DeclarationKind, LocatedToken, Request},
+    lexer::{DefinitionKind, LocatedToken, Request},
     token::{Keyword, Token},
 };
 use crate::parser::{
     base::{
-        Declaration, Error, PreEnumDeclaration, PreIndDeclaration, PreProgram, PreTypeDeclaration,
+        Definition, Error, PreEnumDefinition, PreIndDefinition, PreProgram, PreTypeDefinition,
         Result, State,
     },
     combinator::delimited_possibly_empty_sequence_to_vector,
@@ -26,10 +26,10 @@ use crate::parser::{
 pub fn pre_program(state: &mut State) -> Result<PreProgram> {
     let mut program = PreProgram::new();
 
-    for declaration in
-        delimited_possibly_empty_sequence_to_vector(state, program_declaration, do_nothing)?
+    for definition in
+        delimited_possibly_empty_sequence_to_vector(state, program_definition, do_nothing)?
     {
-        program.add_declaration(declaration);
+        program.add_definition(definition);
     }
     check_program_names_uniqueness(&program)?;
     Ok(program)
@@ -50,37 +50,37 @@ fn check_program_names_uniqueness(program: &PreProgram) -> Result<()> {
         });
     }
 
-    match program.run_declarations.len() {
-        0 => return Err(Error::RunDeclarationNotFound),
+    match program.run_definitions.len() {
+        0 => return Err(Error::RunDefinitionNotFound),
         1 => {}
-        _ => return Err(Error::MoreThanOneRunDeclaration),
+        _ => return Err(Error::MoreThanOneRunDefinition),
     }
 
     match program.msg_types.len() {
-        0 => return Err(Error::MsgTypeDeclarationNotFound),
+        0 => return Err(Error::MsgTypeDefinitionNotFound),
         1 => {}
-        _ => return Err(Error::MoreThanOneMsgTypeDeclaration),
+        _ => return Err(Error::MoreThanOneMsgTypeDefinition),
     }
 
     Ok(())
 }
 
-fn program_declaration(state: &mut State) -> Result<Declaration> {
-    use DeclarationKind::*;
-    match state.peek_declaration_token()? {
-        Type => Ok(Declaration::Type(type_declaration(state)?)),
-        Run => Ok(Declaration::Run(run_declaration(state)?)),
-        UserFunction => Ok(Declaration::Function(FunctionDeclaration::User(
-            user_function_declaration(state)?,
+fn program_definition(state: &mut State) -> Result<Definition> {
+    use DefinitionKind::*;
+    match state.peek_definition_token()? {
+        Type => Ok(Definition::Type(type_definition(state)?)),
+        Run => Ok(Definition::Run(run_definition(state)?)),
+        UserFunction => Ok(Definition::Function(FunctionDefinition::User(
+            user_function_definition(state)?,
         ))),
-        ForeignFunction => Ok(Declaration::Function(FunctionDeclaration::Foreign(
-            foreign_function_declaration(state)?,
+        ForeignFunction => Ok(Definition::Function(FunctionDefinition::Foreign(
+            foreign_function_definition(state)?,
         ))),
-        MsgType => Ok(Declaration::MsgType(msg_type_declaration(state)?)),
+        MsgType => Ok(Definition::MsgType(msg_type_definition(state)?)),
     }
 }
 
-fn constructor_declaration(state: &mut State) -> Result<ConstructorDeclaration> {
+fn constructor_definition(state: &mut State) -> Result<ConstructorDefinition> {
     let constructor_name = constructor_name(state)?;
 
     if state.is_next_token_open_paren()? {
@@ -88,22 +88,22 @@ fn constructor_declaration(state: &mut State) -> Result<ConstructorDeclaration> 
         state.request_token(Request::OpenParen)?;
         let parameter_types = type_nonempty_sequence(state)?;
         state.request_token(Request::CloseParen)?;
-        Ok(ConstructorDeclaration {
+        Ok(ConstructorDefinition {
             name: constructor_name,
             parameters: parameter_types,
         })
     } else {
         // Constant
-        Ok(ConstructorDeclaration {
+        Ok(ConstructorDefinition {
             name: constructor_name,
             parameters: vec![],
         })
     }
 }
 
-fn constructor_declaration_sequence(state: &mut State) -> Result<Vec<ConstructorDeclaration>> {
+fn constructor_definition_sequence(state: &mut State) -> Result<Vec<ConstructorDefinition>> {
     state.consume_optional_or()?;
-    delimited_possibly_empty_sequence_to_vector(state, constructor_declaration, or_separator)
+    delimited_possibly_empty_sequence_to_vector(state, constructor_definition, or_separator)
 }
 
 static FORBIDDEN_TYPE_NAMES: [&str; 5] = ["Fn", "I32", "F32", "String", "Cmd"];
@@ -117,9 +117,9 @@ fn is_type_name_forbidden(name: &str) -> bool {
     false
 }
 
-// TODO: Make sure that for ind type declarations the recursive type-variable doesn't shadow any of
+// TODO: Make sure that for ind type definitions the recursive type-variable doesn't shadow any of
 // its parameters.
-pub fn type_declaration(state: &mut State) -> Result<PreTypeDeclaration> {
+pub fn type_definition(state: &mut State) -> Result<PreTypeDefinition> {
     state.request_keyword(Keyword::Type_)?;
 
     let type_name = type_name(state)?;
@@ -150,71 +150,71 @@ pub fn type_declaration(state: &mut State) -> Result<PreTypeDeclaration> {
     let LocatedToken {
         token: Token::Keyword(keyword),
         ..
-    } = state.request_token(Request::TypeDeclarationKeyword)?
+    } = state.request_token(Request::TypeDefinitionKeyword)?
     else {
         unreachable!()
     };
     state.request_token(Request::OpenCurly)?;
-    let declaration = match keyword {
-        Keyword::Enum => PreTypeDeclaration::Enum(PreEnumDeclaration {
+    let definition = match keyword {
+        Keyword::Enum => PreTypeDefinition::Enum(PreEnumDefinition {
             name: type_name,
             type_parameters,
-            constructors: constructor_declaration_sequence(state)?,
+            constructors: constructor_definition_sequence(state)?,
         }),
         Keyword::Ind => {
             let recursive_type_var = type_variable(state)?;
 
             state.request_token(Request::BindingSeparator)?;
 
-            PreTypeDeclaration::Ind(PreIndDeclaration {
+            PreTypeDefinition::Ind(PreIndDefinition {
                 name: type_name,
                 type_parameters,
                 recursive_type_var,
-                constructors: constructor_declaration_sequence(state)?,
+                constructors: constructor_definition_sequence(state)?,
             })
         }
         _ => unreachable!(),
     };
     state.request_token(Request::CloseCurly)?;
 
-    Ok(declaration)
+    Ok(definition)
 }
 
-pub fn msg_type_declaration(state: &mut State) -> Result<PreTypeDeclaration> {
+pub fn msg_type_definition(state: &mut State) -> Result<PreTypeDefinition> {
     state.request_keyword(Keyword::Msg)?;
     // TODO: It seems that this will allow `msgtype`.
-    let type_declaration = type_declaration(state)?;
-    Ok(type_declaration)
+    let type_definition = type_definition(state)?;
+    Ok(type_definition)
 }
 
-// ===Function Declarations===
-pub fn foreign_function_declaration(state: &mut State) -> Result<ForeignFunctionDeclaration> {
+// ===Function Definitions===
+pub fn foreign_function_definition(state: &mut State) -> Result<ForeignFunctionBinding> {
     state.request_keyword(Keyword::Foreign)?;
     let external_name = foreign_function_name(state)?;
     state.request_keyword(Keyword::Fn)?;
     let name = function_name(state)?;
     state.request_keyword(Keyword::TypeAnnotationSeparator)?;
     let type_ = foreign_function_type(state)?;
-    Ok(ForeignFunctionDeclaration {
+    Ok(ForeignFunctionBinding {
         name,
         type_,
         external_name,
     })
 }
 
-pub fn user_function_declaration(state: &mut State) -> Result<UserFunctionDeclaration> {
+pub fn user_function_definition(state: &mut State) -> Result<UserFunctionBinding> {
     state.request_keyword(Keyword::Fn)?;
     let function_name = function_name(state)?;
     state.request_keyword(Keyword::Eq)?;
 
-    fn inner_function_declaration(
+    fn inner_function_definition(
         state: &mut State,
         function_name: FunctionName,
         type_parameters: Vec<TypeVariable>,
-    ) -> Result<UserFunctionDeclaration> {
+    ) -> Result<UserFunctionBinding> {
         let type_ = function_type_annotation(state)?;
         let function = typed_function(state, type_)?;
-        Ok(UserFunctionDeclaration {
+        Ok(UserFunctionBinding {
             name: function_name,
             type_parameters,
             function,
@@ -227,13 +227,13 @@ pub fn user_function_declaration(state: &mut State) -> Result<UserFunctionDeclar
         let type_parameters = parameter_non_empty_sequence(state)?;
         state.request_token(Request::BindingSeparator)?;
 
-        let declaration = inner_function_declaration(state, function_name, type_parameters)?;
+        let definition = inner_function_definition(state, function_name, type_parameters)?;
 
         state.request_token(Request::CloseCurly)?;
-        Ok(declaration)
+        Ok(definition)
     } else {
         // no forall
-        inner_function_declaration(state, function_name, vec![])
+        inner_function_definition(state, function_name, vec![])
     }
 }
 
@@ -264,9 +264,9 @@ pub fn typed_function(state: &mut State, type_: FunctionType) -> Result<TypedFun
     }
 }
 
-pub fn run_declaration(state: &mut State) -> Result<RunDeclaration> {
+pub fn run_definition(state: &mut State) -> Result<RunDefinition> {
     state.request_keyword(Keyword::Run)?;
 
     let typed_term = typed_term(state)?;
-    Ok(RunDeclaration { body: typed_term })
+    Ok(RunDefinition { body: typed_term })
 }

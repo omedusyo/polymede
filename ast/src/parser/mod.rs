@@ -18,11 +18,11 @@ pub fn parse_program(s: &str) -> Result<Program, Error> {
 
 #[cfg(test)]
 mod tests {
-    use crate::base::{RunDeclaration, Term, Type, UserFunctionDeclaration};
+    use crate::base::{RunDefinition, Term, Type, UserFunctionBinding};
     use crate::identifier::{interner, Identifier};
     use crate::parser::{
-        base::{Error, PreEnumDeclaration, PreIndDeclaration, PreTypeDeclaration, Result, State},
-        program::{pre_program, run_declaration, type_declaration, user_function_declaration},
+        base::{Error, PreEnumDefinition, PreIndDefinition, PreTypeDefinition, Result, State},
+        program::{pre_program, run_definition, type_definition, user_function_definition},
         types::type_,
     };
 
@@ -77,15 +77,15 @@ mod tests {
     }
 
     #[test]
-    fn test_type_declaration_0() -> Result<()> {
+    fn test_type_definition_0() -> Result<()> {
         let mut interner = interner();
         let s = "type Bool = enum { T | F }";
         let mut state = State::new(s, &mut interner);
 
-        let result = type_declaration(&mut state);
+        let result = type_definition(&mut state);
 
-        assert!(matches!(result, Ok(PreTypeDeclaration::Enum(_))));
-        let Ok(PreTypeDeclaration::Enum(PreEnumDeclaration {
+        assert!(matches!(result, Ok(PreTypeDefinition::Enum(_))));
+        let Ok(PreTypeDefinition::Enum(PreEnumDefinition {
             name,
             type_parameters: _,
             constructors,
@@ -103,16 +103,16 @@ mod tests {
     }
 
     #[test]
-    fn test_type_declaration_1() -> Result<()> {
+    fn test_type_definition_1() -> Result<()> {
         let mut interner = interner();
         let s = "type SomeType = enum { | Const | Unary(a) | Binary(Foo(x, Bar), y) | Ternary(a, b, c) }";
         let mut state = State::new(s, &mut interner);
 
-        let result = type_declaration(&mut state);
+        let result = type_definition(&mut state);
 
-        assert!(matches!(result, Ok(PreTypeDeclaration::Enum(_))));
+        assert!(matches!(result, Ok(PreTypeDefinition::Enum(_))));
 
-        let Ok(PreTypeDeclaration::Enum(PreEnumDeclaration {
+        let Ok(PreTypeDefinition::Enum(PreEnumDefinition {
             name,
             type_parameters: _,
             constructors,
@@ -137,15 +137,15 @@ mod tests {
     }
 
     #[test]
-    fn test_type_declaration_2() -> Result<()> {
+    fn test_type_definition_2() -> Result<()> {
         let mut interner = interner();
         let s = "type Nat = ind { nat . Zero | Succ(nat) }";
         let mut state = State::new(s, &mut interner);
 
-        let result = type_declaration(&mut state);
+        let result = type_definition(&mut state);
 
-        assert!(matches!(result, Ok(PreTypeDeclaration::Ind(_))));
-        let Ok(PreTypeDeclaration::Ind(PreIndDeclaration {
+        assert!(matches!(result, Ok(PreTypeDefinition::Ind(_))));
+        let Ok(PreTypeDefinition::Ind(PreIndDefinition {
             name,
             type_parameters: _,
             recursive_type_var,
@@ -168,15 +168,15 @@ mod tests {
     }
 
     #[test]
-    fn test_type_declaration_3() -> Result<()> {
+    fn test_type_definition_3() -> Result<()> {
         let mut interner = interner();
         let s = "type List(a, ignored) = ind { list . Nil | Cons(a, list) }";
         let mut state = State::new(s, &mut interner);
 
-        let result = type_declaration(&mut state);
+        let result = type_definition(&mut state);
 
-        assert!(matches!(result, Ok(PreTypeDeclaration::Ind(_))));
-        let Ok(PreTypeDeclaration::Ind(PreIndDeclaration {
+        assert!(matches!(result, Ok(PreTypeDefinition::Ind(_))));
+        let Ok(PreTypeDefinition::Ind(PreIndDefinition {
             name,
             type_parameters,
             recursive_type_var,
@@ -204,12 +204,12 @@ mod tests {
     }
 
     #[test]
-    fn test_type_declaration_4() -> Result<()> {
+    fn test_type_definition_4() -> Result<()> {
         let mut interner = interner();
         let s = "type Foo(x, y, z, y, z) = enum { A | B }";
         let mut state = State::new(s, &mut interner);
 
-        let result = type_declaration(&mut state);
+        let result = type_definition(&mut state);
 
         assert!(matches!(result, Err(Error::DuplicateVariableNames { .. })));
         let Err(Error::DuplicateVariableNames { duplicates }) = result else {
@@ -223,14 +223,14 @@ mod tests {
     }
 
     #[test]
-    fn test_function_declaration_0() -> Result<()> {
+    fn test_function_definition_0() -> Result<()> {
         let mut interner = interner();
         let s = "fn square = # Nat -> Nat : { x . mul(x, x) }";
         let mut state = State::new(s, &mut interner);
 
-        let result = user_function_declaration(&mut state);
+        let result = user_function_definition(&mut state);
         assert!(matches!(result, Ok(_)));
-        let UserFunctionDeclaration {
+        let UserFunctionBinding {
             name,
             type_parameters,
             function,
@@ -266,14 +266,14 @@ mod tests {
     }
 
     #[test]
-    fn test_function_declaration_1() -> Result<()> {
+    fn test_function_definition_1() -> Result<()> {
         let mut interner = interner();
         let s = "fn id = forall { a . # a -> a : { x . x } }";
         let mut state = State::new(s, &mut interner);
 
-        let result = user_function_declaration(&mut state);
+        let result = user_function_definition(&mut state);
         assert!(matches!(result, Ok(_)));
-        let UserFunctionDeclaration {
+        let UserFunctionBinding {
             name,
             type_parameters,
             function,
@@ -300,14 +300,14 @@ mod tests {
     }
 
     #[test]
-    fn test_function_declaration_2() -> Result<()> {
+    fn test_function_definition_2() -> Result<()> {
         let mut interner = interner();
         let s = "fn map = forall { a, b . # Fn(a -> b), List(a) -> List(b) : { f, xs . fold xs { Nil . Nil | Cons(x, state) . Cons(f(x), state) } } }";
         let mut state = State::new(s, &mut interner);
 
-        let result = user_function_declaration(&mut state);
+        let result = user_function_definition(&mut state);
         assert!(matches!(result, Ok(_)));
-        let UserFunctionDeclaration {
+        let UserFunctionBinding {
             name,
             type_parameters,
             function: _,
@@ -320,26 +320,26 @@ mod tests {
     }
 
     #[test]
-    fn test_run_declaration_0() -> Result<()> {
+    fn test_run_definition_0() -> Result<()> {
         let mut interner = interner();
         let s = "run # Nat : S(S(Zero))";
         let mut state = State::new(s, &mut interner);
 
-        let result = run_declaration(&mut state);
+        let result = run_definition(&mut state);
         assert!(matches!(result, Ok(_)));
 
         Ok(())
     }
 
     #[test]
-    fn test_run_declaration_1() -> Result<()> {
+    fn test_run_definition_1() -> Result<()> {
         let mut interner = interner();
         let s = "run # List(Nat) : Nil";
         let mut state = State::new(s, &mut interner);
 
-        let result = run_declaration(&mut state);
+        let result = run_definition(&mut state);
         assert!(matches!(result, Ok(_)));
-        let RunDeclaration { body: _ } = result?;
+        let RunDefinition { body: _ } = result?;
 
         Ok(())
     }
@@ -350,7 +350,7 @@ mod tests {
         let s = "fn f = # Nat -> Nat : { x . let {, y = # Nat : add(x, One), z = # Nat : add(x, Two) . mul(y, z) } }";
         let mut state = State::new(s, &mut interner);
 
-        let result = user_function_declaration(&mut state);
+        let result = user_function_definition(&mut state);
         assert!(matches!(result, Ok(_)));
 
         Ok(())
@@ -362,7 +362,7 @@ mod tests {
         let s = "fn twice = forall { a, b . # Fn(a -> b), a -> b : { f, a . apply f to (apply f to (a)) }}";
         let mut state = State::new(s, &mut interner);
 
-        let result = user_function_declaration(&mut state);
+        let result = user_function_definition(&mut state);
         assert!(matches!(result, Ok(_)));
 
         Ok(())

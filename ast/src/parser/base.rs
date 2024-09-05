@@ -1,12 +1,12 @@
 use crate::base::{
-    ConstructorDeclaration, FunctionDeclaration, Program, RunDeclaration, Type, TypeDeclaration,
+    ConstructorDefinition, FunctionDefinition, Program, RunDefinition, Type, TypeDefinition,
 };
 use crate::identifier::{
     ConstructorName, FunctionName, Interner, RawIdentifier, TypeName, TypeVariable,
 };
 use crate::parser::lex::{
     lexer,
-    lexer::{DeclarationKind, LocatedToken, Request},
+    lexer::{DefinitionKind, LocatedToken, Request},
     token::Keyword,
 };
 use crate::parser::program::pre_program;
@@ -50,10 +50,10 @@ pub enum Error {
     TypeHasForbiddenName {
         received: String,
     },
-    MoreThanOneRunDeclaration,
-    RunDeclarationNotFound,
-    MsgTypeDeclarationNotFound,
-    MoreThanOneMsgTypeDeclaration,
+    MoreThanOneRunDefinition,
+    RunDefinitionNotFound,
+    MsgTypeDefinitionNotFound,
+    MoreThanOneMsgTypeDefinition,
     FunctionHasDifferentNumberOfParametersThanDeclaredInItsType {
         declared_in_type: usize,
         parameters: usize,
@@ -72,71 +72,71 @@ pub fn parse_program(s: &str) -> Result<Program> {
     let pre_program = pre_program(&mut state)?;
 
     // ===types===
-    for pre_decl in pre_program.type_declarations {
-        let decl = TypeDeclaration::new(pre_decl, &mut program.constructor_to_type_mapping);
-        program.type_declarations_ordering.push(decl.name().clone());
-        program.type_declarations.insert(decl.name().clone(), decl);
+    for pre_def in pre_program.type_defs {
+        let def = TypeDefinition::new(pre_def, &mut program.constructor_to_type_mapping);
+        program.type_definitions_ordering.push(def.name().clone());
+        program.type_definitions.insert(def.name().clone(), def);
     }
     // ===msg type====
     program.msg_type = pre_program.msg_types.into_iter().next();
 
     // ===functions===
-    for decl in pre_program.function_declarations {
-        program.function_declarations_ordering.push(decl.name());
-        program.function_declarations.insert(decl.name(), decl);
+    for def in pre_program.function_definitions {
+        program.function_definitions_ordering.push(def.name());
+        program.function_definitions.insert(def.name(), def);
     }
     // ===run====
-    program.run_declaration = pre_program.run_declarations.into_iter().next();
+    program.run_definition = pre_program.run_definitions.into_iter().next();
 
     Ok(program)
 }
 
-pub enum Declaration {
-    Type(PreTypeDeclaration),
-    Run(RunDeclaration),
-    Function(FunctionDeclaration),
-    MsgType(PreTypeDeclaration),
+pub enum Definition {
+    Type(PreTypeDefinition),
+    Run(RunDefinition),
+    Function(FunctionDefinition),
+    MsgType(PreTypeDefinition),
 }
 
 #[derive(Debug)]
 pub struct PreProgram {
-    pub type_declarations: Vec<PreTypeDeclaration>,
-    pub function_declarations: Vec<FunctionDeclaration>,
-    pub run_declarations: Vec<RunDeclaration>,
+    pub type_defs: Vec<PreTypeDefinition>,
+    pub function_definitions: Vec<FunctionDefinition>,
+    pub run_definitions: Vec<RunDefinition>,
     pub msg_types: Vec<TypeName>,
 }
 
 #[derive(Debug)]
-pub struct PreEnumDeclaration {
+pub struct PreEnumDefinition {
     pub name: TypeName,
     pub type_parameters: Vec<TypeVariable>,
-    pub constructors: Vec<ConstructorDeclaration>,
+    pub constructors: Vec<ConstructorDefinition>,
 }
 
 #[derive(Debug)]
-pub struct PreIndDeclaration {
+pub struct PreIndDefinition {
     pub name: TypeName,
     pub type_parameters: Vec<TypeVariable>,
     pub recursive_type_var: TypeVariable,
-    pub constructors: Vec<ConstructorDeclaration>,
+    pub constructors: Vec<ConstructorDefinition>,
 }
 
 #[derive(Debug)]
-pub struct PreMsgTypeDeclaration {
-    pub type_declaration: PreTypeDeclaration,
+pub struct PreMsgTypeDefinition {
+    pub type_definition: PreTypeDefinition,
 }
 
 #[derive(Debug)]
-pub enum PreTypeDeclaration {
-    Enum(PreEnumDeclaration),
-    Ind(PreIndDeclaration),
+pub enum PreTypeDefinition {
+    Enum(PreEnumDefinition),
+    Ind(PreIndDefinition),
 }
 
-impl PreTypeDeclaration {
+impl PreTypeDefinition {
     fn name(&self) -> &TypeName {
         match self {
-            Self::Enum(decl) => &decl.name,
-            Self::Ind(decl) => &decl.name,
+            Self::Enum(def) => &def.name,
+            Self::Ind(def) => &def.name,
         }
     }
 }
@@ -150,32 +150,32 @@ impl Default for PreProgram {
 impl PreProgram {
     pub fn new() -> Self {
         Self {
-            type_declarations: vec![],
-            function_declarations: vec![],
-            run_declarations: vec![],
+            type_defs: vec![],
+            function_definitions: vec![],
+            run_definitions: vec![],
             msg_types: vec![],
         }
     }
 
-    pub fn add_declaration(&mut self, decl: Declaration) {
-        use Declaration::*;
-        match decl {
-            Type(type_declaration) => self.type_declarations.push(type_declaration),
-            Run(run_declaration) => self.run_declarations.push(run_declaration),
-            Function(function_declaration) => self.function_declarations.push(function_declaration),
-            MsgType(type_declaration) => {
-                self.msg_types.push(type_declaration.name().clone());
-                self.type_declarations.push(type_declaration);
+    pub fn add_definition(&mut self, def: Definition) {
+        use Definition::*;
+        match def {
+            Type(def) => self.type_defs.push(def),
+            Run(def) => self.run_definitions.push(def),
+            Function(def) => self.function_definitions.push(def),
+            MsgType(def) => {
+                self.msg_types.push(def.name().clone());
+                self.type_defs.push(def);
             }
         }
     }
 
     pub fn type_names(&self) -> Vec<TypeName> {
         let mut names = vec![];
-        for declaration in &self.type_declarations {
-            match declaration {
-                PreTypeDeclaration::Enum(declaration) => names.push(declaration.name.clone()),
-                PreTypeDeclaration::Ind(declaration) => names.push(declaration.name.clone()),
+        for def in &self.type_defs {
+            match def {
+                PreTypeDefinition::Enum(def) => names.push(def.name.clone()),
+                PreTypeDefinition::Ind(def) => names.push(def.name.clone()),
             }
         }
         names
@@ -183,13 +183,13 @@ impl PreProgram {
 
     pub fn constructor_names(&self) -> Vec<ConstructorName> {
         let mut names = vec![];
-        for declaration in &self.type_declarations {
-            let constructors = match &declaration {
-                PreTypeDeclaration::Enum(declaration) => &declaration.constructors[..],
-                PreTypeDeclaration::Ind(declaration) => &declaration.constructors[..],
+        for def in &self.type_defs {
+            let constructors = match &def {
+                PreTypeDefinition::Enum(def) => &def.constructors[..],
+                PreTypeDefinition::Ind(def) => &def.constructors[..],
             };
-            for constructor_declaration in constructors {
-                names.push(constructor_declaration.name.clone())
+            for constructor_def in constructors {
+                names.push(constructor_def.name.clone())
             }
         }
         names
@@ -197,8 +197,8 @@ impl PreProgram {
 
     pub fn function_names(&self) -> Vec<FunctionName> {
         let mut names = vec![];
-        for declaration in &self.function_declarations {
-            names.push(declaration.name().clone())
+        for def in &self.function_definitions {
+            names.push(def.name().clone())
         }
         names
     }
@@ -286,9 +286,9 @@ impl<'lex_state, 'interner> State<'lex_state, 'interner> {
             .map_err(Error::Lex)
     }
 
-    pub fn peek_declaration_token(&mut self) -> Result<DeclarationKind> {
+    pub fn peek_definition_token(&mut self) -> Result<DefinitionKind> {
         self.lexer_state
-            .peek_declaration_token()
+            .peek_definition_token()
             .map_err(Error::Lex)
     }
 

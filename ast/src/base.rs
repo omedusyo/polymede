@@ -2,18 +2,18 @@ use crate::identifier::{
     interner, ConstructorName, ExternalName, FunctionName, Interner, RawIdentifier, TypeName,
     TypeVariable, Variable,
 };
-use crate::parser::base::PreTypeDeclaration;
+use crate::parser::base::PreTypeDefinition;
 use std::collections::HashMap;
 
 // ===Program===
 #[derive(Debug)]
 pub struct Program {
     interner: Interner,
-    pub type_declarations: HashMap<TypeName, TypeDeclaration>,
-    pub type_declarations_ordering: Vec<TypeName>,
-    pub function_declarations: HashMap<FunctionName, FunctionDeclaration>,
-    pub function_declarations_ordering: Vec<FunctionName>,
-    pub run_declaration: Option<RunDeclaration>,
+    pub type_definitions: HashMap<TypeName, TypeDefinition>,
+    pub type_definitions_ordering: Vec<TypeName>,
+    pub function_definitions: HashMap<FunctionName, FunctionDefinition>,
+    pub function_definitions_ordering: Vec<FunctionName>,
+    pub run_definition: Option<RunDefinition>,
     pub constructor_to_type_mapping: HashMap<ConstructorName, TypeName>,
     pub msg_type: Option<TypeName>,
 }
@@ -28,11 +28,11 @@ impl Program {
     pub fn new() -> Self {
         Self {
             interner: interner(),
-            type_declarations: HashMap::new(),
-            type_declarations_ordering: vec![],
-            function_declarations: HashMap::new(),
-            function_declarations_ordering: vec![],
-            run_declaration: None,
+            type_definitions: HashMap::new(),
+            type_definitions_ordering: vec![],
+            function_definitions: HashMap::new(),
+            function_definitions_ordering: vec![],
+            run_definition: None,
             constructor_to_type_mapping: HashMap::new(),
             msg_type: None,
         }
@@ -46,103 +46,103 @@ impl Program {
         &mut self.interner
     }
 
-    pub fn get_type_declaration(&self, type_name: &TypeName) -> Option<&TypeDeclaration> {
-        self.type_declarations.get(type_name)
+    pub fn get_type_definition(&self, type_name: &TypeName) -> Option<&TypeDefinition> {
+        self.type_definitions.get(type_name)
     }
 
-    pub fn get_function_declaration(
+    pub fn get_function_definition(
         &self,
         function_name: &FunctionName,
-    ) -> Option<&FunctionDeclaration> {
-        self.function_declarations.get(function_name)
+    ) -> Option<&FunctionDefinition> {
+        self.function_definitions.get(function_name)
     }
 
-    pub fn get_type_declaration_of_constructor(
+    pub fn get_type_definition_of_constructor(
         &self,
         constructor_name: &ConstructorName,
-    ) -> Option<&TypeDeclaration> {
+    ) -> Option<&TypeDefinition> {
         let type_name = self.constructor_to_type_mapping.get(constructor_name)?;
-        self.get_type_declaration(type_name)
+        self.get_type_definition(type_name)
     }
 
-    pub fn type_declarations_in_source_ordering(&self) -> Vec<&TypeDeclaration> {
+    pub fn type_definition_in_source_ordering(&self) -> Vec<&TypeDefinition> {
         let mut result = vec![];
-        for type_name in &self.type_declarations_ordering {
-            result.push(self.get_type_declaration(type_name).unwrap())
+        for type_name in &self.type_definitions_ordering {
+            result.push(self.get_type_definition(type_name).unwrap())
         }
         result
     }
 
-    pub fn get_msg_type_declaration(&self) -> &TypeDeclaration {
+    pub fn get_msg_type_definition(&self) -> &TypeDefinition {
         let Some(msg_type_name) = &self.msg_type else {
             unreachable!()
         };
-        let Some(msg_type_declaration) = self.get_type_declaration(msg_type_name) else {
+        let Some(msg_type_definition) = self.get_type_definition(msg_type_name) else {
             unreachable!()
         };
-        msg_type_declaration
+        msg_type_definition
     }
 
     pub fn get_msg_type(&self) -> Type {
-        let decl = self.get_msg_type_declaration();
-        let type_name = decl.name();
+        let def = self.get_msg_type_definition();
+        let type_name = def.name();
         Type::TypeApplication(type_name.clone(), vec![])
     }
 
-    pub fn function_declarations_in_source_ordering(&self) -> Vec<&FunctionDeclaration> {
+    pub fn function_definitions_in_source_ordering(&self) -> Vec<&FunctionDefinition> {
         let mut result = vec![];
-        for function_name in &self.function_declarations_ordering {
-            result.push(self.get_function_declaration(function_name).unwrap())
+        for function_name in &self.function_definitions_ordering {
+            result.push(self.get_function_definition(function_name).unwrap())
         }
         result
     }
 }
 
-// ===Declarations===
+// ===Definitions===
 #[derive(Debug)]
-pub struct ConstructorDeclaration {
+pub struct ConstructorDefinition {
     pub name: ConstructorName,
     pub parameters: Vec<Type>,
 }
 
 #[derive(Debug)]
-pub struct EnumDeclaration {
+pub struct EnumDefinition {
     pub name: TypeName,
     pub type_parameters: Vec<TypeVariable>,
-    pub constructors: HashMap<ConstructorName, ConstructorDeclaration>,
+    pub constructors: HashMap<ConstructorName, ConstructorDefinition>,
     pub constructors_ordering: Vec<ConstructorName>,
 }
 
 #[derive(Debug)]
-pub struct IndDeclaration {
+pub struct IndDefinition {
     pub name: TypeName,
     pub type_parameters: Vec<TypeVariable>,
     pub recursive_type_var: TypeVariable,
-    pub constructors: HashMap<ConstructorName, ConstructorDeclaration>,
+    pub constructors: HashMap<ConstructorName, ConstructorDefinition>,
     pub constructors_ordering: Vec<ConstructorName>,
 }
 
 #[derive(Debug)]
-pub enum TypeDeclaration {
-    Enum(EnumDeclaration),
-    Ind(IndDeclaration),
+pub enum TypeDefinition {
+    Enum(EnumDefinition),
+    Ind(IndDefinition),
 }
 
 #[derive(Debug)]
-pub enum FunctionDeclaration {
-    User(UserFunctionDeclaration),
-    Foreign(ForeignFunctionDeclaration),
+pub enum FunctionDefinition {
+    User(UserFunctionBinding),
+    Foreign(ForeignFunctionBinding),
 }
 
 #[derive(Debug)]
-pub struct UserFunctionDeclaration {
+pub struct UserFunctionBinding {
     pub name: FunctionName,
     pub type_parameters: Vec<TypeVariable>,
     pub function: TypedFunction,
 }
 
 #[derive(Debug)]
-pub struct ForeignFunctionDeclaration {
+pub struct ForeignFunctionBinding {
     pub name: FunctionName,
     pub type_: FunctionType,
     pub external_name: ExternalName,
@@ -161,7 +161,7 @@ pub struct Function {
 }
 
 #[derive(Debug)]
-pub struct RunDeclaration {
+pub struct RunDefinition {
     pub body: TypedTerm,
 }
 
@@ -230,41 +230,41 @@ pub enum DoBinding {
     Bind(Variable, Term),
 }
 
-impl TypeDeclaration {
+impl TypeDefinition {
     pub fn new(
-        pre_decl: PreTypeDeclaration,
+        pre_def: PreTypeDefinition,
         constructor_to_type_mapping: &mut HashMap<ConstructorName, TypeName>,
     ) -> Self {
-        match pre_decl {
-            PreTypeDeclaration::Enum(pre_decl) => {
+        match pre_def {
+            PreTypeDefinition::Enum(pre_def) => {
                 let mut constructors = HashMap::new();
                 let mut constructors_ordering = vec![];
-                for constructor_decl in pre_decl.constructors {
+                for constructor_def in pre_def.constructors {
                     constructor_to_type_mapping
-                        .insert(constructor_decl.name.clone(), pre_decl.name.clone());
-                    constructors_ordering.push(constructor_decl.name.clone());
-                    constructors.insert(constructor_decl.name.clone(), constructor_decl);
+                        .insert(constructor_def.name.clone(), pre_def.name.clone());
+                    constructors_ordering.push(constructor_def.name.clone());
+                    constructors.insert(constructor_def.name.clone(), constructor_def);
                 }
-                Self::Enum(EnumDeclaration {
-                    name: pre_decl.name,
-                    type_parameters: pre_decl.type_parameters,
+                Self::Enum(EnumDefinition {
+                    name: pre_def.name,
+                    type_parameters: pre_def.type_parameters,
                     constructors,
                     constructors_ordering,
                 })
             }
-            PreTypeDeclaration::Ind(pre_decl) => {
+            PreTypeDefinition::Ind(pre_def) => {
                 let mut constructors = HashMap::new();
                 let mut constructors_ordering = vec![];
-                for constructor_decl in pre_decl.constructors {
+                for constructor_def in pre_def.constructors {
                     constructor_to_type_mapping
-                        .insert(constructor_decl.name.clone(), pre_decl.name.clone());
-                    constructors_ordering.push(constructor_decl.name.clone());
-                    constructors.insert(constructor_decl.name.clone(), constructor_decl);
+                        .insert(constructor_def.name.clone(), pre_def.name.clone());
+                    constructors_ordering.push(constructor_def.name.clone());
+                    constructors.insert(constructor_def.name.clone(), constructor_def);
                 }
-                Self::Ind(IndDeclaration {
-                    name: pre_decl.name,
-                    recursive_type_var: pre_decl.recursive_type_var,
-                    type_parameters: pre_decl.type_parameters,
+                Self::Ind(IndDefinition {
+                    name: pre_def.name,
+                    recursive_type_var: pre_def.recursive_type_var,
+                    type_parameters: pre_def.type_parameters,
                     constructors,
                     constructors_ordering,
                 })
@@ -273,23 +273,23 @@ impl TypeDeclaration {
     }
 
     pub fn name(&self) -> &TypeName {
-        use TypeDeclaration::*;
+        use TypeDefinition::*;
         match self {
-            Enum(decl) => &decl.name,
-            Ind(decl) => &decl.name,
+            Enum(def) => &def.name,
+            Ind(def) => &def.name,
         }
     }
 
     pub fn arity(&self) -> usize {
-        use TypeDeclaration::*;
+        use TypeDefinition::*;
         match self {
-            Enum(decl) => decl.type_parameters.len(),
-            Ind(decl) => decl.type_parameters.len(),
+            Enum(def) => def.type_parameters.len(),
+            Ind(def) => def.type_parameters.len(),
         }
     }
 
     // WARNING: Assumes number of elements of `type_args` matches arity of the constructor.
-    // e.g. consider type declaration
+    // e.g. consider type definitions
     //   type BinTree(a, b) = ind { tree .
     //   | Leaf(a)
     //   | Branch(b, Fn(Two -> tree))
@@ -300,11 +300,11 @@ impl TypeDeclaration {
         &self,
         constructor_name: &ConstructorName,
         type_args: &[Type],
-    ) -> Option<(&ConstructorDeclaration, Vec<Type>)> {
-        use TypeDeclaration::*;
+    ) -> Option<(&ConstructorDefinition, Vec<Type>)> {
+        use TypeDefinition::*;
         match self {
-            Enum(decl) => decl.type_apply_constructor(constructor_name, type_args),
-            Ind(decl) => decl.type_apply_constructor(
+            Enum(def) => def.type_apply_constructor(constructor_name, type_args),
+            Ind(def) => def.type_apply_constructor(
                 constructor_name,
                 type_args,
                 &Type::TypeApplication(self.name().clone(), type_args.to_vec()),
@@ -312,19 +312,19 @@ impl TypeDeclaration {
         }
     }
 
-    pub fn constructors(&self) -> &HashMap<ConstructorName, ConstructorDeclaration> {
-        use TypeDeclaration::*;
+    pub fn constructors(&self) -> &HashMap<ConstructorName, ConstructorDefinition> {
+        use TypeDefinition::*;
         match self {
-            Enum(decl) => &decl.constructors,
-            Ind(decl) => &decl.constructors,
+            Enum(def) => &def.constructors,
+            Ind(def) => &def.constructors,
         }
     }
 
-    pub fn constructors_in_source_ordering(&self) -> Vec<&ConstructorDeclaration> {
-        use TypeDeclaration::*;
+    pub fn constructors_in_source_ordering(&self) -> Vec<&ConstructorDefinition> {
+        use TypeDefinition::*;
         match self {
-            Enum(decl) => decl.constructors_in_source_ordering(),
-            Ind(decl) => decl.constructors_in_source_ordering(),
+            Enum(def) => def.constructors_in_source_ordering(),
+            Ind(def) => def.constructors_in_source_ordering(),
         }
     }
 }
@@ -336,7 +336,7 @@ impl Type {
         match self {
             VariableUse(_) => true,
             TypeApplication(_type_name, types) => {
-                // TODO: This is not sufficient. We need to have access to the declaration of
+                // TODO: This is not sufficient. We need to have access to the definition of
                 // `_type_name` and that needs to be a value type too. Would be nice if this
                 // information was precomputed. Also you need some sort of loop check for mutually
                 // recursive types.
@@ -356,29 +356,29 @@ impl Type {
     }
 }
 
-impl EnumDeclaration {
+impl EnumDefinition {
     pub fn type_apply_constructor(
         &self,
         constructor_name: &ConstructorName,
         type_args: &[Type],
-    ) -> Option<(&ConstructorDeclaration, Vec<Type>)> {
-        let constructor_decl = self.constructors.get(constructor_name)?;
-        let specialized_constructor_type_arguments: Vec<Type> = constructor_decl
+    ) -> Option<(&ConstructorDefinition, Vec<Type>)> {
+        let constructor_def = self.constructors.get(constructor_name)?;
+        let specialized_constructor_type_arguments: Vec<Type> = constructor_def
             .parameters
             .iter()
             .map(|type_body| type_apply(&self.type_parameters, type_body, type_args))
             .collect();
-        Some((constructor_decl, specialized_constructor_type_arguments))
+        Some((constructor_def, specialized_constructor_type_arguments))
     }
 
     pub fn get_constructor(
         &self,
         constructor_name: &ConstructorName,
-    ) -> Option<&ConstructorDeclaration> {
+    ) -> Option<&ConstructorDefinition> {
         self.constructors.get(constructor_name)
     }
 
-    pub fn constructors_in_source_ordering(&self) -> Vec<&ConstructorDeclaration> {
+    pub fn constructors_in_source_ordering(&self) -> Vec<&ConstructorDefinition> {
         let mut result = vec![];
         for constructor_name in &self.constructors_ordering {
             let cons = self.get_constructor(constructor_name).unwrap();
@@ -388,14 +388,14 @@ impl EnumDeclaration {
     }
 }
 
-impl IndDeclaration {
+impl IndDefinition {
     pub fn type_apply_constructor(
         &self,
         constructor_name: &ConstructorName,
         type_args: &[Type],
         recursive_type: &Type,
-    ) -> Option<(&ConstructorDeclaration, Vec<Type>)> {
-        let constructor_decl = self.constructors.get(constructor_name)?;
+    ) -> Option<(&ConstructorDefinition, Vec<Type>)> {
+        let constructor_def = self.constructors.get(constructor_name)?;
 
         // TODO: This assumes that type_parameters + rec_type_var are all unique, and that
         // the rec_type_var doesn't shadow anything. But I don't yet check this!
@@ -405,22 +405,22 @@ impl IndDeclaration {
         let mut type_args: Vec<Type> = type_args.to_vec();
         type_args.push(recursive_type.clone());
 
-        let specialized_constructor_type_arguments: Vec<Type> = constructor_decl
+        let specialized_constructor_type_arguments: Vec<Type> = constructor_def
             .parameters
             .iter()
             .map(|type_body| type_apply(&type_parameters, type_body, &type_args))
             .collect();
-        Some((constructor_decl, specialized_constructor_type_arguments))
+        Some((constructor_def, specialized_constructor_type_arguments))
     }
 
     pub fn get_constructor(
         &self,
         constructor_name: &ConstructorName,
-    ) -> Option<&ConstructorDeclaration> {
+    ) -> Option<&ConstructorDefinition> {
         self.constructors.get(constructor_name)
     }
 
-    pub fn constructors_in_source_ordering(&self) -> Vec<&ConstructorDeclaration> {
+    pub fn constructors_in_source_ordering(&self) -> Vec<&ConstructorDefinition> {
         let mut result = vec![];
         for constructor_name in &self.constructors_ordering {
             let cons = self.get_constructor(constructor_name).unwrap();
@@ -430,16 +430,16 @@ impl IndDeclaration {
     }
 }
 
-impl FunctionDeclaration {
+impl FunctionDefinition {
     pub fn name(&self) -> FunctionName {
         match self {
-            Self::User(decl) => decl.name(),
-            Self::Foreign(decl) => decl.name(),
+            Self::User(def) => def.name(),
+            Self::Foreign(def) => def.name(),
         }
     }
 }
 
-impl UserFunctionDeclaration {
+impl UserFunctionBinding {
     pub fn name(&self) -> FunctionName {
         self.name.clone()
     }
@@ -469,7 +469,7 @@ impl UserFunctionDeclaration {
     }
 }
 
-impl ForeignFunctionDeclaration {
+impl ForeignFunctionBinding {
     pub fn name(&self) -> FunctionName {
         self.name.clone()
     }
@@ -479,7 +479,7 @@ impl ForeignFunctionDeclaration {
     }
 }
 
-impl ConstructorDeclaration {
+impl ConstructorDefinition {
     pub fn arity(&self) -> usize {
         self.parameters.len()
     }

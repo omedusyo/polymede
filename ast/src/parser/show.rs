@@ -1,6 +1,6 @@
 use crate::base::{
-    ConstructorDeclaration, EnumDeclaration, FunctionDeclaration, FunctionType, IndDeclaration,
-    Program, RunDeclaration, Type, TypeDeclaration,
+    ConstructorDefinition, EnumDefinition, FunctionDefinition, FunctionType, IndDefinition,
+    Program, RunDefinition, Type, TypeDefinition,
 };
 use crate::identifier::{Identifier, Interner};
 
@@ -17,80 +17,80 @@ impl<'show> Show<'show> {
         self.interner
     }
 
-    pub fn show_program_declarations(&self, program: &Program) -> String {
-        let type_declarations = program
-            .type_declarations_in_source_ordering()
+    pub fn show_program_definitions(&self, program: &Program) -> String {
+        let type_definitions = program
+            .type_definition_in_source_ordering()
             .iter()
-            .map(|decl| self.show_type_declaration(decl))
+            .map(|def| self.show_type_definition(def))
             .collect::<Vec<_>>()
             .join("\n\n");
-        let function_declarations = program
-            .function_declarations_in_source_ordering()
+        let function_definitions = program
+            .function_definitions_in_source_ordering()
             .iter()
-            .map(|decl| self.show_function_declaration(decl))
+            .map(|def| self.show_function_definition(def))
             .collect::<Vec<_>>()
             .join("\n");
-        let run_declaration = program
-            .run_declaration
+        let run_definition = program
+            .run_definition
             .iter()
-            .map(|decl| self.show_run_declaration(decl))
+            .map(|def| self.show_run_definition(def))
             .collect::<Vec<_>>()
             .join("\n");
-        format!("{type_declarations}\n\n{function_declarations}\n{run_declaration}")
+        format!("{type_definitions}\n\n{function_definitions}\n{run_definition}")
     }
 
-    fn show_type_declaration(&self, type_declaration: &TypeDeclaration) -> String {
-        use TypeDeclaration::*;
-        match type_declaration {
-            Enum(enum_declaration) => self.show_enum_declaration(enum_declaration),
-            Ind(ind_declaration) => self.show_ind_declaration(ind_declaration),
+    fn show_type_definition(&self, type_definition: &TypeDefinition) -> String {
+        use TypeDefinition::*;
+        match type_definition {
+            Enum(enum_definition) => self.show_enum_definition(enum_definition),
+            Ind(ind_definition) => self.show_ind_definition(ind_definition),
         }
     }
 
-    fn show_enum_declaration(&self, declaration: &EnumDeclaration) -> String {
-        let name_str = declaration.name.str(self.interner());
-        let constructor_strs = declaration
+    fn show_enum_definition(&self, definition: &EnumDefinition) -> String {
+        let name_str = definition.name.str(self.interner());
+        let constructor_strs = definition
             .constructors_in_source_ordering()
             .iter()
-            .map(|decl| self.show_constructor_declaration(decl))
+            .map(|def| self.show_constructor_definition(def))
             .collect::<Vec<_>>()
             .join("\n");
         let after_equals_str = format!("enum {{\n{constructor_strs}\n}}");
-        if declaration.type_parameters.is_empty() {
+        if definition.type_parameters.is_empty() {
             format!("type {name_str} = {after_equals_str}")
         } else {
-            let parameter_strs = self.show_sequence_of_identifiers(&declaration.type_parameters);
+            let parameter_strs = self.show_sequence_of_identifiers(&definition.type_parameters);
             format!("type {name_str}({parameter_strs}) = {after_equals_str}")
         }
     }
 
-    fn show_ind_declaration(&self, declaration: &IndDeclaration) -> String {
-        let name_str = declaration.name.str(self.interner());
-        let rec_var_str = declaration.recursive_type_var.str(self.interner());
-        let constructor_strs = declaration
+    fn show_ind_definition(&self, definition: &IndDefinition) -> String {
+        let name_str = definition.name.str(self.interner());
+        let rec_var_str = definition.recursive_type_var.str(self.interner());
+        let constructor_strs = definition
             .constructors_in_source_ordering()
             .iter()
-            .map(|decl| self.show_constructor_declaration(decl))
+            .map(|def| self.show_constructor_definition(def))
             .collect::<Vec<_>>()
             .join("\n");
         let after_equals_str = format!("ind {{ {rec_var_str} .\n{constructor_strs}\n}}");
-        if declaration.type_parameters.is_empty() {
+        if definition.type_parameters.is_empty() {
             format!("type {name_str} = {after_equals_str}")
         } else {
-            let parameter_strs = self.show_sequence_of_identifiers(&declaration.type_parameters);
+            let parameter_strs = self.show_sequence_of_identifiers(&definition.type_parameters);
             format!("type {name_str}({parameter_strs}) = {after_equals_str}")
         }
     }
 
-    fn show_constructor_declaration(
+    fn show_constructor_definition(
         &self,
-        constructor_declaration: &ConstructorDeclaration,
+        constructor_definition: &ConstructorDefinition,
     ) -> String {
-        let name_str = constructor_declaration.name.str(self.interner());
-        if constructor_declaration.parameters.is_empty() {
+        let name_str = constructor_definition.name.str(self.interner());
+        if constructor_definition.parameters.is_empty() {
             format!("| {name_str}")
         } else {
-            let parameter_strs = constructor_declaration
+            let parameter_strs = constructor_definition
                 .parameters
                 .iter()
                 .map(|type_| self.show_type(type_))
@@ -108,29 +108,29 @@ impl<'show> Show<'show> {
             .join(", ")
     }
 
-    fn show_function_declaration(&self, declaration: &FunctionDeclaration) -> String {
-        let fn_name = declaration.name();
+    fn show_function_definition(&self, definition: &FunctionDefinition) -> String {
+        let fn_name = definition.name();
         let name_str = fn_name.str(self.interner());
-        match declaration {
-            FunctionDeclaration::User(declaration) => {
-                let type_ = self.show_function_type(&declaration.function.type_);
-                if declaration.type_parameters.is_empty() {
+        match definition {
+            FunctionDefinition::User(definition) => {
+                let type_ = self.show_function_type(&definition.function.type_);
+                if definition.type_parameters.is_empty() {
                     format!("fn {name_str} : {type_} ")
                 } else {
                     let type_var_strs =
-                        self.show_sequence_of_identifiers(&declaration.type_parameters);
+                        self.show_sequence_of_identifiers(&definition.type_parameters);
                     format!("fn {name_str} : forall {{ {type_var_strs} . {type_} }}")
                 }
             }
-            FunctionDeclaration::Foreign(declaration) => {
-                let type_ = self.show_function_type(&declaration.type_);
+            FunctionDefinition::Foreign(definition) => {
+                let type_ = self.show_function_type(&definition.type_);
                 format!("fn {name_str} : {type_} ")
             }
         }
     }
 
-    fn show_run_declaration(&self, declaration: &RunDeclaration) -> String {
-        let type_ = self.show_type(&declaration.body.type_);
+    fn show_run_definition(&self, definition: &RunDefinition) -> String {
+        let type_ = self.show_type(&definition.body.type_);
         format!("run {type_} ")
     }
 
