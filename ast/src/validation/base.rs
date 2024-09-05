@@ -16,7 +16,7 @@ pub enum Error {
     UndefinedTypeVariable {
         variable: TypeVariable,
     },
-    NegativeOccuranceOfRecursiveTypeVariableInInductiveDeclaration {
+    NegativeOccuranceOfRecursiveTypeVariableInInductiveDefinition {
         variable: TypeVariable,
     },
     MsgTypeIsNotValueType {
@@ -49,7 +49,7 @@ pub enum Error {
     TermIsCommandButExpectedTypeIsNotCommandType {
         expected_type: Type,
     },
-    ConstructorDoesntBelongToExpectedTypeDeclaration {
+    ConstructorDoesntBelongToExpectedTypeDefinition {
         constructor_name: ConstructorName,
         type_name: TypeName,
     },
@@ -122,7 +122,7 @@ pub enum Error {
 }
 
 #[derive(Debug)]
-pub enum ErrorInDeclaration {
+pub enum ErrorInDefinition {
     Type(TypeName, Error),
     Function(FunctionName, Error),
     Run(Error),
@@ -144,8 +144,8 @@ impl Error {
                 "Undefined type variable '{}'.",
                 sh.show_identifier(variable)
             ),
-            NegativeOccuranceOfRecursiveTypeVariableInInductiveDeclaration { variable } => format!(
-                "Negative occurance of self type variable {} in inductive type declaration.",
+            NegativeOccuranceOfRecursiveTypeVariableInInductiveDefinition { variable } => format!(
+                "Negative occurance of self type variable {} in inductive type definition.",
                 sh.show_identifier(variable)
             ),
             MsgTypeIsNotValueType { received_type } => format!(
@@ -204,11 +204,11 @@ impl Error {
                 "Term is a command, but its expected type is {}.",
                 sh.show_type(expected_type)
             ),
-            ConstructorDoesntBelongToExpectedTypeDeclaration {
+            ConstructorDoesntBelongToExpectedTypeDefinition {
                 constructor_name,
                 type_name,
             } => format!(
-                "Constructor '{}' doesn't belong to type declaration '{}'.",
+                "Constructor '{}' doesn't belong to type definition '{}'.",
                 sh.show_identifier(constructor_name),
                 sh.show_identifier(type_name)
             ),
@@ -308,7 +308,7 @@ impl Error {
     }
 }
 
-impl ErrorInDeclaration {
+impl ErrorInDefinition {
     pub fn show(&self, sh: &Show) -> String {
         match self {
             Self::Type(name, e) => {

@@ -174,8 +174,8 @@ impl State {
 pub fn compile(program: &polymede::Program) -> gmm::Program {
     let mut state = State::new();
     // ===Constructor Name ~> Constructor Index===
-    for decl in program.type_declarations_in_source_ordering() {
-        for (count, constructor) in decl
+    for def in program.type_definition_in_source_ordering() {
+        for (count, constructor) in def
             .constructors_in_source_ordering()
             .into_iter()
             .enumerate()
@@ -187,18 +187,18 @@ pub fn compile(program: &polymede::Program) -> gmm::Program {
     }
 
     // ===Function Name ~> Function Index===
-    for (next_function_index, decl) in program
-        .function_declarations_in_source_ordering()
+    for (next_function_index, def) in program
+        .function_definitions_in_source_ordering()
         .into_iter()
         .enumerate()
     {
         state
             .function_mapping
-            .insert(decl.name(), next_function_index);
+            .insert(def.name(), next_function_index);
     }
 
     // ===Main===
-    let Some(run) = &program.run_declaration else {
+    let Some(run) = &program.run_definition else {
         unreachable!()
     };
     let main = compile_typed_term(
@@ -209,18 +209,18 @@ pub fn compile(program: &polymede::Program) -> gmm::Program {
     // ===Functions===
     let mut functions: Vec<gmm::FunctionOrImport> =
         Vec::with_capacity(state.function_mapping.len());
-    for decl in program.function_declarations_in_source_ordering() {
-        match decl {
-            polymede::FunctionDeclaration::User(decl) => {
+    for def in program.function_definitions_in_source_ordering() {
+        match def {
+            polymede::FunctionDefinition::User(def) => {
                 functions.push(gmm::FunctionOrImport::Fn(compile_function(
                     &mut state,
-                    &desugared_polymede::desugar_function(&decl.function.function),
+                    &desugared_polymede::desugar_function(&def.function.function),
                 )));
             }
-            polymede::FunctionDeclaration::Foreign(decl) => {
+            polymede::FunctionDefinition::Foreign(def) => {
                 let gmm_import = gmm::FunctionImport {
-                    number_of_parameters: decl.type_.input_types.len(),
-                    external_name: decl.external_name.str(program.interner()).to_string(),
+                    number_of_parameters: def.type_.input_types.len(),
+                    external_name: def.external_name.str(program.interner()).to_string(),
                 };
                 functions.push(gmm::FunctionOrImport::Import(gmm_import));
             }

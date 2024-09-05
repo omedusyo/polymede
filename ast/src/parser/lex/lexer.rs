@@ -29,8 +29,8 @@ pub enum Error {
     ExpectedValidUnicodeSequenceInStringLiteral { found: String },
     ExpectedOpeningBraceForUnicodeSequenceInStringLiteral { found: String },
     ExpectedClosingBraceForUnicodeSequenceInStringLiteral { found: String },
-    ExpectedDeclarationKeyword,
-    ExpectedTypeDeclarationKeyword,
+    ExpectedDefinitionKeyword,
+    ExpectedTypeDefinitionKeyword,
     Int32LiteralOutOfBounds,
 }
 
@@ -78,7 +78,7 @@ pub enum Request {
     CloseCurly,
     Quote,
     Keyword(token::Keyword),
-    TypeDeclarationKeyword,
+    TypeDefinitionKeyword,
     Identifier,
     Separator(SeparatorSymbol),
     BindingSeparator,
@@ -86,7 +86,7 @@ pub enum Request {
 }
 
 #[derive(Debug)]
-pub enum DeclarationKind {
+pub enum DefinitionKind {
     Type,
     Run,
     UserFunction,
@@ -240,14 +240,14 @@ impl<'state> State<'state> {
             Request::CloseCurly => self.match_string("}", request, Token::CloseCurly),
             Request::Quote => self.match_string("\"", request, Token::CloseCurly),
             Request::Keyword(keyword) => self.match_keyword(request, keyword),
-            Request::TypeDeclarationKeyword => {
+            Request::TypeDefinitionKeyword => {
                 let c = self.read_char_or_fail_when_end()?;
                 if c == 'e' {
                     self.match_keyword(request, token::Keyword::Enum)
                 } else if c == 'i' {
                     self.match_keyword(request, token::Keyword::Ind)
                 } else {
-                    self.error(Error::ExpectedTypeDeclarationKeyword)
+                    self.error(Error::ExpectedTypeDefinitionKeyword)
                 }
             }
             Request::Identifier => {
@@ -380,25 +380,25 @@ impl<'state> State<'state> {
         }
     }
 
-    pub fn peek_declaration_token(&mut self) -> Result<DeclarationKind> {
+    pub fn peek_definition_token(&mut self) -> Result<DefinitionKind> {
         self.consume_whitespace();
         let c = self.read_char_or_fail_when_end()?;
         match c {
-            't' => Ok(DeclarationKind::Type),
-            'r' => Ok(DeclarationKind::Run),
-            'm' => Ok(DeclarationKind::MsgType),
+            't' => Ok(DefinitionKind::Type),
+            'r' => Ok(DefinitionKind::Run),
+            'm' => Ok(DefinitionKind::MsgType),
             'f' => {
                 let saved_state = self.save_copy();
                 self.advance();
                 let c = self.read_char_or_fail_when_end()?;
                 *self = saved_state;
                 match c {
-                    'o' => Ok(DeclarationKind::ForeignFunction),
-                    'n' => Ok(DeclarationKind::UserFunction),
-                    _ => self.error(Error::ExpectedDeclarationKeyword),
+                    'o' => Ok(DefinitionKind::ForeignFunction),
+                    'n' => Ok(DefinitionKind::UserFunction),
+                    _ => self.error(Error::ExpectedDefinitionKeyword),
                 }
             }
-            _ => self.error(Error::ExpectedDeclarationKeyword),
+            _ => self.error(Error::ExpectedDefinitionKeyword),
         }
     }
 
